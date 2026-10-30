@@ -13,6 +13,7 @@ Sections 1 to 3 describe what the collections contain. Section 5 describes how t
 | Principles | The four collections and how they reference each other | `collections` |
 | 1 | Primitives: color palettes, sizes, typography, opacity | `primitives` |
 | 1.1.8 | How palettes are named | `primitives.paletteNaming` |
+| 1.1.9 | Tinted neutral palettes | `primitives.neutralTint` |
 | 2 | Theme collection: roles, alpha tokens, typography, sizes | `theme` |
 | 3 | Appearance collection: tokens, scopes, contrast pairings | `appearance` |
 | 3.5 | ColorScheme collection (Android) | `colorScheme` |
@@ -79,7 +80,7 @@ The Primitives collection holds four types of tokens: Color, Size, Typography, a
 #### 1.1.1 Naming and value rules
 
 - Naming: `Color/{Hue}/{Step}`, with PascalCase hue names. Example: `Color/Red/500`.
-- Hue names are chosen by the plugin from the hue of the supplied HEX (section 1.1.8). The user never types or sees them in the form. Gray, Black, and White are fixed.
+- Hue names are chosen by the plugin from the hue of the supplied HEX (section 1.1.8). The user never types or sees them in the form. Gray, Black, and White are fixed. Tinted neutral palettes have their own names (section 1.1.9).
 - Primitives carry no meaning. A Primitive name must not describe usage. Use `Color/Red/500`, not `Color/Error/500`.
 - Base neutrals are `Color/Black` and `Color/White`. Every other Primitive belongs to a hue scale.
 - Figma type: COLOR.
@@ -129,23 +130,23 @@ Each step has a target lightness (OKLCH L). The brand palette keeps the brand co
 
 #### 1.1.5 Contrast requirements
 
-Each row pairs a text step of the palette under validation with a background step. The background is a step of Color/Gray, or a step of the same palette when the background palette is "self". These pairings apply to every palette, including the brand and status palettes.
+Each row pairs a text step of the palette under validation with a background step. The background is a step of the theme's neutral palette (Color/Gray, or the theme's tinted neutral, section 1.1.9), or a step of the same palette when the background palette is "self". These pairings apply to every palette, including the brand and status palettes. A palette used by several themes, such as a status color shared by two themes, must meet each pairing against the neutral of every one of them.
 
 | Text step | Background step | Background palette | Minimum contrast | Target contrast |
 |---|---|---|---|---|
-| 500 | 100 | Color/Gray | 4.5:1 | 4.7:1 |
-| 700 | 200 | Color/Gray | 7:1 | 8:1 |
-| 300 | 700 | Color/Gray | 4.5:1 | 6:1 |
-| 150 | 700 | Color/Gray | 7:1 | 9.5:1 |
+| 500 | 100 | Theme neutral | 4.5:1 | 4.7:1 |
+| 700 | 200 | Theme neutral | 7:1 | 8:1 |
+| 300 | 700 | Theme neutral | 4.5:1 | 6:1 |
+| 150 | 700 | Theme neutral | 7:1 | 9.5:1 |
 | 500 | 100 | Same palette (self) | 4.5:1 | 4.5:1 |
 
-> Note: The same-palette pairing protects `color/text/{role}/bold` on `color/bg/{role}/softer` in Light (section 3.4). Step 100 of a palette can be darker than Color/Gray/100, for example when the supplied color is very light and becomes the anchor at step 100.
+> Note: The same-palette pairing protects `color/text/{role}/bold` on `color/bg/{role}/softer` in Light (section 3.4). Step 100 of a palette can be darker than neutral step 100, for example when the supplied color is very light and becomes the anchor at step 100.
 
 Minimum ratios are hard requirements. Target ratios are optimization goals. The method for calculating contrast is defined in section 5.7.
 
 #### 1.1.6 Gray palette
 
-Color/Gray is the neutral palette for every theme. Its values are fixed and are not generated. No other neutral palette exists in this system. Its lightness values are its own; they do not follow the target lightness curve in section 1.1.4.
+Color/Gray is the default neutral palette of every theme. Its values are fixed and are not generated. A theme can instead use a tinted neutral (section 1.1.9), which keeps Gray's lightness and adds a slight hue. Gray's lightness values are its own; they do not follow the target lightness curve in section 1.1.4.
 
 | Token name | Value | Luminance (L) |
 |---|---|---|
@@ -193,6 +194,53 @@ Rules, applied to the colors one at a time in a fixed order: theme by theme, and
 3. **New palette.** Otherwise the color makes a new palette, named after its hue's range. If that name is already taken, it takes the nearest free name in the list. If the two nearest free names are equally far, the one closer to 240° (the colder side) wins. If all 60 names are taken, generation stops as `missing_input`.
 4. **Similar palettes.** After the palettes are generated, each one is compared with the palettes made before it. When no step differs from the same step of an earlier palette by more than 0.03 (OKLab distance, as in section 5.3 step 5), it is reported as `similar_palette` (warning), because the two palettes look almost the same. The finished palettes are compared, not the hues: HSL hues are uneven around the circle, so two colors far apart in HSL can still make almost the same palette (for example `#FF0026` and `#BD4242`, 8.9° apart). The plugin form shows the same notice next to the color before anything is generated.
 5. **Renamed palettes.** The plugin remembers which color (theme and role) made each palette. When a later run gives that color's palette a new name, and no palette of the new run uses the old name, the plugin renames the old palette's variables in place: `Color/Old/{step}` becomes `Color/New/{step}`. Layers and aliases that use them are kept. If a variable with the new name already exists, the old palette is not renamed and is reported as `orphan_variable`. Nothing is deleted.
+
+#### 1.1.9 Tinted neutral palettes
+
+A theme's neutral palette can carry a slight hue, so its grays look warmer or cooler while staying gray. The user picks a neutral color per theme (section 5.1). Only its hue is used: every tinted neutral has the same, small chroma. A plain gray (R, G, and B equal) gives the fixed Color/Gray palette. The values are in `tokens.json`, under `primitives.neutralTint`.
+
+Each step of a tinted neutral:
+
+1. Takes the OKLCH L of the same Color/Gray step (section 1.1.6), so it keeps Gray's lightness.
+2. Takes the neutral color's OKLCH hue, rounded to one decimal place.
+3. Takes the chroma 0.015, faded toward the lightest and darkest steps:
+
+| Step | 50 | 100 | 150 | 200 to 800 | 850 | 900 | 950 |
+|---|---|---|---|---|---|---|---|
+| Share of 0.015 | 55% | 75% | 90% | 100% | 90% | 75% | 55% |
+
+4. Is gamut-clamped like every other palette (section 5.5).
+
+Tinted neutrals are named from their own list of 24 single-word names, one every 15° of HSL hue. Each name covers its center ±7.5°. The rules are those of section 1.1.8: a neutral color within 1° of a tinted neutral already named shares it; otherwise it takes the name of its range, or the nearest free name. The list is in `tokens.json`, under `primitives.neutralTint.naming`. Names are single words, and none of them is a palette name of section 1.1.8.
+
+| Name | Center hue |
+|---|---|
+| Rosewood | 0° |
+| Clay | 15° |
+| Taupe | 30° |
+| Sand | 45° |
+| Khaki | 60° |
+| Lichen | 75° |
+| Moss | 90° |
+| Sage | 105° |
+| Celadon | 120° |
+| Eucalyptus | 135° |
+| Willow | 150° |
+| Agave | 165° |
+| Glacier | 180° |
+| Mist | 195° |
+| Slate | 210° |
+| Steel | 225° |
+| Flint | 240° |
+| Storm | 255° |
+| Smoke | 270° |
+| Heather | 285° |
+| Mauve | 300° |
+| Thistle | 315° |
+| Quartz | 330° |
+| Cameo | 345° |
+
+Every palette of a theme is calibrated against that theme's neutral (section 1.1.5).
 
 ---
 
@@ -288,7 +336,7 @@ Opacity Primitives are stored as integer percentages from 0 to 100. Figma type: 
 
 Theme tokens are the first semantic layer. Their names describe a general role, such as `brand`, `danger`, or `border-radius`. Their values are always references to Primitives.
 
-Every theme resolves the same token names to different Primitives. The palettes for each theme come from user input (section 5.1). The neutral role is the exception: it resolves to Color/Gray in every theme.
+Every theme resolves the same token names to different Primitives. The palettes for each theme come from user input (section 5.1). The neutral role resolves to Color/Gray, unless the theme has a tinted neutral (section 1.1.9).
 
 > Note: The tables in this section show Theme A and Theme B as examples. Each further theme (Theme C, Theme D, and so on) follows the same rule as the columns shown. These are the default mode names. The user can rename any theme (section 5.1); a renamed theme keeps its Figma mode (section 5.8).
 
@@ -324,7 +372,7 @@ Naming: `color/{role}/{step}`, in lowercase, where `{role}` is always a single w
 
 | Role | Purpose | Theme A palette | Theme B palette |
 |---|---|---|---|
-| neutral | Grays, including black and white | Color/Gray | Color/Gray |
+| neutral | Grays, including black and white | Color/Gray or a tinted neutral | Color/Gray or a tinted neutral |
 | brand | Primary brand hue | User input | User input |
 | success | Confirmation, positive states | User input | User input |
 | danger | Errors, destructive actions | User input | User input |
@@ -332,7 +380,7 @@ Naming: `color/{role}/{step}`, in lowercase, where `{role}` is always a single w
 | info | Neutral informational messages and highlights | User input | User input |
 | {custom role} | A color the user adds, such as `promo` | User input | User input |
 
-> Note: Every palette except neutral is named and colored by the user for each theme (section 5.1). Neutral is always Color/Gray. A custom role is named once for the file, and each theme gives it its own palette. It follows every rule of a status role in this section and in section 3.
+> Note: Every palette is colored by the user for each theme (section 5.1) and named by the plugin. Neutral is Color/Gray unless the theme's neutral color has a hue (section 1.1.9). Black and white are always Color/Black and Color/White. A custom role is named once for the file, and each theme gives it its own palette. It follows every rule of a status role in this section and in section 3.
 
 #### Expansion rule
 
@@ -809,6 +857,7 @@ The plugin asks for each input below. Every palette input is a HEX value. The pl
 | Number of themes | Global | Mandatory | Integer, 1 to 26 | None |
 | Theme names | Global | Optional | One name per theme | Theme A, Theme B, ... |
 | Brand color | Per theme | Mandatory | HEX | None |
+| Neutral color | Per theme | Optional | HEX (only its hue is used) | #808080 (plain gray: Color/Gray) |
 | Status roles | Global | Optional | Any of: success, danger, warning, info | All four |
 | Status colors (success, danger, warning, info) | Per theme | Mandatory for each status role in use | HEX, each | None |
 | Font families | Per theme | Mandatory | String | None |
@@ -822,7 +871,7 @@ The plugin asks for each input below. Every palette input is a HEX value. The pl
 
 Rules for inputs:
 
-- Neutral is not an input. The neutral palette is Color/Gray in every theme.
+- The neutral color is optional, one per theme. Only its hue is used. A plain gray (R, G, and B equal), the default, gives the fixed Color/Gray palette. Any other color gives a tinted neutral (section 1.1.9). An invalid HEX stops generation as `invalid_hex`.
 - Status roles choose which of success, danger, warning, and info exist, for all themes at once. Brand and neutral always exist. For a status role that is not in use, no status color is asked for and nothing is generated for it: no Primitive palette, no Theme `color/{role}/...` tokens or alpha tokens, and no Appearance tokens whose name contains the role (such as `color/bg/warning/soft`, `color/text/warning/bold`, `color/border/warning`, and `color/icon/warning`) or whose value points to it. The contrast and status pairings in section 3.4 that use those tokens are skipped. Variables already in the file from an earlier run are not deleted; they are reported as `orphan_variable`.
 - Palette names are not inputs. The plugin chooses them from the list in section 1.1.8. A missing or invalid HEX stops generation as `missing_input` or `invalid_hex`.
 - Defaults apply only to optional inputs. A missing mandatory input stops generation (section 6.2).
@@ -861,7 +910,7 @@ Light values for each light canvas step:
 
 1. **Choose the anchor.** Convert the brand color to OKLCH. The anchor is the step whose target L (section 1.1.4) is closest to the brand color's L. The closest step is usually 300, 400, 500, or 600, but any of the 13 steps is allowed. If two steps are equally close, choose the darker one.
 
-   **Moved anchor.** Lightness and contrast do not match perfectly across hues, so a brand color can be closest to a step and still fail that step's contrast minimum against Color/Gray (section 1.1.5). For example, `#127681` (L 0.519) is closest to step 500 but measures 4.44:1 against Color/Gray/100, below 4.5:1. The brand color is then never changed. Instead, it moves one step away from that pairing's background, to a step that has no pairing of its own:
+   **Moved anchor.** Lightness and contrast do not match perfectly across hues, so a brand color can be closest to a step and still fail that step's contrast minimum against the theme's neutral (section 1.1.5). For example, `#127681` (L 0.519) is closest to step 500 but measures 4.44:1 against Color/Gray/100, below 4.5:1. The brand color is then never changed. Instead, it moves one step away from that pairing's background, to a step that has no pairing of its own:
 
    | Closest step | Pairing it fails | Anchor moves to |
    |---|---|---|
@@ -920,7 +969,7 @@ This procedure applies to every palette and uses one order everywhere:
    - Then, ascending from the current chroma to the maximum in-gamut chroma at that L and hue, or to the step's chroma ceiling (section 5.5) when it is lower.
    - Accept the first candidate whose contrast meets the threshold.
    - The anchor follows the same rule as step 2.
-4. **Re-validate.** One adjustment is one accepted candidate in step 2 or 3. After each adjustment, recalculate the pairing it changed. If the palette needs more than 50 adjustments, stop and report a failure. Only foreground steps are adjusted, and no foreground step is used as a background (section 1.1.5). Step 500 is the foreground in two pairings, and both of its backgrounds (Color/Gray/100 and the palette's own step 100) are lighter than it. Darkening step 500 for one pairing therefore never lowers the contrast of the other.
+4. **Re-validate.** One adjustment is one accepted candidate in step 2 or 3. After each adjustment, recalculate the pairing it changed. If the palette needs more than 50 adjustments, stop and report a failure. Only foreground steps are adjusted, and no foreground step is used as a background (section 1.1.5). Step 500 is the foreground in two pairings, and both of its backgrounds (neutral step 100 and the palette's own step 100) are lighter than it. Darkening step 500 for one pairing therefore never lowers the contrast of the other.
 5. **Aim for targets.** After all minimums pass, apply the lightness search of step 2 with each target in place of its minimum. Targets never use the chroma search of step 3, never move the anchor, and never move the steps re-spaced around a moved anchor (section 5.2 step 3), because they are optimization goals. Never move a value below a minimum to reach a target. A target that cannot be reached is reported as a warning (`contrast_target`).
 
 ### 5.5 Chroma and hue

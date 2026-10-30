@@ -40,15 +40,29 @@ export const GRAY_HEX: Record<number, string> = {
   150: "#DBDBDB", 100: "#EAEAEA", 50: "#F4F4F4",
 };
 
-// Section 1.1.5. bgPalette "Gray" compares against Color/Gray; "self" compares against the same palette.
-export type ContrastPair = { text: number; bg: number; bgPalette: "Gray" | "self"; min: number; target: number };
+// Section 1.1.9: a tinted neutral keeps Gray's lightness and gets this chroma at the neutral color's hue,
+// faded toward the lightest and darkest steps (tokens.json primitives.neutralTint).
+export const NEUTRAL_CHROMA = 0.015;
+export const NEUTRAL_FADE: Record<number, number> = { 50: 0.55, 100: 0.75, 150: 0.9, 850: 0.9, 900: 0.75, 950: 0.55 };
+
+// A neutral palette, step -> HEX: Color/Gray (GRAY_HEX) or a tinted neutral.
+export type Neutral = Record<number, string>;
+
+// Section 1.1.5. bgPalette "neutral" compares against the neutral of every theme that uses the palette
+// (Color/Gray or a tinted neutral); "self" compares against the same palette.
+export type ContrastPair = { text: number; bg: number; bgPalette: "neutral" | "self"; min: number; target: number };
 export const CONTRAST_PAIRS: ContrastPair[] = [
-  { text: 500, bg: 100, bgPalette: "Gray", min: 4.5, target: 4.7 },
-  { text: 700, bg: 200, bgPalette: "Gray", min: 7.0, target: 8.0 },
-  { text: 300, bg: 700, bgPalette: "Gray", min: 4.5, target: 6.0 },
-  { text: 150, bg: 700, bgPalette: "Gray", min: 7.0, target: 9.5 },
+  { text: 500, bg: 100, bgPalette: "neutral", min: 4.5, target: 4.7 },
+  { text: 700, bg: 200, bgPalette: "neutral", min: 7.0, target: 8.0 },
+  { text: 300, bg: 700, bgPalette: "neutral", min: 4.5, target: 6.0 },
+  { text: 150, bg: 700, bgPalette: "neutral", min: 7.0, target: 9.5 },
   { text: 500, bg: 100, bgPalette: "self", min: 4.5, target: 4.5 },
 ];
+
+// The lowest contrast of a color against several backgrounds: it must pass against all of them.
+function minContrast(hex: string, backgrounds: string[]): number {
+  return Math.min(...backgrounds.map((b) => contrast(hex, b)));
+}
 
 // expected and actual are filled in for contrast findings, so the report shows which pairing failed.
 export type Finding = { check: string; step?: number; message: string; expected?: string; actual?: number };
@@ -58,6 +72,8 @@ export type Palette = {
   anchor: number; // -1 for status and custom palettes, which have no anchor (section 5.3)
   // Steps re-spaced around a brand that moved one step (section 5.2 step 3). They do not chase targets.
   respaced?: number[];
+  // The neutral palettes the "neutral" pairings are measured against: one per theme that uses this palette.
+  neutrals: Neutral[];
   steps: Record<number, { lch: Lch; hex: string }>;
   warnings: Finding[];
   errors: Finding[];
@@ -81,34 +97,42 @@ export function chooseAnchor(L0: number): number {
   return best;
 }
 
-// Section 5.2 step 1. The brand's step: the closest target L, unless the brand fails the Gray contrast
-// minimum of that step (section 1.1.5). Then it moves one step away from that rule's background, to a step
+// Section 5.2 step 1. The brand's step: the closest target L, unless the brand fails the neutral contrast
+// minimum of that step (section 1.1.5) against any of the given neutrals. Then it moves one step away from that rule's background, to a step
 // with no rule of its own, so its HEX stays exact: dark text on a light background (500, 700) moves one step
 // lighter (500 -> 400, 700 -> 600); light text on a dark background (300, 150) moves one step darker
 // (300 -> 400, 150 -> 200).
-export function placeAnchor(hex: string): { closest: number; anchor: number } {
+export function placeAnchor(hex: string, neutrals: Neutral[] = [GRAY_HEX]): { closest: number; anchor: number } {
   const closest = chooseAnchor(hexToOklch(hex).L);
   const i = STEPS.indexOf(closest);
-  for (const pair of CONTRAST_PAIRS.filter((x) => x.text === closest && x.bgPalette === "Gray")) {
-    if (contrast(hex, GRAY_HEX[pair.bg]) >= pair.min) continue;
+  for (const pair of CONTRAST_PAIRS.filter((x) => x.text === closest && x.bgPalette === "neutral")) {
+    if (minContrast(hex, neutrals.map((n) => n[pair.bg])) >= pair.min) continue;
     const darkText = pair.text > pair.bg;
     return { closest, anchor: STEPS[i + (darkText ? 1 : -1)] }; // STEPS runs from darkest to lightest
   }
   return { closest, anchor: closest };
 }
 
-// The background color of a pairing: a Gray step, or a step of the palette itself.
-export function pairBackgroundHex(p: Palette, pair: ContrastPair): string {
-  return pair.bgPalette === "self" ? p.steps[pair.bg].hex : GRAY_HEX[pair.bg];
+// The background colors of a pairing: the step of every neutral the palette is used with, or a step of
+// the palette itself.
+export function pairBackgrounds(p: Palette, pair: ContrastPair): string[] {
+  return pair.bgPalette === "self" ? [p.steps[pair.bg].hex] : p.neutrals.map((n) => n[pair.bg]);
 }
 
-// "Gray 100" or "Violet 100", for messages.
+// The hardest background of a pairing for the palette as it is now (the one with the lowest contrast).
+export function pairBackgroundHex(p: Palette, pair: ContrastPair): string {
+  const fg = p.steps[pair.text].hex;
+  return pairBackgrounds(p, pair).reduce((a, b) => (contrast(fg, b) < contrast(fg, a) ? b : a));
+}
+
+// "Gray 100", "neutral 100" (tinted) or "Violet 100", for messages.
 function pairBackgroundLabel(p: Palette, pair: ContrastPair): string {
-  return `${pair.bgPalette === "self" ? p.name : "Gray"} ${pair.bg}`;
+  const plainGray = p.neutrals.every((n) => n === GRAY_HEX);
+  return `${pair.bgPalette === "self" ? p.name : plainGray ? "Gray" : "neutral"} ${pair.bg}`;
 }
 
 function measure(p: Palette, pair: ContrastPair): number {
-  return contrast(p.steps[pair.text].hex, pairBackgroundHex(p, pair));
+  return minContrast(p.steps[pair.text].hex, pairBackgrounds(p, pair));
 }
 
 const r2 = (x: number): number => Math.round(x * 100) / 100;
@@ -131,8 +155,8 @@ function fixPair(p: Palette, pair: ContrastPair, threshold: number, allowAnchor:
   if (s === p.anchor && !allowAnchor) return false;
 
   const cur = p.steps[s].lch;
-  const bgHex = pairBackgroundHex(p, pair);
-  const bgL = hexToOklch(bgHex).L;
+  const bgs = pairBackgrounds(p, pair); // a candidate must pass against every one of them
+  const bgL = hexToOklch(bgs[0]).L; // neutrals share Gray's lightness, so any of them gives the direction
   const dir = cur.L >= bgL ? 1 : -1;
 
   // Bounds: strictly between the nearest darker and lighter steps.
@@ -146,7 +170,7 @@ function fixPair(p: Palette, pair: ContrastPair, threshold: number, allowAnchor:
     const L = r3(cur.L + dir * i * SEARCH_STEP);
     if (L <= lower || L >= upper || L <= 0 || L >= 1) break;
     const cand = clampChroma({ L, C: cur.C, H: cur.H });
-    if (contrast(oklchToHex(cand), bgHex) >= threshold) {
+    if (minContrast(oklchToHex(cand), bgs) >= threshold) {
       commit(p, s, cand);
       return true;
     }
@@ -162,7 +186,7 @@ function fixPair(p: Palette, pair: ContrastPair, threshold: number, allowAnchor:
     for (const C of order) {
       if (C < MIN_CHROMA - 1e-9 || C > maxC) continue;
       const cand: Lch = { L: cur.L, C, H: cur.H };
-      if (contrast(oklchToHex(cand), bgHex) >= threshold) {
+      if (minContrast(oklchToHex(cand), bgs) >= threshold) {
         commit(p, s, cand);
         return true;
       }
@@ -218,14 +242,15 @@ function calibrate(p: Palette): void {
 }
 
 // Section 5.2. Builds a brand palette: the brand HEX stays exactly at its anchor step.
-export function buildPalette(name: string, hex: string): Palette {
+// neutrals: the neutral palette of every theme that uses this palette (Color/Gray when not given).
+export function buildPalette(name: string, hex: string, neutrals: Neutral[] = [GRAY_HEX]): Palette {
   const src = hexToOklch(hex);
-  const placed = placeAnchor(hex);
+  const placed = placeAnchor(hex, neutrals);
   const anchor = placed.anchor;
   const C400 = src.C / CHROMA_MULT[anchor];
   const H = r1(src.H);
 
-  const p: Palette = { name, anchor, steps: {}, warnings: [], errors: [], adjustments: 0 };
+  const p: Palette = { name, anchor, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
   for (const s of STEPS) {
     const L = s === anchor ? src.L : TARGET_L[s];
     // The anchor keeps the brand color's chroma; the other steps stay under the ceiling.
@@ -277,16 +302,33 @@ export function yellowFactor(H: number): number {
 
 // Section 5.3. Builds a status or custom palette from the hue of a HEX only: target L for every step,
 // a fixed chroma curve (with the yellow boost), the ceilings, then the contrast adjustment. No anchor.
-export function buildHuePalette(name: string, hex: string): Palette {
+export function buildHuePalette(name: string, hex: string, neutrals: Neutral[] = [GRAY_HEX]): Palette {
   const H = r1(hexToOklch(hex).H);
   const C400 = REFERENCE_C400 * yellowFactor(H);
-  const p: Palette = { name, anchor: -1, steps: {}, warnings: [], errors: [], adjustments: 0 };
+  const p: Palette = { name, anchor: -1, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
   for (const s of STEPS) {
     const C = Math.max(Math.min(C400 * CHROMA_MULT[s], CHROMA_CEILING[s] ?? Infinity), MIN_CHROMA);
     commit(p, s, { L: TARGET_L[s], C, H });
   }
   calibrate(p);
   return p;
+}
+
+// Section 1.1.9. A tinted neutral: Gray's lightness at every step, the neutral color's hue, and a small
+// fixed chroma that fades toward the lightest and darkest steps. Only the hue of the HEX is used.
+// It has no contrast pairings of its own: other palettes are measured against it.
+export function buildNeutralPalette(name: string, hex: string): Palette {
+  const H = r1(hexToOklch(hex).H);
+  const p: Palette = { name, anchor: -1, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals: [] };
+  for (const s of STEPS) {
+    commit(p, s, { L: hexToOklch(GRAY_HEX[s]).L, C: NEUTRAL_CHROMA * (NEUTRAL_FADE[s] ?? 1), H });
+  }
+  return p;
+}
+
+// A palette as step -> HEX, the shape the contrast pairings use for a neutral.
+export function neutralOf(p: Palette): Neutral {
+  return Object.fromEntries(STEPS.map((s) => [s, p.steps[s].hex]));
 }
 
 // Section 5.3 step 5: the step of a palette closest to a HEX, and how far it is (distance in Oklab).

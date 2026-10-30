@@ -2,7 +2,8 @@
 // Pure functions, no Figma API. Implements foundations-spec.md sections 2, 3, 5.1, 5.6 and 6.1.
 
 import { contrast } from "./color.ts";
-import { buildHuePalette, buildPalette, closestStep, paletteDifference, SHIFT_NOTICE_DISTANCE } from "./palette.ts";
+import { buildHuePalette, buildNeutralPalette, buildPalette, closestStep, GRAY_HEX, neutralOf, paletteDifference, SHIFT_NOTICE_DISTANCE } from "./palette.ts";
+import type { Neutral } from "./palette.ts";
 import type { Palette } from "./palette.ts";
 import { validateHex } from "./validate.ts";
 import { assignPaletteNames, similarPalettes } from "./naming.ts";
@@ -19,6 +20,8 @@ export type HueInput = { hex: string; name?: string };
 
 export type ThemeInput = {
   brand: HueInput;
+  // The neutral color (section 5.1): only its hue is used. A plain gray, or none, gives Color/Gray.
+  neutral?: HueInput;
   // Status colors: needed only for the roles in Inputs.statusRoles.
   success?: HueInput;
   danger?: HueInput;
@@ -198,13 +201,39 @@ export function orderedColors(spec: Spec, inputs: Inputs): (NamedColorInput & { 
 export function namePalettes(spec: Spec, inputs: Inputs) {
   const colors = orderedColors(spec, inputs);
   const result = assignPaletteNames(spec.primitives.paletteNaming, spec.primitives.neutralPalette.name, colors);
+
+  // Neutral palettes (section 1.1.9): one per theme, named from their own list. A plain gray, a missing
+  // or an invalid HEX gives Color/Gray (an invalid HEX is reported by the input checks).
+  const n = Math.max(0, Math.min(inputs?.numberOfThemes ?? 0, inputs?.themes?.length ?? 0));
+  const modes = themeModeNames(spec, n, inputs?.themeNames);
+  const neutralColors = Array.from({ length: n }, (_, i) => {
+    const hex = inputs.themes[i]?.neutral?.hex?.trim().toUpperCase() || spec.inputs.neutralColor.default;
+    return { theme: i, hex: validateHex(hex).length > 0 ? spec.inputs.neutralColor.default : hex,
+      source: `${inputs.themeKeys?.[i] || modes[i]}|neutral`, label: `the neutral color of ${modes[i]}` };
+  });
+  const neutralNaming = assignPaletteNames(spec.primitives.neutralTint.naming, spec.primitives.neutralPalette.name, neutralColors);
+  const neutralBuilt: Palette[] = neutralNaming.palettes.map((p) => buildNeutralPalette(p.name, p.hex));
+  // The neutral palette of theme i: its name, and its steps as HEX.
+  const neutralNameOf = (i: number): string =>
+    neutralNaming.assignments.find((a) => a.source === neutralColors[i]?.source)?.palette ?? spec.primitives.neutralPalette.name;
+  const neutralStepsOf = (i: number): Neutral => {
+    const tinted = neutralBuilt.find((p) => p.name === neutralNameOf(i));
+    return tinted ? neutralOf(tinted) : GRAY_HEX;
+  };
+  // The neutrals a palette is calibrated against: the neutral of every theme that uses it (section 1.1.5).
+  const neutralsFor = (p: NamedPalette): Neutral[] => {
+    const themesUsing = [...new Set(colors.filter((c) => p.sources.includes(c.source)).map((c) => c.theme))];
+    const names = [...new Set(themesUsing.map(neutralNameOf))];
+    return names.map((name) => neutralStepsOf(themesUsing.find((i) => neutralNameOf(i) === name)!));
+  };
   // The palette of each color, by theme index and role.
   const paletteOf = (theme: number, role: string): string | undefined => {
     const c = colors.find((x) => x.theme === theme && x.role === role);
     return c ? result.assignments.find((a) => a.source === c.source)?.palette : undefined;
   };
   // Every palette: brand palettes keep their HEX, the others use only the hue (sections 5.2, 5.3).
-  const built: Palette[] = result.palettes.map((p) => (p.exact ? buildPalette(p.name, p.hex) : buildHuePalette(p.name, p.hex)));
+  const built: Palette[] = result.palettes.map((p) =>
+    (p.exact ? buildPalette(p.name, p.hex, neutralsFor(p)) : buildHuePalette(p.name, p.hex, neutralsFor(p))));
   const byName = (name: string): Palette => built.find((p) => p.name === name)!;
   const build = (): Palette[] => built;
   // Palettes that look almost the same as an earlier one (section 1.1.8 rule 4), with the theme index
@@ -214,7 +243,7 @@ export function namePalettes(spec: Spec, inputs: Inputs) {
     const c = colors.find((x) => x.source === s.source)!;
     return { ...s, theme: c.theme, role: c.role };
   });
-  return { ...result, similar, paletteOf, build, colors };
+  return { ...result, similar, paletteOf, build, colors, neutralNaming, neutralBuilt, neutralNameOf, neutralStepsOf };
 }
 
 // Status and custom colors whose palette has no step close to the HEX picked (section 5.3 step 5).
@@ -316,6 +345,8 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
 
   themes.forEach((t, i) => {
     for (const role of [...activeRoles, ...customRoles]) checkHue(colorOf(t, role), `${role} color`, themeModes[i]);
+    // The neutral color is optional: only a HEX that was typed is checked.
+    if (t.neutral?.hex?.trim()) checkHue(t.neutral, "neutral color", themeModes[i]);
   });
 
   // Font family and weights (section 5.1). Weight slots are the input:fontWeights.{slot} entries.
@@ -400,7 +431,9 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
 
   // Colors with (almost) the same hue share a palette; a color with no hue uses Gray.
   const naming = namePalettes(spec, inputs);
-  for (const p of naming.problems) add("missing_input", "Primitives", "palette names", "Default", "a free palette name", "none left", p);
+  for (const p of [...naming.problems, ...naming.neutralNaming.problems]) {
+    add("missing_input", "Primitives", "palette names", "Default", "a free palette name", "none left", p);
+  }
   for (const s of naming.similar) {
     add("similar_palette", "Primitives", `Color/${s.palette}`, themeModes[s.theme],
       `a step more than ${spec.primitives.paletteNaming.similarMaxStepDifference} from Color/${s.otherPalette}`,
@@ -415,7 +448,7 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
       `step ${h.step} ${h.stepHex}`,
       `Only the hue of ${h.label} (${h.hex}) is used. Its palette is closer to ${h.stepHex} (step ${h.step}).`);
   }
-  for (const p of palettes) {
+  for (const p of [...palettes, ...naming.neutralBuilt]) {
     for (const f of [...p.errors, ...p.warnings]) {
       const token = f.step !== undefined ? `Color/${p.name}/${f.step}` : `Color/${p.name}`;
       if (f.check === "gamut_clamp") {
@@ -446,7 +479,8 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
   for (const [name, hex] of Object.entries(spec.primitives.baseColors) as [string, string][]) prim(name, "COLOR", hex);
   const gray = spec.primitives.neutralPalette;
   for (const step of spec.primitives.steps) prim(`Color/${gray.name}/${step}`, "COLOR", gray.steps[String(step)]);
-  for (const p of palettes) {
+  // Tinted neutrals first, right after Gray, then the other palettes.
+  for (const p of [...naming.neutralBuilt, ...palettes]) {
     for (const step of spec.primitives.steps) prim(`Color/${p.name}/${step}`, "COLOR", p.steps[step].hex);
   }
   for (const v of spec.primitives.sizes) prim(sizeName(v), "FLOAT", v);
@@ -458,10 +492,8 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
   for (const o of spec.primitives.opacities) prim(`Opacity/${o}`, "FLOAT", o, ["OPACITY"]);
 
   // Theme (section 2). Which palette a role uses in theme i.
-  const paletteFor = (role: string, i: number): string => {
-    const rule = spec.theme.colorRoles[role];
-    return rule?.source === "fixed" ? rule.palette : naming.paletteOf(i, role)!;
-  };
+  const paletteFor = (role: string, i: number): string =>
+    (role === "neutral" ? naming.neutralNameOf(i) : naming.paletteOf(i, role)!); // neutral: Gray or a tinted neutral
   const theme = (name: string, type: VarType, values: Record<string, Value>, scopes: string[] = [], alpha = false): void => {
     vars.push({ collection: "Theme", name, type, scopes, values, ...(alpha ? { alpha } : {}) });
   };
@@ -754,7 +786,7 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
     }
   }
 
-  return { ok: true, collections, variables: vars, report, manifest, palettes: naming.palettes };
+  return { ok: true, collections, variables: vars, report, manifest, palettes: [...naming.neutralNaming.palettes, ...naming.palettes] };
 }
 
 // Appearance token names in the order of appearance.order (section 3.3): group (elevation, bg, text,

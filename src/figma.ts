@@ -137,6 +137,11 @@ function previewNames(inputs: Inputs): void {
       const p = built.find((x) => x.name === naming.paletteOf(c.theme, c.role));
       return { theme: c.theme, role: c.role, hexes: steps.map((s) => (p ? p.steps[s].hex : gray[String(s)])) };
     });
+    // Each theme's neutral: Color/Gray, or its tinted neutral (section 1.1.9).
+    for (let i = 0; i < (inputs.themes ?? []).length; i++) {
+      const neutral = naming.neutralStepsOf(i);
+      palettes.push({ theme: i, role: "neutral", hexes: steps.map((s) => neutral[s]) });
+    }
     figma.ui.postMessage({ type: "names-result", similar: notes, palettes });
   } catch {
     figma.ui.postMessage({ type: "names-result", similar: [], palettes: [] });

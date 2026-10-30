@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import { hexToOklch, oklchToHex, contrast, inGamut } from "../src/color.ts";
 import { buildPalette, STEPS, CONTRAST_PAIRS, pairBackgroundHex, buildHuePalette, closestStep, yellowFactor,
-  CHROMA_CEILING, REFERENCE_C400, YELLOW_BOOST, SHIFT_NOTICE_DISTANCE, placeAnchor, TARGET_L } from "../src/palette.ts";
+  CHROMA_CEILING, REFERENCE_C400, YELLOW_BOOST, SHIFT_NOTICE_DISTANCE, placeAnchor, TARGET_L,
+  buildNeutralPalette, NEUTRAL_CHROMA, NEUTRAL_FADE, GRAY_HEX, neutralOf } from "../src/palette.ts";
 import { validateHex } from "../src/validate.ts";
 import { assignPaletteNames, hslHue, hueDistance, paletteRenames } from "../src/naming.ts";
 import { readFileSync } from "node:fs";
@@ -775,5 +776,59 @@ for (const hex of ["#5B3CC4", "#78449F", "#E53935", "#1D4ED8", "#B03C3C"]) {
 }
 // The constant rules match tokens.json: the moved anchor table in section 5.2.
 assert.ok(spec.primitives.brandAnchor.move.includes("500 to 400") && spec.primitives.brandAnchor.move.includes("150 to 200"));
+
+// 18. Tinted neutrals (section 1.1.9, tokens.json primitives.neutralTint).
+const nt = spec.primitives.neutralTint;
+assert.equal(NEUTRAL_CHROMA, nt.chroma);
+assert.deepEqual(NEUTRAL_FADE, Object.fromEntries(Object.entries(nt.fade.steps).map(([k, v]) => [Number(k), v])));
+// 24 single-word names, none of them a palette name or a reserved name.
+assert.equal(nt.naming.names.length, 24);
+assert.ok(nt.naming.names.every((n: string) => /^[A-Z][a-z]+$/.test(n)));
+assert.ok(!nt.naming.names.some((n: string) => spec.primitives.paletteNaming.names.includes(n) || spec.inputs.reservedHueNames.includes(n)));
+// Gray's lightness at every step, the picked hue, and chroma 0.015 faded toward the ends.
+const slate = buildNeutralPalette("Slate", "#4785E6");
+for (const st of STEPS) {
+  assert.ok(Math.abs(slate.steps[st].lch.L - hexToOklch(GRAY_HEX[st]).L) < 0.001, `neutral L at ${st}`);
+  assert.ok(slate.steps[st].lch.C <= NEUTRAL_CHROMA * (NEUTRAL_FADE[st] ?? 1) + 1e-9, `neutral chroma at ${st}`);
+}
+assert.ok(Math.abs(slate.steps[500].lch.C - 0.015) < 1e-6);
+assert.ok(Math.abs(slate.steps[500].lch.H - hexToOklch("#4785E6").H) < 0.1);
+// Only the hue counts: a barely saturated and a vivid color get the same tint strength.
+for (const hex of ["#7F00FF", "#8A8590"]) assert.ok(Math.abs(buildNeutralPalette("x", hex).steps[500].lch.C - NEUTRAL_CHROMA) < 1e-6, hex);
+// In a plan: plain gray (the default) keeps Color/Gray; a tinted neutral gets its own name and palette.
+const neutralAlias = (p: Plan, theme: string) => (p.variables.find((v) => v.collection === "Theme" && v.name === "color/neutral/500")!.values[theme] as { alias: string }).alias;
+assert.equal(neutralAlias(plan, "Theme A"), "Color/Gray/500");
+assert.equal(neutralAlias(buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, neutral: { hex: "#808080" } }] }), "Theme A"), "Color/Gray/500");
+const tintedInputs = { numberOfThemes: 2, themes: [{ ...themeA, neutral: { hex: "#4785E6" } }, { ...themeB, neutral: { hex: "#C9A27A" } }] };
+const tinted = buildPlan(spec, tintedInputs);
+assert.equal(tinted.ok, true, JSON.stringify(tinted.report.filter((r) => r.severity === "error")));
+assert.equal(neutralAlias(tinted, "Theme A"), "Color/Slate/500"); // HSL hue 216.6°
+assert.equal(neutralAlias(tinted, "Theme B"), "Color/Taupe/500"); // HSL hue 30.4°
+assert.ok(tinted.variables.some((v) => v.name === "Color/Slate/50") && tinted.variables.some((v) => v.name === "Color/Gray/50"));
+// Black and white stay pure, and the neutral alpha tokens still link to them.
+assert.deepEqual(tinted.variables.find((v) => v.name === "color/neutral/white")!.values["Theme A"], { alias: "Color/White" });
+// The same tint in two themes shares one palette.
+const sameTint = buildPlan(spec, { numberOfThemes: 2, themes: [{ ...themeA, neutral: { hex: "#4785E6" } }, { ...themeB, neutral: { hex: "#4785E6" } }] });
+assert.equal(sameTint.variables.filter((v) => v.name === "Color/Slate/500").length, 1);
+assert.equal(neutralAlias(sameTint, "Theme B"), "Color/Slate/500");
+// A palette shared by themes with different neutrals is calibrated against both (section 1.1.5).
+const sharedNaming = namePalettes(spec, tintedInputs);
+const successPalette = sharedNaming.build().find((p) => p.name === sharedNaming.paletteOf(0, "success"))!;
+assert.equal(successPalette.neutrals.length, 2);
+for (const neutral of successPalette.neutrals) {
+  assert.ok(contrast(successPalette.steps[500].hex, neutral[100]) >= 4.5);
+  assert.ok(contrast(successPalette.steps[700].hex, neutral[200]) >= 7);
+}
+// An invalid neutral HEX stops generation.
+const badNeutral = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, neutral: { hex: "#12345" } }] });
+assert.equal(badNeutral.ok, false);
+assert.ok(badNeutral.report.some((r) => r.check === "invalid_hex" && r.token === "neutral color"));
+// Every check still passes with tinted neutrals of many hues and every canvas setting.
+for (const hex of ["#4785E6", "#5B6B8C", "#C9A27A", "#48A13F", "#A930FF", "#D4667A", "#FFD400"]) {
+  for (const extra of [{}, { darkCanvasStep: 850 }, { lightCanvasStep: 50 }]) {
+    const p = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, neutral: { hex } }], ...extra });
+    assert.equal(p.ok, true, `${hex} ${JSON.stringify(extra)}: ${JSON.stringify(p.report.filter((r) => r.severity === "error").slice(0, 2))}`);
+  }
+}
 
 console.log("All logic tests passed.");

@@ -432,6 +432,9 @@
   };
   // Starting value of the brand color and of a color added with "Add color": white.
   const EMPTY_COLOR = { hex: "#FFFFFF" };
+  // Starting value of the neutral color: a plain gray, which gives the fixed Color/Gray palette.
+  // Only the hue of the neutral color is used (spec section 1.1.9).
+  const NEUTRAL_DEFAULT = { hex: "#808080" };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const newKey = () => Math.random().toString(36).slice(2, 10);
   const slotOf = (style) => style.replace(/\s+/g, "").toLowerCase();
@@ -541,13 +544,14 @@
 
     // Brand and status rows. The status checkboxes are shared: ticking one in any theme ticks it in all.
     const ticked = statusRoles();
-    for (const role of ["brand", ...STATUS]) {
+    // Brand and neutral have no checkbox: every theme has them.
+    for (const role of ["brand", "neutral", ...STATUS]) {
       const row = document.createElement("div");
       row.className = "color-row";
       row.dataset.role = role;
-      const box = role !== "brand" ? `<input type="checkbox" class="cb status-cb" value="${role}" ${ticked.includes(role) ? "checked" : ""} aria-label="Use ${role}">` : "";
+      const box = STATUS.includes(role) ? `<input type="checkbox" class="cb status-cb" value="${role}" ${ticked.includes(role) ? "checked" : ""} aria-label="Use ${role}">` : "";
       row.innerHTML = `<label class="label${box ? "" : " indent"}">${box}<span>${role}</span></label>`;
-      const fields = colorFields(saved?.colors?.[role] ?? (role === "brand" ? EMPTY_COLOR : STATUS_DEFAULTS[role]));
+      const fields = colorFields(saved?.colors?.[role] ?? (role === "brand" ? EMPTY_COLOR : role === "neutral" ? NEUTRAL_DEFAULT : STATUS_DEFAULTS[role]));
       row.append(fields, paletteStrip());
       panel.colors[role] = fields;
       rows.append(row);
@@ -778,7 +782,7 @@
     const roles = statusRoles();
     const customRoles = customIds.map(roleOf);
     const themes = panels.map((p) => {
-      const t = { brand: p.colors.brand.get(), fontFamily: p.fontFamily(), fontWeights: p.fontWeights() };
+      const t = { brand: p.colors.brand.get(), neutral: p.colors.neutral.get(), fontFamily: p.fontFamily(), fontWeights: p.fontWeights() };
       for (const r of roles) t[r] = p.colors[r].get();
       t.custom = {};
       customIds.forEach((id, i) => { t.custom[customRoles[i]] = p.querySelector(`[data-custom="${id}"] .fields`).get(); });
@@ -814,7 +818,7 @@
     const savedRoles = inputs.statusRoles || STATUS;
     for (let i = 0; i < n; i++) {
       const t = (inputs.themes || [])[i] || {};
-      const colors = { brand: t.brand };
+      const colors = { brand: t.brand, neutral: t.neutral };
       for (const r of STATUS) colors[r] = t[r];
       addTheme({
         key: inputs.themeKeys?.[i],

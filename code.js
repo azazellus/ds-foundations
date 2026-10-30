@@ -22,7 +22,7 @@
 
   // spec/tokens.json
   var tokens_default = {
-    version: "1.14.0",
+    version: "1.15.0",
     description: "Source of truth for the design foundations specification (foundations-spec.md). Palette HEX values are user inputs and palette names come from primitives.paletteNaming; this file defines the rules, inputs, Theme mappings, alpha tokens, Appearance mappings, and ColorScheme mappings.",
     collections: {
       Primitives: { modes: ["Default"] },
@@ -81,6 +81,60 @@
       },
       minChroma: 0.01,
       hueRounding: 1,
+      neutralTint: {
+        description: "A theme's neutral palette tinted with the hue of its neutral color (inputs.neutralColor). Each step keeps the OKLCH L of the same Color/Gray step and takes the neutral color's OKLCH hue, rounded to one decimal, with the chroma below. Only the hue matters: every tinted neutral has the same chroma. Each step is gamut-clamped like other palettes.",
+        chroma: 0.015,
+        fade: {
+          description: "Share of chroma at each step. Steps not listed use the full chroma. The tint fades toward the lightest and darkest steps.",
+          steps: {
+            "50": 0.55,
+            "100": 0.75,
+            "150": 0.9,
+            "850": 0.9,
+            "900": 0.75,
+            "950": 0.55
+          }
+        },
+        naming: {
+          description: "Names for tinted neutral palettes: Color/{Name}/{step}. Single words only. Like primitives.paletteNaming, but with 24 names, one every 15 degrees of HSL hue, starting at 0 degrees.",
+          hueSpace: "HSL hue of the neutral color, in degrees from 0 to 360.",
+          rangeWidth: 15,
+          names: [
+            "Rosewood",
+            "Clay",
+            "Taupe",
+            "Sand",
+            "Khaki",
+            "Lichen",
+            "Moss",
+            "Sage",
+            "Celadon",
+            "Eucalyptus",
+            "Willow",
+            "Agave",
+            "Glacier",
+            "Mist",
+            "Slate",
+            "Steel",
+            "Flint",
+            "Storm",
+            "Smoke",
+            "Heather",
+            "Mauve",
+            "Thistle",
+            "Quartz",
+            "Cameo"
+          ],
+          nameRule: "Name n (from 0) covers the HSL hues from n*15-7.5 up to, but not including, n*15+7.5.",
+          achromatic: {
+            palette: "Gray"
+          },
+          order: "Neutral colors are named theme by theme, in theme order.",
+          shareWithinDegrees: 1,
+          shareRule: "A neutral color whose hue is within shareWithinDegrees of a tinted neutral already named uses that palette.",
+          freeNameRule: "Otherwise it takes the name of its range, or the nearest free name in the list, as in primitives.paletteNaming. When all names are taken, generation stops as missing_input."
+        }
+      },
       brandAnchor: {
         description: "Where the brand color sits in its palette (section 5.2 steps 1 and 3). The brand HEX is always kept exactly.",
         closest: "The brand sits at the step whose targetL is closest to the brand's OKLCH L. Ties go to the darker step.",
@@ -205,11 +259,12 @@
         similarRule: "After the palettes are generated, each palette is compared with every palette made before it in the naming order. When no step differs from the same step of an earlier palette by more than similarMaxStepDifference (OKLab distance, the measure of hueOnlyPalette.shiftNotice), it is reported as similar_palette (warning) against the closest such palette: the two palettes look almost the same. Hues are not compared, because HSL hues are uneven around the circle. The plugin form shows the same notice next to the color.",
         rename: "The plugin remembers which color (theme and role) made each palette. When a later run gives that color's palette a new name, and the old name is not used by any palette of the new run, the plugin renames the old palette's variables in place (Color/Old/{step} becomes Color/New/{step}), so layers and aliases that use them are kept. If a variable with the new name already exists, the old palette is not renamed and is reported as orphan_variable. Nothing is deleted."
       },
+      contrastPairsRule: "backgroundPalette neutral is the neutral palette of the theme that uses the palette being checked: Color/Gray, or that theme's tinted neutral (neutralTint). A palette used by several themes must meet each pairing against the neutral of every one of them. self is the palette itself.",
       contrastPairs: [
-        { text: 500, background: 100, backgroundPalette: "Gray", minimum: 4.5, target: 4.7 },
-        { text: 700, background: 200, backgroundPalette: "Gray", minimum: 7, target: 8 },
-        { text: 300, background: 700, backgroundPalette: "Gray", minimum: 4.5, target: 6 },
-        { text: 150, background: 700, backgroundPalette: "Gray", minimum: 7, target: 9.5 },
+        { text: 500, background: 100, backgroundPalette: "neutral", minimum: 4.5, target: 4.7 },
+        { text: 700, background: 200, backgroundPalette: "neutral", minimum: 7, target: 8 },
+        { text: 300, background: 700, backgroundPalette: "neutral", minimum: 4.5, target: 6 },
+        { text: 150, background: 700, backgroundPalette: "neutral", minimum: 7, target: 9.5 },
         { text: 500, background: 100, backgroundPalette: "self", minimum: 4.5, target: 4.5 }
       ],
       sizes: [0, 0.5, 1, 2, 4, 6, 8, 12, 14, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96, 112, 128, 152, 256, 512, 1024],
@@ -245,6 +300,14 @@
         type: "hex",
         name: "brand",
         paletteName: "primitives.paletteNaming"
+      },
+      neutralColor: {
+        scope: "theme",
+        requirement: "optional",
+        type: "hex",
+        default: "#808080",
+        rule: "Only its hue is used. A HEX whose R, G and B are equal (a plain gray) gives the fixed Color/Gray palette. Any other HEX gives a tinted neutral (primitives.neutralTint), named from primitives.neutralTint.naming.",
+        paletteName: "primitives.neutralTint.naming"
       },
       statusRoles: {
         scope: "global",
@@ -340,7 +403,7 @@
     },
     theme: {
       colorRoles: {
-        neutral: { palette: "Gray", source: "fixed" },
+        neutral: { input: "neutralColor", source: "input", default: "Gray", rule: "The theme's neutral palette: Color/Gray, or a tinted neutral (primitives.neutralTint)." },
         brand: { input: "brandColor", source: "input" },
         success: { input: "statusColors.success", source: "input" },
         danger: { input: "statusColors.danger", source: "input" },
@@ -1006,13 +1069,18 @@
     100: "#EAEAEA",
     50: "#F4F4F4"
   };
+  var NEUTRAL_CHROMA = 0.015;
+  var NEUTRAL_FADE = { 50: 0.55, 100: 0.75, 150: 0.9, 850: 0.9, 900: 0.75, 950: 0.55 };
   var CONTRAST_PAIRS = [
-    { text: 500, bg: 100, bgPalette: "Gray", min: 4.5, target: 4.7 },
-    { text: 700, bg: 200, bgPalette: "Gray", min: 7, target: 8 },
-    { text: 300, bg: 700, bgPalette: "Gray", min: 4.5, target: 6 },
-    { text: 150, bg: 700, bgPalette: "Gray", min: 7, target: 9.5 },
+    { text: 500, bg: 100, bgPalette: "neutral", min: 4.5, target: 4.7 },
+    { text: 700, bg: 200, bgPalette: "neutral", min: 7, target: 8 },
+    { text: 300, bg: 700, bgPalette: "neutral", min: 4.5, target: 6 },
+    { text: 150, bg: 700, bgPalette: "neutral", min: 7, target: 9.5 },
     { text: 500, bg: 100, bgPalette: "self", min: 4.5, target: 4.5 }
   ];
+  function minContrast(hex, backgrounds) {
+    return Math.min(...backgrounds.map((b) => contrast(hex, b)));
+  }
   var r3 = (x) => Math.round(x * 1e3) / 1e3;
   var r1 = (x) => Math.round(x * 10) / 10;
   function chooseAnchor(L0) {
@@ -1027,24 +1095,25 @@
     }
     return best;
   }
-  function placeAnchor(hex) {
+  function placeAnchor(hex, neutrals = [GRAY_HEX]) {
     const closest = chooseAnchor(hexToOklch(hex).L);
     const i = STEPS.indexOf(closest);
-    for (const pair of CONTRAST_PAIRS.filter((x) => x.text === closest && x.bgPalette === "Gray")) {
-      if (contrast(hex, GRAY_HEX[pair.bg]) >= pair.min) continue;
+    for (const pair of CONTRAST_PAIRS.filter((x) => x.text === closest && x.bgPalette === "neutral")) {
+      if (minContrast(hex, neutrals.map((n) => n[pair.bg])) >= pair.min) continue;
       const darkText = pair.text > pair.bg;
       return { closest, anchor: STEPS[i + (darkText ? 1 : -1)] };
     }
     return { closest, anchor: closest };
   }
-  function pairBackgroundHex(p, pair) {
-    return pair.bgPalette === "self" ? p.steps[pair.bg].hex : GRAY_HEX[pair.bg];
+  function pairBackgrounds(p, pair) {
+    return pair.bgPalette === "self" ? [p.steps[pair.bg].hex] : p.neutrals.map((n) => n[pair.bg]);
   }
   function pairBackgroundLabel(p, pair) {
-    return `${pair.bgPalette === "self" ? p.name : "Gray"} ${pair.bg}`;
+    const plainGray = p.neutrals.every((n) => n === GRAY_HEX);
+    return `${pair.bgPalette === "self" ? p.name : plainGray ? "Gray" : "neutral"} ${pair.bg}`;
   }
   function measure(p, pair) {
-    return contrast(p.steps[pair.text].hex, pairBackgroundHex(p, pair));
+    return minContrast(p.steps[pair.text].hex, pairBackgrounds(p, pair));
   }
   var r2 = (x) => Math.round(x * 100) / 100;
   function commit(p, s, cand) {
@@ -1063,8 +1132,8 @@
     const s = pair.text;
     if (s === p.anchor && !allowAnchor) return false;
     const cur = p.steps[s].lch;
-    const bgHex = pairBackgroundHex(p, pair);
-    const bgL = hexToOklch(bgHex).L;
+    const bgs = pairBackgrounds(p, pair);
+    const bgL = hexToOklch(bgs[0]).L;
     const dir = cur.L >= bgL ? 1 : -1;
     const others = STEPS.filter((x) => x !== s).map((x) => p.steps[x].lch.L);
     const lower = others.filter((L) => L < cur.L).reduce((a, b) => Math.max(a, b), 0);
@@ -1074,7 +1143,7 @@
       const L = r3(cur.L + dir * i * SEARCH_STEP);
       if (L <= lower || L >= upper || L <= 0 || L >= 1) break;
       const cand = clampChroma({ L, C: cur.C, H: cur.H });
-      if (contrast(oklchToHex(cand), bgHex) >= threshold) {
+      if (minContrast(oklchToHex(cand), bgs) >= threshold) {
         commit(p, s, cand);
         return true;
       }
@@ -1087,7 +1156,7 @@
       for (const C2 of order) {
         if (C2 < MIN_CHROMA - 1e-9 || C2 > maxC) continue;
         const cand = { L: cur.L, C: C2, H: cur.H };
-        if (contrast(oklchToHex(cand), bgHex) >= threshold) {
+        if (minContrast(oklchToHex(cand), bgs) >= threshold) {
           commit(p, s, cand);
           return true;
         }
@@ -1140,14 +1209,14 @@
       }
     }
   }
-  function buildPalette(name, hex) {
+  function buildPalette(name, hex, neutrals = [GRAY_HEX]) {
     var _a;
     const src = hexToOklch(hex);
-    const placed = placeAnchor(hex);
+    const placed = placeAnchor(hex, neutrals);
     const anchor = placed.anchor;
     const C400 = src.C / CHROMA_MULT[anchor];
     const H = r1(src.H);
-    const p = { name, anchor, steps: {}, warnings: [], errors: [], adjustments: 0 };
+    const p = { name, anchor, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
     for (const s of STEPS) {
       const L = s === anchor ? src.L : TARGET_L[s];
       const C2 = s === anchor ? src.C : Math.max(Math.min(C400 * CHROMA_MULT[s], (_a = CHROMA_CEILING[s]) != null ? _a : Infinity), MIN_CHROMA);
@@ -1189,17 +1258,29 @@
     const w = Math.max(0, Math.min(1, (H - y.zeroBelow) / (y.fullFrom - y.zeroBelow), (y.zeroAbove - H) / (y.zeroAbove - y.fullTo)));
     return 1 + (y.factor - 1) * w;
   }
-  function buildHuePalette(name, hex) {
+  function buildHuePalette(name, hex, neutrals = [GRAY_HEX]) {
     var _a;
     const H = r1(hexToOklch(hex).H);
     const C400 = REFERENCE_C400 * yellowFactor(H);
-    const p = { name, anchor: -1, steps: {}, warnings: [], errors: [], adjustments: 0 };
+    const p = { name, anchor: -1, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
     for (const s of STEPS) {
       const C2 = Math.max(Math.min(C400 * CHROMA_MULT[s], (_a = CHROMA_CEILING[s]) != null ? _a : Infinity), MIN_CHROMA);
       commit(p, s, { L: TARGET_L[s], C: C2, H });
     }
     calibrate(p);
     return p;
+  }
+  function buildNeutralPalette(name, hex) {
+    var _a;
+    const H = r1(hexToOklch(hex).H);
+    const p = { name, anchor: -1, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals: [] };
+    for (const s of STEPS) {
+      commit(p, s, { L: hexToOklch(GRAY_HEX[s]).L, C: NEUTRAL_CHROMA * ((_a = NEUTRAL_FADE[s]) != null ? _a : 1), H });
+    }
+    return p;
+  }
+  function neutralOf(p) {
+    return Object.fromEntries(STEPS.map((s) => [s, p.steps[s].hex]));
   }
   function closestStep(p, hex) {
     const target = lab(hex);
@@ -1389,14 +1470,45 @@
     return out;
   }
   function namePalettes(spec, inputs) {
+    var _a, _b, _c;
     const colors = orderedColors(spec, inputs);
     const result = assignPaletteNames(spec.primitives.paletteNaming, spec.primitives.neutralPalette.name, colors);
-    const paletteOf = (theme, role) => {
-      var _a;
-      const c = colors.find((x) => x.theme === theme && x.role === role);
-      return c ? (_a = result.assignments.find((a) => a.source === c.source)) == null ? void 0 : _a.palette : void 0;
+    const n = Math.max(0, Math.min((_a = inputs == null ? void 0 : inputs.numberOfThemes) != null ? _a : 0, (_c = (_b = inputs == null ? void 0 : inputs.themes) == null ? void 0 : _b.length) != null ? _c : 0));
+    const modes = themeModeNames(spec, n, inputs == null ? void 0 : inputs.themeNames);
+    const neutralColors = Array.from({ length: n }, (_, i) => {
+      var _a2, _b2, _c2, _d;
+      const hex = ((_c2 = (_b2 = (_a2 = inputs.themes[i]) == null ? void 0 : _a2.neutral) == null ? void 0 : _b2.hex) == null ? void 0 : _c2.trim().toUpperCase()) || spec.inputs.neutralColor.default;
+      return {
+        theme: i,
+        hex: validateHex(hex).length > 0 ? spec.inputs.neutralColor.default : hex,
+        source: `${((_d = inputs.themeKeys) == null ? void 0 : _d[i]) || modes[i]}|neutral`,
+        label: `the neutral color of ${modes[i]}`
+      };
+    });
+    const neutralNaming = assignPaletteNames(spec.primitives.neutralTint.naming, spec.primitives.neutralPalette.name, neutralColors);
+    const neutralBuilt = neutralNaming.palettes.map((p) => buildNeutralPalette(p.name, p.hex));
+    const neutralNameOf = (i) => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = neutralNaming.assignments.find((a) => {
+        var _a3;
+        return a.source === ((_a3 = neutralColors[i]) == null ? void 0 : _a3.source);
+      })) == null ? void 0 : _a2.palette) != null ? _b2 : spec.primitives.neutralPalette.name;
     };
-    const built = result.palettes.map((p) => p.exact ? buildPalette(p.name, p.hex) : buildHuePalette(p.name, p.hex));
+    const neutralStepsOf = (i) => {
+      const tinted = neutralBuilt.find((p) => p.name === neutralNameOf(i));
+      return tinted ? neutralOf(tinted) : GRAY_HEX;
+    };
+    const neutralsFor = (p) => {
+      const themesUsing = [...new Set(colors.filter((c) => p.sources.includes(c.source)).map((c) => c.theme))];
+      const names = [...new Set(themesUsing.map(neutralNameOf))];
+      return names.map((name) => neutralStepsOf(themesUsing.find((i) => neutralNameOf(i) === name)));
+    };
+    const paletteOf = (theme, role) => {
+      var _a2;
+      const c = colors.find((x) => x.theme === theme && x.role === role);
+      return c ? (_a2 = result.assignments.find((a) => a.source === c.source)) == null ? void 0 : _a2.palette : void 0;
+    };
+    const built = result.palettes.map((p) => p.exact ? buildPalette(p.name, p.hex, neutralsFor(p)) : buildHuePalette(p.name, p.hex, neutralsFor(p)));
     const byName = (name) => built.find((p) => p.name === name);
     const build = () => built;
     const similar = similarPalettes(
@@ -1407,7 +1519,7 @@
       const c = colors.find((x) => x.source === s.source);
       return __spreadProps(__spreadValues({}, s), { theme: c.theme, role: c.role });
     });
-    return __spreadProps(__spreadValues({}, result), { similar, paletteOf, build, colors });
+    return __spreadProps(__spreadValues({}, result), { similar, paletteOf, build, colors, neutralNaming, neutralBuilt, neutralNameOf, neutralStepsOf });
   }
   function hueOnlyShifts(naming, built) {
     const out = [];
@@ -1512,7 +1624,9 @@
       return customRoles.includes(role) ? (_a2 = t.custom) == null ? void 0 : _a2[role] : t[role];
     };
     themes.forEach((t, i) => {
+      var _a2, _b2;
       for (const role of [...activeRoles, ...customRoles]) checkHue(colorOf(t, role), `${role} color`, themeModes[i]);
+      if ((_b2 = (_a2 = t.neutral) == null ? void 0 : _a2.hex) == null ? void 0 : _b2.trim()) checkHue(t.neutral, "neutral color", themeModes[i]);
     });
     const slots = Object.values(spec.theme.typography).filter((src) => src.startsWith("input:fontWeights.")).map((src) => src.split(".")[1]);
     const weightsByTheme = [];
@@ -1608,7 +1722,9 @@
     });
     if (hasErrors()) return stop();
     const naming = namePalettes(spec, inputs);
-    for (const p of naming.problems) add("missing_input", "Primitives", "palette names", "Default", "a free palette name", "none left", p);
+    for (const p of [...naming.problems, ...naming.neutralNaming.problems]) {
+      add("missing_input", "Primitives", "palette names", "Default", "a free palette name", "none left", p);
+    }
     for (const s of naming.similar) {
       add(
         "similar_palette",
@@ -1633,7 +1749,7 @@
         `Only the hue of ${h.label} (${h.hex}) is used. Its palette is closer to ${h.stepHex} (step ${h.step}).`
       );
     }
-    for (const p of palettes) {
+    for (const p of [...palettes, ...naming.neutralBuilt]) {
       for (const f of [...p.errors, ...p.warnings]) {
         const token = f.step !== void 0 ? `Color/${p.name}/${f.step}` : `Color/${p.name}`;
         if (f.check === "gamut_clamp") {
@@ -1655,7 +1771,7 @@
     for (const [name, hex] of Object.entries(spec.primitives.baseColors)) prim(name, "COLOR", hex);
     const gray = spec.primitives.neutralPalette;
     for (const step of spec.primitives.steps) prim(`Color/${gray.name}/${step}`, "COLOR", gray.steps[String(step)]);
-    for (const p of palettes) {
+    for (const p of [...naming.neutralBuilt, ...palettes]) {
       for (const step of spec.primitives.steps) prim(`Color/${p.name}/${step}`, "COLOR", p.steps[step].hex);
     }
     for (const v of spec.primitives.sizes) prim(sizeName(v), "FLOAT", v);
@@ -1664,10 +1780,7 @@
     const usedWeights = [...new Set(weightsByTheme.flat())];
     for (const w of usedWeights) prim(`Typography/Font-weight/${w}`, "STRING", w);
     for (const o of spec.primitives.opacities) prim(`Opacity/${o}`, "FLOAT", o, ["OPACITY"]);
-    const paletteFor = (role, i) => {
-      const rule = spec.theme.colorRoles[role];
-      return (rule == null ? void 0 : rule.source) === "fixed" ? rule.palette : naming.paletteOf(i, role);
-    };
+    const paletteFor = (role, i) => role === "neutral" ? naming.neutralNameOf(i) : naming.paletteOf(i, role);
     const theme = (name, type, values, scopes = [], alpha = false) => {
       vars.push(__spreadValues({ collection: "Theme", name, type, scopes, values }, alpha ? { alpha } : {}));
     };
@@ -1946,7 +2059,7 @@
         manifest.push(entry);
       }
     }
-    return { ok: true, collections, variables: vars, report, manifest, palettes: naming.palettes };
+    return { ok: true, collections, variables: vars, report, manifest, palettes: [...naming.neutralNaming.palettes, ...naming.palettes] };
   }
   function appearanceOrder(spec, names) {
     const { categories, emphasis } = spec.appearance.order;
@@ -2921,6 +3034,7 @@ import androidx.compose.ui.graphics.Color
     }
   };
   function previewNames(inputs) {
+    var _a;
     try {
       const naming = namePalettes(tokens_default, inputs);
       const built = naming.build();
@@ -2934,6 +3048,10 @@ import androidx.compose.ui.graphics.Color
         const p = built.find((x) => x.name === naming.paletteOf(c.theme, c.role));
         return { theme: c.theme, role: c.role, hexes: steps.map((s) => p ? p.steps[s].hex : gray[String(s)]) };
       });
+      for (let i = 0; i < ((_a = inputs.themes) != null ? _a : []).length; i++) {
+        const neutral = naming.neutralStepsOf(i);
+        palettes.push({ theme: i, role: "neutral", hexes: steps.map((s) => neutral[s]) });
+      }
       figma.ui.postMessage({ type: "names-result", similar: notes, palettes });
     } catch (e) {
       figma.ui.postMessage({ type: "names-result", similar: [], palettes: [] });
