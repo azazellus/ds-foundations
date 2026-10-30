@@ -1,0 +1,13 @@
+# Installed tools: rebuilt with "npm install".
+node_modules/
+
+# Mac and editor files.
+.DS_Store
+.vscode/
+.idea/
+
+# Logs.
+npm-debug.log*
+
+# code.js is kept on purpose: it is the built plugin, so anyone can load it in Figma without building first.
+# Run "npm run build" and commit it again after changing anything in src/.

@@ -1,0 +1,17 @@
+{
+  "name": "design-foundations-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Figma plugin that creates design foundation variables from spec/tokens.json.",
+  "scripts": {
+    "build": "esbuild src/figma.ts --bundle --outfile=code.js --target=es2017 --format=iife",
+    "test": "node --experimental-strip-types test/logic.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.100.0",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.6.0"
+  }
+}

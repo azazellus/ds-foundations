@@ -1,0 +1,1048 @@
+<!-- Plugin window: the input form (foundations-spec.md section 5.1) and the validation report (section 6.1).
+     Layout follows the "Plugin UI" design (Figma file vVJzXGPhbz2Zb5KXwuJfse, node 39:2602): a 960 × 880 window,
+     with each color's palette shown next to it. Always light. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --text: #000000;
+    --muted: #6a6a6a;
+    --step-label: #606060;
+    --placeholder: rgba(0, 0, 0, 0.32);
+    --window: #ffffff;
+    --panel: #ffffff;
+    --add-bg: #fafafa; /* the "Add …" placeholder sections */
+    --field: #ffffff;
+    --border: rgba(0, 0, 0, 0.08);
+    --field-line: rgba(0, 0, 0, 0.1);
+    --accent: #1b01ff;  /* selected weight chips */
+    --action: #4938df;  /* buttons, ticked checkboxes, "Create variables" */
+    --accent-soft: #e4e1ff;
+    --empty-swatch: #d9d9d9;
+    --error: #d1293d;
+    --warning: #b86200;
+    --success: #14804a;
+    /* Fonts. Figma plugin windows cannot load web fonts, so each falls back to what is installed. */
+    --display: "Inter Display", Inter, system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    /* Effects from the design. Borders are drawn inside, as in Figma, so they never change a size. */
+    --line: inset 0 0 0 0.5px var(--border);
+    --field-border: inset 0 0 0 0.5px var(--field-line);
+    --extrude: inset 0 -2px 12px rgba(0, 0, 0, 0.08);        /* white panels */
+    --incave: inset 0 4px 8px rgba(0, 0, 0, 0.04);           /* "Add …" sections and HEX fields */
+    --shadow-secondary: inset 0 -4px 4px rgba(0, 0, 0, 0.04); /* white buttons and dropdowns */
+    --shadow-primary: inset 0 -4px 8px rgba(7, 0, 72, 0.5);   /* the main button */
+  }
+  * { box-sizing: border-box; }
+  /* The window itself never scrolls (and never bounces), so the bottom button bar stays put.
+     Only the content area (.scroll) scrolls. Its bottom padding leaves room for the button bar. */
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  body { margin: 0; background: var(--window); color: var(--text); font: 14px/20px Inter, system-ui, sans-serif; }
+  .scroll { height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 16px 16px 120px; }
+  /* The native scrollbar is hidden so it takes no width from the layout. A thin scrollbar is drawn
+     over the content instead (.scrollbar, moved by the script "Overlay scrollbar"). */
+  .scroll { scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+  .scrollbar { position: fixed; top: 2px; right: 0; bottom: 2px; width: 12px; z-index: 20; pointer-events: none; }
+  .scrollbar .thumb {
+    position: absolute; right: 3px; width: 6px; border-radius: 3px; background: rgba(0, 0, 0, 0.32);
+    opacity: 0; transition: opacity 0.3s; pointer-events: auto;
+  }
+  .scrollbar.active .thumb, .scrollbar .thumb:hover { opacity: 1; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  .hidden { display: none !important; }
+
+  /* Sections: "Themes", "Color modes", "Export tokens" and "Report". */
+  .card { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 24px; }
+  .card > h1 { align-self: stretch; margin: 0; padding: 12px 24px; font-size: 32px; line-height: 40px; font-weight: 700; }
+  .stack { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
+
+  /* White panels: one per theme, appearance, or export. */
+  .panel { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 24px; background: var(--panel); border-radius: 24px; box-shadow: var(--line), var(--extrude); }
+  .panel.theme { gap: 16px; }
+  .panel-title { align-self: stretch; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .panel-title .name, .panel-title input { font-size: 24px; line-height: 32px; font-weight: 700; }
+  .panel-title input { flex: 1; min-width: 0; padding: 0 8px; border: 0; border-radius: 8px; background: var(--field); box-shadow: var(--field-border); color: var(--text); font-family: inherit; }
+  .panel-title input::placeholder { color: var(--placeholder); }
+  .panel-title .icons { display: flex; gap: 16px; align-items: center; }
+  .appearance .panel-title .icons { gap: 8px; }
+  .icon { display: block; position: relative; flex-shrink: 0; }
+  .icon img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .i24 { width: 24px; height: 24px; } .i20 { width: 20px; height: 20px; } .i16 { width: 16px; height: 16px; }
+
+  /* Separator line (design asset, stretched to the panel width). */
+  .sep { position: relative; align-self: stretch; height: 0; }
+  .sep img { position: absolute; top: -0.5px; left: -0.29%; width: 100.58%; height: 1px; display: block; }
+
+  /* "Add …" placeholder sections: light grey, recessed, with a white button in the middle. */
+  .add-section { align-self: stretch; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+    background: var(--add-bg); border-radius: 24px; box-shadow: var(--line), var(--incave); }
+  .add-section.theme { height: 80px; }   /* "Add theme" */
+  .add-section.mode { min-height: 120px; } /* "Add appearance", a cell of the color-mode grid */
+
+  .section { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; align-self: stretch; }
+  .section.colors { gap: 12px; }
+  .section h2 { margin: 0; padding: 4px 0; font: 700 16px/20px var(--display); }
+  .rows { display: flex; flex-direction: column; gap: 4px; }
+  .colors .rows { align-self: stretch; }
+
+  /* Colors header: the title over the label and HEX columns, then the palette step numbers. */
+  .colors-head { align-self: stretch; display: flex; align-items: baseline; gap: 8px; }
+  .colors-head h2 { width: 248px; flex-shrink: 0; }
+  /* Same width as the palette strips below, one number per tile. */
+  .step-labels { flex: 1 1 0; min-width: 0; display: flex; text-align: center; font-size: 12px; line-height: 16px; color: var(--step-label); }
+  .step-labels span { flex: 1 0 0; }
+
+  /* A color row: label (136px), HEX field with swatch (104px), then the palette strip in the width that is left. */
+  .color-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 24px; }
+  /* Notices under a color, aligned with its HEX field. */
+  .similar-note { flex-basis: 100%; padding-left: 144px; font-size: 12px; line-height: 16px; color: var(--warning); }
+  .color-row .label { display: flex; align-items: center; gap: 8px; width: 136px; flex-shrink: 0; white-space: nowrap; font-weight: 600; }
+  .color-row .label.indent { padding-left: 24px; } /* no checkbox: line up with the labels that have one */
+  .color-row.off .label { color: var(--muted); font-weight: 400; }
+  .color-row .fields { display: flex; gap: 4px; align-items: center; }
+  .color-row.off .fields, .color-row.off .palette { display: none; }
+  .field { height: 24px; border-radius: 8px; background: var(--field); box-shadow: var(--field-border), var(--shadow-secondary); border: 0; color: var(--text); font: 14px/20px var(--mono); }
+  .field:focus, .field:focus-within, .hex:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
+  input.field { padding: 2px 12px; }
+  input.field::placeholder, .hex input::placeholder { color: var(--placeholder); }
+  .role-field { width: 112px; font: 400 14px/20px Inter, system-ui, sans-serif; padding: 2px 8px !important; }
+  .hex { display: flex; align-items: center; gap: 8px; width: 104px; height: 24px; padding: 2px 12px 2px 2px; border-radius: 8px; background: var(--field); box-shadow: var(--field-border), var(--incave); }
+  .hex input[type=text] { flex: 1; min-width: 0; border: 0; padding: 0; background: none; font: 14px/20px var(--mono); color: var(--text); outline: none; }
+  .swatch { position: relative; width: 20px; height: 20px; flex-shrink: 0; border-radius: 6px; background: var(--empty-swatch); cursor: pointer; }
+  .swatch.white { box-shadow: var(--line); }
+  .swatch input[type=color] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+  /* The palette this color makes: one tile per step, lightest first. Empty while the HEX is not valid. */
+  /* It takes the space left in the row, so it stays on the same line even when a scrollbar narrows the window. */
+  .palette { display: flex; flex: 1 1 0; min-width: 0; height: 20px; border-radius: 4px; overflow: hidden; }
+  .palette span { flex: 1 0 0; }
+
+  /* Typography: font family and font weights side by side. */
+  .typo { flex-direction: row; gap: 32px; align-items: flex-start; }
+  .typo .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .typo .col.family h2 { width: 238px; }
+  .typo .col.weight-col { flex: 1; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  /* A weight is a toggle chip. Off: white with the style name. On: light purple, bold, with a "×" to turn it off.
+     The hidden checkbox keeps it accessible; the script mirrors it as the class "on". */
+  .chip { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 12px; border-radius: 512px;
+    background: #ffffff; box-shadow: var(--line), var(--shadow-secondary); color: var(--text); font-weight: 400; cursor: pointer; white-space: nowrap; }
+  .chip input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+  .chip .x { display: none; width: 16px; height: 16px; }
+  .chip.on { padding-right: 8px; background: #f2f1ff; box-shadow: inset 0 0 0 0.5px rgba(18, 0, 181, 0.16), var(--shadow-secondary); color: var(--accent); font-weight: 600; }
+  .chip.on .x { display: block; }
+  .chip:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* Checkboxes: 16px, blue with the design's check icon when ticked. */
+  input.cb {
+    appearance: none; -webkit-appearance: none; margin: 0; flex-shrink: 0;
+    width: 16px; height: 16px; border: 0; border-radius: 4px; background: #ffffff; cursor: pointer;
+    box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.16), var(--incave);
+  }
+  input.cb:checked { background: var(--action) var(--check-icon) center / 16px 16px no-repeat; box-shadow: none; }
+  input.cb:focus-visible { outline: 2px solid var(--action); outline-offset: 1px; }
+  .check-row { display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: 24px; }
+
+  /* Dropdowns: a styled box with a transparent native <select> on top, so it stays accessible. */
+  .picker { position: relative; display: flex; align-items: center; gap: 8px; height: 24px; padding: 2px 4px 2px 12px; border-radius: 8px; background: var(--field); box-shadow: var(--field-border), var(--shadow-secondary); font: 14px/20px var(--mono); }
+  .picker:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .picker .text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .picker select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font: inherit; }
+  .picker.font { width: 256px; }
+  .picker.canvas { flex: 1; min-width: 0; padding-left: 2px; }
+  /* A label and its field: the label first, the field fills the rest of the row. */
+  .canvas-row, .option-row { align-self: stretch; display: flex; align-items: center; gap: 16px; }
+  .option-row > span:first-child { width: 128px; flex-shrink: 0; }
+  .option-row > .picker, .option-row > .field { flex: 1; min-width: 0; }
+
+  /* Color modes: two columns that fill the width. "Add appearance" is the next cell. */
+  .mode-grid { align-self: stretch; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #appearances { display: contents; }
+  .panel.appearance { min-width: 0; gap: 16px; }
+
+  /* Export tokens: two panels side by side. The button sits at the bottom right. */
+  .export-grid { align-self: stretch; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .panel.export { gap: 16px; min-width: 0; }
+  .panel.export .about { font-size: 12px; line-height: 16px; min-height: 48px; margin: 0; }
+  .panel.export .options { align-self: stretch; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .panel.export > .pill { align-self: flex-end; }
+
+  /* Pill buttons: white with a thin line and a soft inner shadow; the main one is purple. */
+  .pill { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 2px 12px 2px 8px; border-radius: 512px; background: #ffffff; box-shadow: var(--field-border), var(--shadow-secondary); color: var(--action); font-weight: 600; white-space: nowrap; }
+  .pill.small { height: 24px; padding-top: 0; padding-bottom: 0; }
+  .pill.text-only { padding: 2px 12px; }
+  .pill.primary { background: var(--action); box-shadow: var(--shadow-primary); color: #ffffff; }
+  .pill:disabled { opacity: 0.5; cursor: default; }
+  .icon-btn { border-radius: 6px; }
+  .icon-btn:focus-visible, .pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Bottom button bar: flush with the window's bottom edge, rounded at the top. */
+  .bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; }
+  .bottom-buttons {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 24px;
+    background: #ffffff; border-radius: 48px 48px 0 0;
+    box-shadow: inset 0.5px 0.5px 0 0 var(--border), inset -0.5px 0 0 0 var(--border), var(--extrude), 0 4px 24px rgba(0, 0, 0, 0.12);
+  }
+  .bottom-buttons .group { display: flex; gap: 8px; }
+  .bottom-buttons .pill { height: 48px; padding: 0 24px; font-size: 16px; }
+  .row-of-pills { display: flex; gap: 8px; justify-content: center; }
+
+  /* Report. */
+  .report .panel { align-self: stretch; align-items: stretch; }
+  #status { font-weight: 600; }
+  #status.error { color: var(--error); } #status.ok { color: var(--success); }
+  #summary { color: var(--text); }
+  .report table { width: 100%; border-collapse: collapse; font-size: 11px; line-height: 15px; }
+  .report th, .report td { text-align: left; padding: 4px; border-bottom: 1px solid #e1e1e1; vertical-align: top; word-break: break-word; }
+  .report td.error { color: var(--error); font-weight: 600; } .report td.warning { color: var(--warning); font-weight: 600; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tabs .pill { height: 24px; font-size: 12px; color: var(--text); font-weight: 400; padding: 0 10px; }
+  .tabs .pill.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  textarea { width: 100%; height: 160px; padding: 8px; font: 11px/1.3 var(--mono); border: 0; border-radius: 8px; background: var(--field); box-shadow: var(--field-border), var(--incave); color: var(--text); }
+</style>
+
+<main class="scroll" id="scroll">
+<section class="card" aria-labelledby="themesTitle">
+  <h1 id="themesTitle">Themes</h1>
+  <div class="stack" id="themes"></div>
+  <div class="add-section theme">
+    <button type="button" class="pill" id="addTheme"><span class="icon i20" data-icon="add"></span>Add theme</button>
+  </div>
+</section>
+
+<section class="card" aria-labelledby="appearancesTitle">
+  <h1 id="appearancesTitle">Color modes</h1>
+  <!-- One cell per appearance (#appearances lays its panels straight into the grid), then the "Add" cell. -->
+  <div class="mode-grid">
+    <div id="appearances"></div>
+    <div class="add-section mode">
+      <button type="button" class="pill hidden" id="addDark"><span class="icon i20" data-icon="add"></span>Add Dark</button>
+      <button type="button" class="pill" id="addAppearance"><span class="icon i20" data-icon="add"></span>Add appearance</button>
+    </div>
+  </div>
+</section>
+
+<!-- Developer exports (src/export.ts, spec section 6.1.2): Appearance tokens, and ColorScheme tokens for Android. -->
+<section class="card" aria-labelledby="exportTitle">
+  <h1 id="exportTitle">Export tokens</h1>
+  <div class="export-grid">
+    <div class="panel export" data-collection="appearance">
+      <div class="panel-title"><span class="name">Appearance</span></div>
+      <p class="about">JSON for developers: every Appearance token as HEX, for every theme and appearance, read from the variables in this file.</p>
+      <div class="options">
+        <label class="check-row"><input type="checkbox" class="cb" id="keepColor" checked> Keep “color” at the beginning</label>
+        <div class="option-row"><span>Naming convention</span>
+          <div class="picker"><span class="text" id="namingText"></span><span class="icon i16" data-icon="arrow"></span>
+            <select id="naming" aria-label="Naming convention">
+              <option value="dot">dot.case</option>
+              <option value="pascal">PascalCase</option>
+              <option value="camel">camelCase</option>
+              <option value="kebab">kebab-case (CSS)</option>
+            </select></div></div>
+        <div class="option-row"><span>Files</span>
+          <div class="picker"><span class="text" id="splitText"></span><span class="icon i16" data-icon="arrow"></span>
+            <select id="split" aria-label="Files">
+              <option value="all">One file with all themes</option>
+              <option value="perTheme">One file per theme</option>
+            </select></div></div>
+      </div>
+      <button type="button" class="pill" id="export"><span class="icon i20" data-icon="openInNew"></span>Export JSON</button>
+    </div>
+    <div class="panel export" data-collection="colorScheme">
+      <div class="panel-title"><span class="name">ColorScheme (Android)</span></div>
+      <p class="about" id="schemeAbout"></p>
+      <div class="options">
+        <div class="option-row"><span>Format</span>
+          <div class="picker"><span class="text" id="formatText"></span><span class="icon i16" data-icon="arrow"></span>
+            <select id="exportFormat" aria-label="Format">
+              <option value="kotlin">Kotlin (Jetpack Compose)</option>
+              <option value="json">JSON</option>
+            </select></div></div>
+        <div class="option-row kotlin-only"><span>Kotlin package</span>
+          <input type="text" class="field" id="kotlinPackage" value="com.example.ui.theme" aria-label="Kotlin package" spellcheck="false"></div>
+        <div class="option-row"><span>Files</span>
+          <div class="picker"><span class="text" id="schemeSplitText"></span><span class="icon i16" data-icon="arrow"></span>
+            <select id="schemeSplit" aria-label="Files">
+              <option value="all">One file with all themes</option>
+              <option value="perTheme">One file per theme</option>
+            </select></div></div>
+      </div>
+      <button type="button" class="pill" id="exportScheme"><span class="icon i20" data-icon="openInNew"></span><span id="exportSchemeLabel">Export Kotlin</span></button>
+    </div>
+  </div>
+</section>
+
+
+<section class="card report hidden" id="result" aria-labelledby="reportTitle">
+  <h1 id="reportTitle">Report</h1>
+  <div class="panel stack">
+    <div id="status" role="status"></div>
+    <div id="summary"></div>
+    <!-- Validation details; hidden after "Update tables", which runs no checks. -->
+    <div id="details" class="stack">
+      <label class="check-row"><input type="checkbox" class="cb" id="showWarnings" checked> Show warnings</label>
+      <table>
+        <thead><tr><th>Severity</th><th>Check</th><th>Token</th><th>Mode</th><th>Expected</th><th>Actual</th><th>Message</th></tr></thead>
+        <tbody id="findings"></tbody>
+      </table>
+      <div class="tabs">
+        <button type="button" class="pill on" data-out="report">Report JSON</button>
+        <button type="button" class="pill" data-out="manifest">Manifest JSON</button>
+        <button type="button" class="pill" data-out="definitions">Variable definitions</button>
+        <button type="button" class="pill" id="copy">Copy</button>
+      </div>
+      <textarea id="output" readonly aria-label="JSON output"></textarea>
+    </div>
+    <!-- Export result: shown after "Export JSON". -->
+    <div id="exportDetails" class="stack hidden">
+      <!-- One pill per exported file; the selected file is shown below. -->
+      <div class="tabs" id="exportFiles"></div>
+      <div class="tabs">
+        <button type="button" class="pill" id="download">Download this file</button>
+        <button type="button" class="pill" id="downloadAll">Download all files</button>
+        <button type="button" class="pill" id="copyExport">Copy</button>
+      </div>
+      <textarea id="exportOutput" readonly aria-label="Exported JSON"></textarea>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<div class="scrollbar" id="scrollbar" aria-hidden="true"><div class="thumb"></div></div>
+
+<div class="bottom-bar">
+  <div class="bottom-buttons">
+    <div class="group">
+      <button type="button" class="pill text-only" id="check">Check only</button>
+      <button type="button" class="pill text-only" id="tables" title="Redraw the color tables from the variables as they are now in this file">Update tables</button>
+    </div>
+    <button type="button" class="pill text-only primary" id="create">Create variables</button>
+  </div>
+</div>
+
+<script>
+  // ---------- Icons from the design (exported unchanged from Figma; see ui-assets/) ----------
+  const ICONS = {
+    edit: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="edit">
+<path id="vector" d="M5 19H6.425L16.2 9.225L14.775 7.8L5 17.575V19ZM4 21C3.71667 21 3.47917 20.9042 3.2875 20.7125C3.09583 20.5208 3 20.2833 3 20V17.575C3 17.3083 3.05 17.0542 3.15 16.8125C3.25 16.5708 3.39167 16.3583 3.575 16.175L16.2 3.575C16.4 3.39167 16.6208 3.25 16.8625 3.15C17.1042 3.05 17.3583 3 17.625 3C17.8917 3 18.15 3.05 18.4 3.15C18.65 3.25 18.8667 3.4 19.05 3.6L20.425 5C20.625 5.18333 20.7708 5.4 20.8625 5.65C20.9542 5.9 21 6.15 21 6.4C21 6.66667 20.9542 6.92083 20.8625 7.1625C20.7708 7.40417 20.625 7.625 20.425 7.825L7.825 20.425C7.64167 20.6083 7.42917 20.75 7.1875 20.85C6.94583 20.95 6.69167 21 6.425 21H4ZM15.475 8.525L14.775 7.8L16.2 9.225L15.475 8.525Z" fill="#1C1B1F"/>
+</g>
+</svg>`,
+    delete: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="delete">
+<path id="vector" d="M7 21C6.45 21 5.97917 20.8042 5.5875 20.4125C5.19583 20.0208 5 19.55 5 19V6C4.71667 6 4.47917 5.90417 4.2875 5.7125C4.09583 5.52083 4 5.28333 4 5C4 4.71667 4.09583 4.47917 4.2875 4.2875C4.47917 4.09583 4.71667 4 5 4H9C9 3.71667 9.09583 3.47917 9.2875 3.2875C9.47917 3.09583 9.71667 3 10 3H14C14.2833 3 14.5208 3.09583 14.7125 3.2875C14.9042 3.47917 15 3.71667 15 4H19C19.2833 4 19.5208 4.09583 19.7125 4.2875C19.9042 4.47917 20 4.71667 20 5C20 5.28333 19.9042 5.52083 19.7125 5.7125C19.5208 5.90417 19.2833 6 19 6V19C19 19.55 18.8042 20.0208 18.4125 20.4125C18.0208 20.8042 17.55 21 17 21H7ZM17 6H7V19H17V6ZM10.7125 16.7125C10.9042 16.5208 11 16.2833 11 16V9C11 8.71667 10.9042 8.47917 10.7125 8.2875C10.5208 8.09583 10.2833 8 10 8C9.71667 8 9.47917 8.09583 9.2875 8.2875C9.09583 8.47917 9 8.71667 9 9V16C9 16.2833 9.09583 16.5208 9.2875 16.7125C9.47917 16.9042 9.71667 17 10 17C10.2833 17 10.5208 16.9042 10.7125 16.7125ZM14.7125 16.7125C14.9042 16.5208 15 16.2833 15 16V9C15 8.71667 14.9042 8.47917 14.7125 8.2875C14.5208 8.09583 14.2833 8 14 8C13.7167 8 13.4792 8.09583 13.2875 8.2875C13.0958 8.47917 13 8.71667 13 9V16C13 16.2833 13.0958 16.5208 13.2875 16.7125C13.4792 16.9042 13.7167 17 14 17C14.2833 17 14.5208 16.9042 14.7125 16.7125Z" fill="#1C1B1F"/>
+</g>
+</svg>`,
+    add: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="add">
+<path id="vector" d="M9.16667 10.8333H5C4.76389 10.8333 4.56597 10.7535 4.40625 10.5938C4.24653 10.434 4.16667 10.2361 4.16667 10C4.16667 9.76389 4.24653 9.56597 4.40625 9.40625C4.56597 9.24653 4.76389 9.16667 5 9.16667H9.16667V5C9.16667 4.76389 9.24653 4.56597 9.40625 4.40625C9.56597 4.24653 9.76389 4.16667 10 4.16667C10.2361 4.16667 10.434 4.24653 10.5938 4.40625C10.7535 4.56597 10.8333 4.76389 10.8333 5V9.16667H15C15.2361 9.16667 15.434 9.24653 15.5938 9.40625C15.7535 9.56597 15.8333 9.76389 15.8333 10C15.8333 10.2361 15.7535 10.434 15.5938 10.5938C15.434 10.7535 15.2361 10.8333 15 10.8333H10.8333V15C10.8333 15.2361 10.7535 15.434 10.5938 15.5938C10.434 15.7535 10.2361 15.8333 10 15.8333C9.76389 15.8333 9.56597 15.7535 9.40625 15.5938C9.24653 15.434 9.16667 15.2361 9.16667 15V10.8333Z" fill="#4938DF"/>
+</g>
+</svg>`,
+    check: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="check">
+<path id="vector" d="M6.36667 10.1L12.0167 4.45C12.15 4.31667 12.3056 4.25 12.4833 4.25C12.6611 4.25 12.8167 4.31667 12.95 4.45C13.0833 4.58333 13.15 4.74167 13.15 4.925C13.15 5.10833 13.0833 5.26667 12.95 5.4L6.83333 11.5333C6.7 11.6667 6.54444 11.7333 6.36667 11.7333C6.18889 11.7333 6.03333 11.6667 5.9 11.5333L3.03333 8.66667C2.9 8.53333 2.83611 8.375 2.84167 8.19167C2.84722 8.00833 2.91667 7.85 3.05 7.71667C3.18333 7.58333 3.34167 7.51667 3.525 7.51667C3.70833 7.51667 3.86667 7.58333 4 7.71667L6.36667 10.1Z" fill="white"/>
+</g>
+</svg>`,
+    arrow: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="keyboard_arrow_down">
+<path id="vector" d="M11.625 14.9125C11.5083 14.8708 11.4 14.8 11.3 14.7L6.7 10.1C6.51667 9.91667 6.425 9.68333 6.425 9.4C6.425 9.11667 6.51667 8.88333 6.7 8.7C6.88333 8.51667 7.11667 8.425 7.4 8.425C7.68333 8.425 7.91667 8.51667 8.1 8.7L12 12.6L15.9 8.7C16.0833 8.51667 16.3167 8.425 16.6 8.425C16.8833 8.425 17.1167 8.51667 17.3 8.7C17.4833 8.88333 17.575 9.11667 17.575 9.4C17.575 9.68333 17.4833 9.91667 17.3 10.1L12.7 14.7C12.6 14.8 12.4917 14.8708 12.375 14.9125C12.2583 14.9542 12.1333 14.975 12 14.975C11.8667 14.975 11.7417 14.9542 11.625 14.9125Z" fill="#1C1B1F"/>
+</g>
+</svg>`,
+    separator: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="175" height="1" viewBox="0 0 175 1" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Separator">
+<path id="Vector 1" d="M0.5 0.5H174.5" stroke-linecap="round" stroke="#E1E1E1"/>
+</g>
+</svg>`,
+    openInNew: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="open_in_new">
+<path id="vector" d="M4.16667 17.5C3.70833 17.5 3.31597 17.3368 2.98958 17.0104C2.66319 16.684 2.5 16.2917 2.5 15.8333V4.16667C2.5 3.70833 2.66319 3.31597 2.98958 2.98958C3.31597 2.66319 3.70833 2.5 4.16667 2.5H9.16667C9.40278 2.5 9.60069 2.57986 9.76042 2.73958C9.92014 2.89931 10 3.09722 10 3.33333C10 3.56944 9.92014 3.76736 9.76042 3.92708C9.60069 4.08681 9.40278 4.16667 9.16667 4.16667H4.16667V15.8333H15.8333V10.8333C15.8333 10.5972 15.9132 10.3993 16.0729 10.2396C16.2326 10.0799 16.4306 10 16.6667 10C16.9028 10 17.1007 10.0799 17.2604 10.2396C17.4201 10.3993 17.5 10.5972 17.5 10.8333V15.8333C17.5 16.2917 17.3368 16.684 17.0104 17.0104C16.684 17.3368 16.2917 17.5 15.8333 17.5H4.16667ZM15.8333 5.33333L8.66667 12.5C8.51389 12.6528 8.31944 12.7292 8.08333 12.7292C7.84722 12.7292 7.65278 12.6528 7.5 12.5C7.34722 12.3472 7.27083 12.1528 7.27083 11.9167C7.27083 11.6806 7.34722 11.4861 7.5 11.3333L14.6667 4.16667H12.5C12.2639 4.16667 12.066 4.08681 11.9062 3.92708C11.7465 3.76736 11.6667 3.56944 11.6667 3.33333C11.6667 3.09722 11.7465 2.89931 11.9062 2.73958C12.066 2.57986 12.2639 2.5 12.5 2.5H16.6667C16.9028 2.5 17.1007 2.57986 17.2604 2.73958C17.4201 2.89931 17.5 3.09722 17.5 3.33333V7.5C17.5 7.73611 17.4201 7.93403 17.2604 8.09375C17.1007 8.25347 16.9028 8.33333 16.6667 8.33333C16.4306 8.33333 16.2326 8.25347 16.0729 8.09375C15.9132 7.93403 15.8333 7.73611 15.8333 7.5V5.33333Z" fill="#1B01FF"/>
+</g>
+</svg>`,
+    close: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="close">
+<path id="vector" d="M8 8.93333L4.73333 12.2C4.61111 12.3222 4.45556 12.3833 4.26667 12.3833C4.07778 12.3833 3.92222 12.3222 3.8 12.2C3.67778 12.0778 3.61667 11.9222 3.61667 11.7333C3.61667 11.5444 3.67778 11.3889 3.8 11.2667L7.06667 8L3.8 4.73333C3.67778 4.61111 3.61667 4.45556 3.61667 4.26667C3.61667 4.07778 3.67778 3.92222 3.8 3.8C3.92222 3.67778 4.07778 3.61667 4.26667 3.61667C4.45556 3.61667 4.61111 3.67778 4.73333 3.8L8 7.06667L11.2667 3.8C11.3889 3.67778 11.5444 3.61667 11.7333 3.61667C11.9222 3.61667 12.0778 3.67778 12.2 3.8C12.3222 3.92222 12.3833 4.07778 12.3833 4.26667C12.3833 4.45556 12.3222 4.61111 12.2 4.73333L8.93333 8L12.2 11.2667C12.3222 11.3889 12.3833 11.5444 12.3833 11.7333C12.3833 11.9222 12.3222 12.0778 12.2 12.2C12.0778 12.3222 11.9222 12.3833 11.7333 12.3833C11.5444 12.3833 11.3889 12.3222 11.2667 12.2L8 8.93333Z" fill="#1B01FF"/>
+</g>
+</svg>`,
+  };
+  const iconUrl = (name) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(ICONS[name]);
+  const icon = (name, size) => `<span class="icon i${size}"><img alt="" src="${iconUrl(name)}"></span>`;
+  const SEPARATOR = `<div class="sep"><img alt="" src="${iconUrl("separator")}"></div>`;
+  document.documentElement.style.setProperty("--check-icon", `url("${iconUrl("check")}")`);
+  for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = `<img alt="" src="${iconUrl(el.dataset.icon)}">`;
+
+  // ---------- Overlay scrollbar ----------
+  // A thin scrollbar drawn over the content, so scrolling never changes the layout width.
+  // It shows while scrolling or when pointed at, and can be dragged.
+  const scroller = document.getElementById("scroll");
+  const bar = document.getElementById("scrollbar");
+  const thumb = bar.querySelector(".thumb");
+  let dragging = null; // { y, top } where a drag started
+  let fadeTimer = null;
+  function placeThumb() {
+    const { scrollTop, scrollHeight, clientHeight } = scroller;
+    const fits = scrollHeight <= clientHeight + 1;
+    bar.classList.toggle("hidden", fits);
+    if (fits) return;
+    const track = bar.clientHeight;
+    const h = Math.max(32, (track * clientHeight) / scrollHeight);
+    thumb.style.height = `${h}px`;
+    thumb.style.top = `${(scrollTop / (scrollHeight - clientHeight)) * (track - h)}px`;
+  }
+  function flashThumb() {
+    bar.classList.add("active");
+    clearTimeout(fadeTimer);
+    fadeTimer = setTimeout(() => { if (!dragging) bar.classList.remove("active"); }, 800);
+  }
+  scroller.addEventListener("scroll", () => { placeThumb(); flashThumb(); });
+  // Moving the thumb by the distance dragged scrolls the content by the same share of its length.
+  thumb.addEventListener("pointerdown", (e) => {
+    dragging = { y: e.clientY, top: scroller.scrollTop };
+    thumb.setPointerCapture(e.pointerId);
+    bar.classList.add("active");
+    e.preventDefault();
+  });
+  thumb.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const range = bar.clientHeight - thumb.offsetHeight;
+    scroller.scrollTop = dragging.top + ((e.clientY - dragging.y) * (scroller.scrollHeight - scroller.clientHeight)) / range;
+  });
+  thumb.addEventListener("pointerup", () => { dragging = null; flashThumb(); });
+  thumb.addEventListener("wheel", (e) => { scroller.scrollTop += e.deltaY; }, { passive: true });
+  // The content grows and shrinks as themes and colors are added or removed.
+  const sizeWatcher = new ResizeObserver(placeThumb);
+  sizeWatcher.observe(scroller);
+  for (const section of scroller.children) sizeWatcher.observe(section);
+
+  // ---------- Values sent by the plugin (from spec/tokens.json and Figma) ----------
+  let FONTS = {}; // font family -> non-italic styles
+  let GRAY = {}; // Gray palette step -> HEX, for the canvas swatches
+  let SLOTS = []; // weight slots: light, regular, medium, semibold, bold
+  let LIGHT_STEPS = ["white", 50];
+  let DARK_STEPS = [950, 900, 850];
+  let STEPS = [50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 850, 900, 950]; // palette steps, lightest first
+
+  const STATUS = ["success", "danger", "warning", "info"];
+  const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
+  // Starting values of the status colors in a new theme. The user can change them.
+  const STATUS_DEFAULTS = {
+    success: { hex: "#48A13F" },
+    danger: { hex: "#E74B3C" },
+    warning: { hex: "#CE6924" },
+    info: { hex: "#4785E6" },
+  };
+  // Starting value of the brand color and of a color added with "Add color": white.
+  const EMPTY_COLOR = { hex: "#FFFFFF" };
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const newKey = () => Math.random().toString(36).slice(2, 10);
+  const slotOf = (style) => style.replace(/\s+/g, "").toLowerCase();
+
+  // Usual weight order, lightest first, so the checkboxes read top to bottom from thin to black.
+  const WEIGHT_ORDER = ["hairline", "thin", "extralight", "ultralight", "light", "book", "regular", "normal", "medium",
+    "semibold", "demibold", "bold", "extrabold", "ultrabold", "black", "heavy"];
+  const weightRank = (s) => { const i = WEIGHT_ORDER.indexOf(slotOf(s)); return i < 0 ? WEIGHT_ORDER.length : i; };
+
+  // ---------- Panel title with rename (pencil) and delete (trash) ----------
+  // options: { name, canRename, canDelete, placeholder, onDelete, startEditing }
+  function panelTitle(options) {
+    const row = document.createElement("div");
+    row.className = "panel-title";
+    row.innerHTML = `<span class="name"></span><span class="icons">
+      ${options.canRename ? `<button type="button" class="icon-btn" data-act="rename" aria-label="Rename">${icon("edit", 24)}</button>` : ""}
+      ${options.canDelete ? `<button type="button" class="icon-btn" data-act="delete" aria-label="Delete">${icon("delete", 24)}</button>` : ""}
+    </span>`;
+    const nameEl = row.querySelector(".name");
+    nameEl.textContent = options.name;
+    // While the name is being edited, the typed text counts.
+    row.getName = () => (row.querySelector("input")?.value ?? nameEl.textContent).trim();
+    const edit = () => {
+      const input = document.createElement("input");
+      input.value = nameEl.textContent;
+      input.placeholder = options.placeholder || "Name";
+      input.setAttribute("aria-label", "Name");
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+      const done = () => { nameEl.textContent = input.value.trim(); input.replaceWith(nameEl); };
+      input.onblur = done;
+      input.onkeydown = (e) => { if (e.key === "Enter" || e.key === "Escape") input.blur(); };
+    };
+    row.querySelector('[data-act="rename"]')?.addEventListener("click", edit);
+    row.querySelector('[data-act="delete"]')?.addEventListener("click", options.onDelete);
+    if (options.startEditing) setTimeout(edit, 0);
+    return row;
+  }
+
+  // ---------- Color fields: HEX with a swatch that opens the color picker ----------
+  // The palette name is chosen by the plugin from the hue (foundations-spec.md section 1.1.8).
+  function colorFields(value) {
+    const box = document.createElement("div");
+    box.className = "fields";
+    box.innerHTML = `
+      <div class="hex"><label class="swatch"><input type="color" tabindex="-1" aria-label="Pick color"></label>
+        <input type="text" placeholder="HEX" maxlength="7" aria-label="HEX value"></div>`;
+    const hex = box.querySelector('input[type="text"]');
+    const pick = box.querySelector('input[type="color"]');
+    const swatch = box.querySelector(".swatch");
+    const paint = () => {
+      const v = hex.value.trim();
+      const ok = HEX_RE.test(v);
+      swatch.style.background = ok ? v : "";
+      swatch.classList.toggle("white", ok && v.toUpperCase() === "#FFFFFF");
+      if (ok) pick.value = v;
+    };
+    hex.addEventListener("input", paint);
+    pick.addEventListener("input", () => { hex.value = pick.value.toUpperCase(); paint(); });
+    box.get = () => ({ hex: hex.value.trim().toUpperCase() });
+    box.set = (h) => { hex.value = h?.hex || ""; paint(); };
+    box.set(value);
+    return box;
+  }
+
+  // ---------- Themes ----------
+  // Theme A holds the status checkboxes and the custom colors' role names; other themes follow it.
+  const themesBox = document.getElementById("themes");
+  const themePanels = () => [...themesBox.children];
+  let customIds = []; // custom color rows, in order; their role names are typed in Theme A
+
+  function nextThemeName() {
+    const used = new Set(themePanels().map((p) => p.head.getName()));
+    for (const l of LETTERS) if (!used.has(`Theme ${l}`)) return `Theme ${l}`;
+    return "";
+  }
+
+  function addTheme(saved, copyFrom) {
+    if (themePanels().length >= 26) return;
+    const first = themePanels().length === 0;
+    const panel = document.createElement("div");
+    panel.className = "panel theme";
+    panel.dataset.key = saved?.key || newKey();
+    panel.head = panelTitle({
+      name: saved?.name || nextThemeName(),
+      canRename: true,
+      canDelete: !first,
+      placeholder: "Theme name",
+      onDelete: () => { panel.remove(); refreshAddTheme(); },
+    });
+    panel.append(panel.head);
+    panel.insertAdjacentHTML("beforeend", `${SEPARATOR}
+      <div class="section colors">
+        <div class="colors-head"><h2>Colors</h2><div class="step-labels">${STEPS.map((s) => `<span>${s}</span>`).join("")}</div></div>
+        <div class="rows"></div>
+        <button type="button" class="pill add-color">${icon("add", 20)}Add color</button>
+      </div>
+      ${SEPARATOR}
+      <div class="section typo">
+        <div class="col family"><h2>Font family</h2>
+          <div class="picker font"><span class="text"></span>${icon("arrow", 16)}<select aria-label="Font family"></select></div></div>
+        <div class="col weight-col"><h2>Font weights</h2><div class="chips"></div></div>
+      </div>`);
+    const rows = panel.querySelector(".colors .rows");
+    panel.colors = {};
+
+    // Brand and status rows. The status checkboxes are shared: ticking one in any theme ticks it in all.
+    const ticked = statusRoles();
+    for (const role of ["brand", ...STATUS]) {
+      const row = document.createElement("div");
+      row.className = "color-row";
+      row.dataset.role = role;
+      const box = role !== "brand" ? `<input type="checkbox" class="cb status-cb" value="${role}" ${ticked.includes(role) ? "checked" : ""} aria-label="Use ${role}">` : "";
+      row.innerHTML = `<label class="label${box ? "" : " indent"}">${box}<span>${role}</span></label>`;
+      const fields = colorFields(saved?.colors?.[role] ?? (role === "brand" ? EMPTY_COLOR : STATUS_DEFAULTS[role]));
+      row.append(fields, paletteStrip());
+      panel.colors[role] = fields;
+      rows.append(row);
+    }
+    for (const cb of panel.querySelectorAll(".status-cb")) cb.onchange = () => setStatusRole(cb.value, cb.checked);
+    panel.querySelector(".add-color").onclick = () => addCustomColor(undefined, undefined, panel);
+    themesBox.append(panel);
+
+    // Custom color rows that already exist (added in Theme A) appear in a new theme too.
+    for (const id of customIds) addCustomRow(panel, id, saved?.custom?.[id]);
+
+    // Typography: a new theme starts with the font and weights of the theme it copies (Theme A).
+    const font = saved?.fontFamily || copyFrom?.fontFamily() || (FONTS.Inter ? "Inter" : Object.keys(FONTS)[0] || "");
+    setupFont(panel, font, saved?.fontWeights || copyFrom?.fontWeights());
+    applyStatusRoles();
+    refreshAddTheme();
+    return panel;
+  }
+
+  // The font dropdown lists the installed families; the weight chips list that family's styles.
+  function setupFont(panel, family, weights) {
+    const picker = panel.querySelector(".picker.font");
+    const select = picker.querySelector("select");
+    const families = Object.keys(FONTS).sort((a, b) => a.localeCompare(b));
+    if (family && !FONTS[family]) families.unshift(family); // saved, but not installed on this computer
+    select.innerHTML = families.map((f) => `<option value="${esc(f)}">${esc(f)}${FONTS[f] ? "" : " (not installed)"}</option>`).join("");
+    select.value = family;
+    const box = panel.querySelector(".chips");
+    const render = (keep) => {
+      const f = select.value;
+      picker.querySelector(".text").textContent = f;
+      const styles = [...(FONTS[f] || [])].sort((a, b) => weightRank(a) - weightRank(b));
+      // Keep the ticked styles that this family has; if none, tick the styles that fill a weight slot.
+      let ticked = (keep || []).filter((w) => styles.includes(w));
+      if (ticked.length === 0) ticked = styles.filter((w) => SLOTS.includes(slotOf(w)));
+      // One toggle chip per style; a ticked chip is purple with a "×".
+      box.innerHTML = styles.length
+        ? styles.map((w) => `<label class="chip${ticked.includes(w) ? " on" : ""}"><input type="checkbox" value="${esc(w)}" ${ticked.includes(w) ? "checked" : ""}><span>${esc(w)}</span><span class="x">${icon("close", 16)}</span></label>`).join("")
+        : `<span style="color: var(--muted)">No styles found for this font.</span>`;
+      for (const cb of box.querySelectorAll("input")) cb.onchange = () => cb.parentElement.classList.toggle("on", cb.checked);
+    };
+    select.onchange = () => render(panel.fontWeights());
+    panel.fontFamily = () => select.value;
+    panel.fontWeights = () => [...box.querySelectorAll("input:checked")].map((b) => b.value);
+    render(weights);
+  }
+
+  // Status checkboxes: every theme shows them, but they hold one shared choice (Theme A's boxes are read).
+  // An unticked status role is greyed out and has no fields, in every theme.
+  function statusRoles() {
+    const a = themePanels()[0];
+    return a ? [...a.querySelectorAll(".status-cb")].filter((b) => b.checked).map((b) => b.value) : STATUS;
+  }
+  function setStatusRole(role, on) {
+    for (const cb of themesBox.querySelectorAll(`.status-cb[value="${role}"]`)) cb.checked = on;
+    applyStatusRoles();
+  }
+  function applyStatusRoles() {
+    const on = statusRoles();
+    for (const row of themesBox.querySelectorAll(".color-row[data-role]")) {
+      const r = row.dataset.role;
+      row.classList.toggle("off", STATUS.includes(r) && !on.includes(r));
+    }
+  }
+
+  // Custom colors: every theme has the same list of colors, each with its own HEX per theme.
+  // The role name can be typed in any theme; it is copied to the same row in the other themes.
+  function addCustomColor(role, savedByTheme, focusIn) {
+    const id = newKey();
+    customIds.push(id);
+    themePanels().forEach((p, i) => addCustomRow(p, id, savedByTheme?.[i], role));
+    (focusIn || themePanels()[0])?.querySelector(`[data-custom="${id}"] .role-field`)?.focus();
+    askNames();
+    return id;
+  }
+  function addCustomRow(panel, id, value, role) {
+    const row = document.createElement("div");
+    row.className = "color-row";
+    row.dataset.custom = id;
+    row.innerHTML = `<div class="label">
+      <button type="button" class="icon-btn" aria-label="Remove this color">${icon("delete", 16)}</button>
+      <input type="text" class="field role-field" placeholder="role name" aria-label="Role name"></div>`;
+    const input = row.querySelector(".role-field");
+    input.value = role ?? roleOf(id);
+    input.oninput = () => syncRoleNames(id, input);
+    row.querySelector("button").onclick = () => removeCustomColor(id);
+    const fields = colorFields(value ?? EMPTY_COLOR);
+    row.append(fields, paletteStrip());
+    panel.querySelector(".colors .rows").append(row);
+  }
+  const roleOf = (id) => themesBox.querySelector(`[data-custom="${id}"] .role-field`)?.value.trim() ?? "";
+  // Copies the role name typed in one theme to the same color row in every other theme.
+  function syncRoleNames(id, from) {
+    for (const el of themesBox.querySelectorAll(`[data-custom="${id}"] .role-field`)) if (el !== from) el.value = from.value;
+  }
+  function removeCustomColor(id) {
+    customIds = customIds.filter((x) => x !== id);
+    for (const row of themesBox.querySelectorAll(`[data-custom="${id}"]`)) row.remove();
+    askNames();
+  }
+
+  // ---------- Live palettes and notices ----------
+  // While colors change, the plugin is asked for the palette of every color, and which ones would make a
+  // palette that looks almost the same as another (foundations-spec.md section 1.1.8, rule 4).
+  // It answers with "names-result".
+  let namesTimer = null;
+  function askNames() {
+    clearTimeout(namesTimer);
+    namesTimer = setTimeout(() => parent.postMessage({ pluginMessage: { type: "names", inputs: readInputs() } }, "*"), 150);
+  }
+  themesBox.addEventListener("input", askNames);
+  themesBox.addEventListener("change", askNames);
+  new MutationObserver(askNames).observe(themesBox, { childList: true }); // a theme added or removed
+  // The row of one color: a built-in role by name, a custom role by the name typed in Theme A.
+  function colorRow(themeIndex, role) {
+    const panel = themePanels()[themeIndex];
+    if (!panel) return null;
+    const id = customIds.find((x) => roleOf(x) === role);
+    return id ? panel.querySelector(`[data-custom="${id}"]`) : panel.querySelector(`.color-row[data-role="${role}"]`);
+  }
+  // ---------- Palette strips ----------
+  // Each color row shows the palette the plugin will make for it (sent with "names-result").
+  function paletteStrip() {
+    const strip = document.createElement("div");
+    strip.className = "palette";
+    strip.setAttribute("aria-hidden", "true");
+    return strip;
+  }
+  function showPalettes(palettes) {
+    for (const strip of themesBox.querySelectorAll(".palette")) strip.innerHTML = ""; // a HEX that is not valid: no palette
+    for (const p of palettes) {
+      const strip = colorRow(p.theme, p.role)?.querySelector(".palette");
+      if (!strip) continue;
+      strip.innerHTML = p.hexes.map((hex, i) => `<span style="background:${hex}" title="${STEPS[i]} · ${hex}"></span>`).join("");
+    }
+  }
+
+  function showSimilar(similar) {
+    for (const el of themesBox.querySelectorAll(".similar-note")) el.remove();
+    for (const s of similar) {
+      const row = colorRow(s.theme, s.role);
+      if (!row) continue;
+      const note = document.createElement("div");
+      note.className = "similar-note";
+      note.textContent = s.note;
+      row.append(note);
+    }
+  }
+
+  function refreshAddTheme() {
+    document.getElementById("addTheme").disabled = themePanels().length >= 26;
+  }
+  document.getElementById("addTheme").onclick = () => {
+    const a = themePanels()[0];
+    addTheme(null, a);
+  };
+
+  // ---------- Appearances ----------
+  // Light is always there. Dark can be removed (Light-only file). Extra appearances are user-named.
+  const appearancesBox = document.getElementById("appearances");
+  const canvasLabel = (step) => `color/neutral/${step}`;
+  const canvasHex = (step) => (step === "white" ? "#FFFFFF" : GRAY[String(step)] || "");
+
+  // options: [{ value, base, step }]
+  function canvasPicker(options, value) {
+    const picker = document.createElement("div");
+    picker.className = "picker canvas";
+    picker.innerHTML = `<span class="swatch"></span><span class="text"></span>${icon("arrow", 16)}
+      <select aria-label="Canvas color">${options.map((o) => `<option value="${o.value}">${canvasLabel(o.step)}</option>`).join("")}</select>`;
+    const select = picker.querySelector("select");
+    const paint = () => {
+      const o = options.find((x) => x.value === select.value) || options[0];
+      picker.querySelector(".text").textContent = canvasLabel(o.step);
+      const sw = picker.querySelector(".swatch");
+      sw.style.background = canvasHex(o.step);
+      sw.classList.toggle("white", o.step === "white");
+    };
+    select.onchange = paint;
+    if (value && options.some((o) => o.value === value)) select.value = value;
+    paint();
+    picker.get = () => options.find((x) => x.value === select.value) || options[0];
+    return picker;
+  }
+
+  function appearancePanel(kind, saved) {
+    const panel = document.createElement("div");
+    panel.className = "panel appearance";
+    panel.dataset.kind = kind; // "Light", "Dark" or "extra"
+    panel.dataset.key = saved?.key || newKey();
+    panel.head = panelTitle({
+      name: kind === "extra" ? saved?.name || "" : kind,
+      canRename: kind === "extra",
+      canDelete: kind !== "Light",
+      placeholder: "Appearance name",
+      startEditing: kind === "extra" && !saved,
+      onDelete: () => { panel.remove(); refreshAddDark(); },
+    });
+    const light = LIGHT_STEPS.map((s) => ({ value: `Light:${s}`, base: "Light", step: s }));
+    const dark = DARK_STEPS.map((s) => ({ value: `Dark:${s}`, base: "Dark", step: s }));
+    const options = kind === "Light" ? light : kind === "Dark" ? dark : [...light, ...dark];
+    const row = document.createElement("div");
+    row.className = "canvas-row";
+    row.innerHTML = `<span>Canvas color</span>`;
+    panel.canvas = canvasPicker(options, saved ? `${saved.base}:${saved.canvasStep}` : options[0].value);
+    row.append(panel.canvas);
+    panel.append(panel.head, row);
+    return panel;
+  }
+  function addAppearance(kind, saved) {
+    const panel = appearancePanel(kind, saved);
+    // Dark goes right after Light; extra appearances go at the end.
+    if (kind === "Dark") appearancesBox.children[0].after(panel);
+    else appearancesBox.append(panel);
+    refreshAddDark();
+  }
+  const darkPanel = () => appearancesBox.querySelector('[data-kind="Dark"]');
+  function refreshAddDark() {
+    document.getElementById("addDark").classList.toggle("hidden", !!darkPanel());
+  }
+  document.getElementById("addDark").onclick = () => addAppearance("Dark", { base: "Dark", canvasStep: DARK_STEPS[0] });
+  document.getElementById("addAppearance").onclick = () => addAppearance("extra");
+
+  // ---------- Reading and restoring the form ----------
+
+  // The form as the Inputs shape of src/foundations.ts (plus keys, which the Figma layer uses for renames).
+  function readInputs() {
+    const panels = themePanels();
+    const roles = statusRoles();
+    const customRoles = customIds.map(roleOf);
+    const themes = panels.map((p) => {
+      const t = { brand: p.colors.brand.get(), fontFamily: p.fontFamily(), fontWeights: p.fontWeights() };
+      for (const r of roles) t[r] = p.colors[r].get();
+      t.custom = {};
+      customIds.forEach((id, i) => { t.custom[customRoles[i]] = p.querySelector(`[data-custom="${id}"] .fields`).get(); });
+      return t;
+    });
+    const lightCanvas = appearancesBox.querySelector('[data-kind="Light"]').canvas.get();
+    const dark = darkPanel();
+    const extraAppearances = [...appearancesBox.querySelectorAll('[data-kind="extra"]')].map((p) => {
+      const c = p.canvas.get();
+      return { name: p.head.getName(), base: c.base, canvasStep: c.step, key: p.dataset.key };
+    });
+    return {
+      numberOfThemes: panels.length,
+      themes,
+      themeNames: panels.map((p) => p.head.getName()),
+      themeKeys: panels.map((p) => p.dataset.key),
+      statusRoles: roles,
+      customRoles,
+      includeDark: !!dark,
+      lightCanvasStep: lightCanvas.step,
+      ...(dark ? { darkCanvasStep: dark.canvas.get().step } : {}),
+      extraAppearances,
+    };
+  }
+
+  // Put saved inputs back (or start a fresh form when there are none).
+  function fillInputs(inputs) {
+    inputs = inputs || {};
+    themesBox.innerHTML = "";
+    appearancesBox.innerHTML = "";
+    customIds = [];
+    const n = Math.min(26, Math.max(1, inputs.numberOfThemes || 1));
+    const savedRoles = inputs.statusRoles || STATUS;
+    for (let i = 0; i < n; i++) {
+      const t = (inputs.themes || [])[i] || {};
+      const colors = { brand: t.brand };
+      for (const r of STATUS) colors[r] = t[r];
+      addTheme({
+        key: inputs.themeKeys?.[i],
+        name: inputs.themeNames?.[i] || `Theme ${LETTERS[i]}`,
+        colors,
+        fontFamily: t.fontFamily,
+        fontWeights: t.fontWeights,
+      });
+      if (i === 0) for (const cb of themesBox.querySelectorAll(".status-cb")) cb.checked = savedRoles.includes(cb.value);
+    }
+    for (const role of inputs.customRoles || []) {
+      addCustomColor(role, (inputs.themes || []).map((t) => t?.custom?.[role]));
+    }
+    applyStatusRoles();
+    addAppearance("Light", { base: "Light", canvasStep: inputs.lightCanvasStep ?? LIGHT_STEPS[0] });
+    if (inputs.includeDark !== false) addAppearance("Dark", { base: "Dark", canvasStep: inputs.darkCanvasStep ?? DARK_STEPS[0] });
+    for (const a of inputs.extraAppearances || []) {
+      const steps = a.base === "Light" ? LIGHT_STEPS : DARK_STEPS;
+      addAppearance("extra", { ...a, canvasStep: a.canvasStep ?? steps[0] });
+    }
+    refreshAddDark();
+  }
+
+  // ---------- Buttons ----------
+  const statusEl = document.getElementById("status");
+  function showResult(text) {
+    statusEl.textContent = text;
+    statusEl.className = "";
+    document.getElementById("result").classList.remove("hidden");
+    document.getElementById("result").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function run(write) {
+    document.activeElement?.blur(); // finish a rename that is being typed
+    showResult(write ? "Creating variables..." : "Checking...");
+    document.getElementById("summary").innerHTML = "";
+    document.getElementById("details").classList.add("hidden"); // shown again with the result
+    document.getElementById("exportDetails").classList.add("hidden");
+    parent.postMessage({ pluginMessage: { type: "run", inputs: readInputs(), write } }, "*");
+  }
+  document.getElementById("check").onclick = () => run(false);
+  document.getElementById("create").onclick = () => run(true);
+
+  // Redraw the tables from the file's current variables. The form inputs are not used.
+  document.getElementById("tables").onclick = () => {
+    showResult("Updating color tables...");
+    document.getElementById("summary").innerHTML = "";
+    document.getElementById("details").classList.add("hidden");
+    document.getElementById("exportDetails").classList.add("hidden");
+    parent.postMessage({ pluginMessage: { type: "tables" } }, "*");
+  };
+
+  // ---------- Developer export ----------
+  // The options of one export panel: "appearance" (JSON) or "colorScheme" (JSON or Kotlin).
+  const exportOptions = (collection) => collection === "colorScheme"
+    ? {
+      collection, keepColorPrefix: true, naming: "dot",
+      format: document.getElementById("exportFormat").value,
+      kotlinPackage: document.getElementById("kotlinPackage").value,
+      split: document.getElementById("schemeSplit").value,
+    }
+    : {
+      collection,
+      keepColorPrefix: document.getElementById("keepColor").checked,
+      naming: document.getElementById("naming").value,
+      split: document.getElementById("split").value,
+    };
+  // The text of the selected option, shown in a dropdown's box.
+  const pickedText = (id) => { const sel = document.getElementById(id); return sel.options[sel.selectedIndex].text; };
+  function showNaming() {
+    document.getElementById("namingText").textContent = pickedText("naming");
+    document.getElementById("splitText").textContent = pickedText("split");
+    document.getElementById("formatText").textContent = pickedText("exportFormat");
+    document.getElementById("schemeSplitText").textContent = pickedText("schemeSplit");
+    // ColorScheme: the package applies to Kotlin only; the text and button follow the format.
+    const kotlin = document.getElementById("exportFormat").value === "kotlin";
+    for (const el of document.querySelectorAll(".kotlin-only")) el.classList.toggle("hidden", !kotlin);
+    document.getElementById("schemeAbout").textContent = kotlin
+      ? "Kotlin for Android developers: a lightColorScheme or darkColorScheme for every theme and appearance, with the Compose role names, read from the variables in this file."
+      : "JSON for Android developers: every ColorScheme role as HEX, with the Compose names, for every theme and appearance, read from the variables in this file.";
+    document.getElementById("exportSchemeLabel").textContent = kotlin ? "Export Kotlin" : "Export JSON";
+  }
+  for (const id of ["naming", "split", "exportFormat", "schemeSplit"]) document.getElementById(id).onchange = showNaming;
+  showNaming();
+  function startExport(collection) {
+    showResult(collection === "colorScheme" ? "Exporting ColorScheme tokens..." : "Exporting appearance tokens...");
+    document.getElementById("summary").innerHTML = "";
+    document.getElementById("details").classList.add("hidden");
+    document.getElementById("exportDetails").classList.add("hidden");
+    parent.postMessage({ pluginMessage: { type: "export", options: exportOptions(collection) } }, "*");
+  }
+  document.getElementById("export").onclick = () => startExport("appearance");
+  document.getElementById("exportScheme").onclick = () => startExport("colorScheme");
+  // The exported files ({ fileName, data } for JSON, { fileName, text } for Kotlin) and the one shown.
+  let exported = [];
+  let shownFile = 0;
+  const fileText = (f) => f.text ?? JSON.stringify(f.data, null, 2);
+  function showFile(i) {
+    shownFile = i;
+    document.getElementById("exportOutput").value = exported[i] ? fileText(exported[i]) : "";
+    document.querySelectorAll("#exportFiles .pill").forEach((b, j) => b.classList.toggle("on", j === i));
+  }
+  // Saves one file. Plugin windows can start a download from a link.
+  function download(f) {
+    const blob = new Blob([fileText(f)], { type: f.text !== undefined ? "text/plain" : "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = f.fileName;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  document.getElementById("download").onclick = () => exported[shownFile] && download(exported[shownFile]);
+  // Several files: one download each, a moment apart, so the browser does not merge or drop them.
+  document.getElementById("downloadAll").onclick = () => exported.forEach((f, i) => setTimeout(() => download(f), i * 400));
+  document.getElementById("copyExport").onclick = () => {
+    const out = document.getElementById("exportOutput");
+    out.select();
+    document.execCommand("copy"); // the clipboard API is blocked inside Figma plugin windows
+  };
+
+  // ---------- Report display ----------
+  let last = null;
+  let currentOut = "report";
+
+  function renderFindings() {
+    const showWarnings = document.getElementById("showWarnings").checked;
+    const rows = last.report.filter((r) => showWarnings || r.severity === "error");
+    document.getElementById("findings").innerHTML = rows.map((r) => `<tr>
+      <td class="${r.severity}">${r.severity}</td><td>${esc(r.check)}</td><td>${esc(r.token)}</td>
+      <td>${esc(r.mode)}</td><td>${esc(r.expected)}</td><td>${esc(r.actual)}</td><td>${esc(r.message)}</td></tr>`).join("");
+  }
+
+  // Section 6.1 output 3: Figma-ready variable definitions, grouped by collection and mode.
+  function definitions() {
+    const out = {};
+    for (const c of last.collections) {
+      out[c.name] = {};
+      for (const m of c.modes) {
+        out[c.name][m] = last.variables.filter((v) => v.collection === c.name).map((v) => ({
+          name: v.name, type: v.type, scopes: v.scopes, value: v.values[m],
+        }));
+      }
+    }
+    return out;
+  }
+
+  function renderOutput() {
+    const data = currentOut === "report" ? last.report : currentOut === "manifest" ? last.manifest : definitions();
+    document.getElementById("output").value = JSON.stringify(data, null, 2);
+    for (const b of document.querySelectorAll(".tabs [data-out]")) b.classList.toggle("on", b.dataset.out === currentOut);
+  }
+  for (const b of document.querySelectorAll(".tabs [data-out]")) {
+    b.onclick = () => { currentOut = b.dataset.out; if (last) renderOutput(); };
+  }
+  document.getElementById("showWarnings").onchange = () => last && renderFindings();
+  document.getElementById("copy").onclick = () => {
+    const out = document.getElementById("output");
+    out.select();
+    document.execCommand("copy"); // the clipboard API is blocked inside Figma plugin windows
+  };
+
+  onmessage = (event) => {
+    const msg = event.data.pluginMessage;
+    if (!msg) return;
+    if (msg.type === "saved-inputs") {
+      FONTS = msg.fonts || {};
+      GRAY = msg.ui?.gray || {};
+      SLOTS = msg.ui?.slots || [];
+      LIGHT_STEPS = msg.ui?.lightSteps || LIGHT_STEPS;
+      DARK_STEPS = msg.ui?.darkSteps || DARK_STEPS;
+      STEPS = msg.ui?.steps || STEPS;
+      fillInputs(msg.inputs);
+    }
+    if (msg.type === "names-result") { showPalettes(msg.palettes || []); showSimilar(msg.similar || []); }
+    if (msg.type === "failure") {
+      statusEl.textContent = "Figma error: " + msg.message;
+      statusEl.className = "error";
+    }
+    if (msg.type === "export-result") {
+      const themes = Object.keys(msg.data.themes);
+      const ok = themes.length > 0;
+      const first = ok ? Object.values(msg.data.themes[themes[0]].appearances) : [];
+      const tokens = first.length ? Object.keys(first[0]).length : 0;
+      statusEl.textContent = ok
+        ? `Exported ${tokens} tokens for ${themes.length} theme(s) and ${first.length} appearance(s), in ${(msg.files || []).length} file(s).`
+        : "Nothing to export.";
+      statusEl.className = msg.problems.length ? "error" : "ok";
+      document.getElementById("summary").innerHTML = msg.problems.length
+        ? `<b>Problems:</b><br>${msg.problems.map(esc).join("<br>")}` : "";
+      exported = msg.files || [];
+      document.getElementById("exportFiles").innerHTML = exported
+        .map((f, i) => `<button type="button" class="pill" data-file="${i}">${esc(f.fileName)}</button>`).join("");
+      document.querySelectorAll("#exportFiles .pill").forEach((b) => { b.onclick = () => showFile(Number(b.dataset.file)); });
+      document.getElementById("downloadAll").classList.toggle("hidden", exported.length < 2);
+      showFile(0);
+      document.getElementById("exportDetails").classList.toggle("hidden", !ok);
+    }
+    if (msg.type === "tables-result") {
+      statusEl.textContent = `Color tables updated on the page "${msg.page}" (${msg.tables} table(s)).`;
+      statusEl.className = "ok";
+      document.getElementById("summary").innerHTML = msg.missing.length
+        ? `No ${msg.missing.map(esc).join(", ")} collection in this file, so that table was skipped.` : "";
+    }
+    if (msg.type === "result") {
+      last = msg;
+      document.getElementById("details").classList.remove("hidden");
+      const errors = msg.report.filter((r) => r.severity === "error").length;
+      const warnings = msg.report.length - errors;
+      if (!msg.ok) {
+        statusEl.textContent = `Stopped: ${errors} error(s), ${warnings} warning(s). Nothing was written.`;
+        statusEl.className = "error";
+      } else if (msg.wrote) {
+        statusEl.textContent = `Done. ${warnings} warning(s).`;
+        statusEl.className = "ok";
+      } else {
+        statusEl.textContent = `Check passed. ${warnings} warning(s). Nothing was written yet.`;
+        statusEl.className = "ok";
+      }
+      const s = msg.summary;
+      document.getElementById("summary").innerHTML = s
+        ? `${s.created} created, ${s.updated} updated, ${s.unchanged} unchanged` +
+          (s.renamed?.length ? `<br>${s.renamed.map(esc).join("<br>")}` : "") +
+          (s.tablesPage ? `<br>Color tables updated on the page "${esc(s.tablesPage)}".` : "") +
+          (s.problems.length ? `<br><b>Problems:</b><br>${s.problems.map(esc).join("<br>")}` : "")
+        : "";
+      renderFindings();
+      renderOutput();
+    }
+  };
+</script>
