@@ -2,143 +2,83 @@
 
 Tokenseed is a Figma plugin to create accessible and maintainable foundation tokens for design systems.
 
-The plugin creates the color, size, and typography variables of a design system in a Figma file. You pick a few colors and fonts. The plugin builds the full palettes, checks that text stays readable (contrast), and writes the variables into four collections.
+You pick a few colors and fonts. The plugin builds full color palettes, checks that text stays readable, and creates the variables of your design system in your Figma file. When your choices change, run it again and the variables update in place.
 
----
+## What you get
 
-## 1. What the plugin makes
+**Four variable collections:**
 
-| Collection | What it holds | Modes |
-|---|---|---|
-| Primitives | Raw values: 13-step color palettes, sizes, font families and weights, opacities | One (Default) |
-| Theme | Roles such as `color/brand/500`, linked to Primitives | One per theme (Main theme, Custom theme, …) |
-| Appearance | What designs use, such as `color/bg/brand/bold`, linked to Theme tokens | Light, Dark, and any extra appearances |
-| ColorScheme | The same colors with Android (Jetpack Compose) names, such as `primary` | Same as Appearance |
-
-The plugin also draws color tables and ColorScheme color maps on a page called "Color tokens", and exports the tokens for developers (JSON, or Kotlin for Android).
-
-All the rules live in `spec/`. The plugin follows them exactly.
-
----
-
-## 2. The files
-
-```
-tokenseed/
-├── README.md            ← this guide
-├── manifest.json        ← tells Figma the plugin's name and files
-├── ui.html              ← the plugin window (the form and the report)
-├── code.js              ← the built plugin that Figma runs (made by "npm run build")
-├── ui-assets/           ← icons used in the window, and the font embedded in it (fonts/, with its license)
-├── spec/                ← the rules
-│   ├── foundations-spec.md   ← the full written specification
-│   ├── tokens.json           ← the same rules in machine-readable form (wins if the two disagree)
-│   └── CONVENTIONS.md        ← writing style for editing the spec
-├── src/                 ← the program code
-│   ├── color.ts         ← color math: HEX and OKLCH conversions, contrast
-│   ├── palette.ts       ← builds a 13-step palette and fixes low contrast
-│   ├── naming.ts        ← chooses each palette's name from its hue
-│   ├── foundations.ts   ← turns the form's inputs into the full plan of variables and checks
-│   ├── validate.ts      ← checks HEX values
-│   ├── tables.ts        ← describes the color tables
-│   ├── color-maps.ts    ← describes the ColorScheme color maps
-│   ├── saved-inputs.ts  ← decides which settings the form opens with
-│   ├── previews.ts      ← works out the real colors of each appearance card in the window
-│   ├── export.ts        ← builds the developer exports (JSON and Kotlin)
-│   ├── figma.ts         ← the Figma side: talks to the window and writes the variables
-│   ├── modes-figma.ts   ← finds, renames, and adds modes in the file
-│   ├── palettes-figma.ts← renames palettes whose name changed
-│   └── tables-figma.ts  ← draws the color tables in Figma
-└── test/
-    └── logic.test.ts    ← automatic checks of all the logic
-```
-
-Files ending in `-figma.ts`, and `figma.ts` itself, are the only ones that touch Figma. Everything else is plain logic, so the tests can check it without Figma.
-
----
-
-## 3. Set up (one time)
-
-You need two programs.
-
-1. **Node.js**, version 22 or newer. Download the LTS version from https://nodejs.org and run the installer.
-2. **The Figma desktop app**, from https://www.figma.com/downloads.
-
-Then open a terminal in this folder and install the project's tools:
-
-```bash
-npm install
-```
-
-To open a terminal: on a Mac, press Cmd + Space, type `Terminal`, and press Enter. On Windows, press the Windows key, type `PowerShell`, and press Enter. Then go to the folder with `cd`, for example `cd ~/Projects/tokenseed`.
-
----
-
-## 4. Build and test
-
-Run these from the project folder.
-
-| Command | What it does |
+| Collection | What it holds |
 |---|---|
-| `npm test` | Runs the automatic checks. The last line must say `All logic tests passed.` |
-| `npm run typecheck` | Checks the code for mistakes in types. No output means no problems. |
-| `npm run build` | Builds `code.js`, the file Figma runs. Run it after every code change. |
+| Primitives | The raw values: color palettes, sizes, font families and weights, opacities |
+| Theme | Color and font roles, such as your brand color. There is one mode for each theme you make |
+| Appearance | The tokens you use in your designs, such as a brand background. There is one mode for each appearance, such as Light and Dark |
+| ColorScheme | The same colors with Android names, for teams that build with Jetpack Compose |
 
-A line that says `ExperimentalWarning` is harmless.
+**Color tables and color maps**, drawn on a page called "Color tokens", so you can see all your colors at a glance.
 
----
+**Exports for developers:** Appearance or ColorScheme tokens as JSON, or ColorScheme tokens as Kotlin.
 
-## 5. Load the plugin in Figma
+## Install the plugin
 
-1. Open a test file in the Figma desktop app. Do not use a real design file (see section 7).
-2. In the menu, choose **Plugins → Development → Import plugin from manifest…**
-3. Select `manifest.json` in this folder.
-4. Run it from **Plugins → Development → Tokenseed**.
+1. Install the **Figma desktop app**, from https://www.figma.com/downloads. Importing a plugin does not work in the browser.
+2. Unzip the plugin folder and keep it somewhere permanent.
+3. Open a test file in the Figma desktop app. Do not start in a real design file.
+4. In the menu, choose **Plugins → Development → Import plugin from manifest…**
+5. Select `manifest.json` in the plugin folder.
+6. Run it from **Plugins → Development → Tokenseed**.
 
-After a rebuild, close and run the plugin again to load the new `code.js`.
+You only import the plugin once. After that, run it from the same menu.
 
----
+## Use the plugin
 
-## 6. Use the plugin
+### 1. Set up your themes
 
-**Themes.** Each theme has a brand color, a neutral color (only its hue is used, to tint the grays), status colors (success, danger, warning, info), optional added colors, and a font family with its weights. Each color row shows the palette the plugin will make, as you type. A note appears under a color when its palette looks almost the same as another one, or when it will look quite different from the color picked.
+A theme is one look for your product, with its own colors and fonts. Each theme has:
 
-**Names.** The first theme is called Main theme. A theme or appearance you add without typing a name is called Custom theme or Custom appearance, then Custom theme 2, Custom appearance 2, and so on.
+- a brand color
+- a neutral color, whose hue is used to tint the grays
+- status colors: success, danger, warning, and info
+- any other colors you want to add
+- a font family with its weights
 
-**Appearances.** Light is always there. Dark can be removed. You can add appearances based on Light or Dark. Each one has its own canvas color and text fill (how strong the bolder text and icons are). Each card is painted in its real colors, taken from the first theme, and shows a preview of its text.
+Each color row shows the palette the plugin will make, as you type. A note appears under a color when its palette looks almost the same as another one, or when it will look quite different from the color you picked.
 
-**Buttons:**
+### 2. Set up your color modes
+
+A color mode, also called an appearance, is a version of the theme's colors. Light is always there, and Dark can be removed. You can also add your own, based on Light or Dark.
+
+Each one has its own canvas color and text fill, which sets how strong the bolder text and icons are. Each card shows its real colors, taken from the first theme, with a preview of its text.
+
+If you add a theme or color mode without typing a name, it is called Custom theme or Custom appearance, then Custom theme 2, Custom appearance 2, and so on.
+
+### 3. Generate your tokens
 
 | Button | What it does |
 |---|---|
-| Check only | Builds everything and runs every check. Writes nothing. |
-| Generate tokens | Runs the checks. If there is no error, creates or updates the variables and redraws the color tables and color maps. |
+| Check only | Runs every check and writes nothing to your file. |
+| Generate tokens | Runs every check. If there is no error, it creates or updates the variables and redraws the color tables and color maps. |
 | Update tables | Redraws the color tables and color maps from the variables in the file, including changes made by hand. |
-| Export | Exports Appearance or ColorScheme tokens as JSON, or ColorScheme tokens as Kotlin. Reads only. |
+| Export | Exports tokens for developers. It changes nothing in your file. |
 
 The report under the form lists every error and warning. If there is an error, nothing is written.
 
-**Your settings** are saved in the file when you press Generate tokens, so each file keeps its own. If the file has no tokens (a new file, or you deleted them all), the form opens with the default settings. Changes you did not generate are not kept when you close the plugin.
+## Good to know
 
-**Running it again** in a file that already has the variables updates them in place. Nothing is deleted. Variables and modes that the plugin no longer makes are listed as `orphan_variable` and `orphan_mode`, and left alone. Values you changed by hand on the plugin's variables are set back to the plan.
+- **Try it in a test file first.** Check the result before you run the plugin in a real design file.
+- **Your settings stay with the file.** They are saved when you press Generate tokens, so each file keeps its own. Changes you did not generate are lost when you close the plugin.
+- **A file with no tokens starts fresh.** In a new file, or after you delete all the tokens, the form opens with the default settings.
+- **Running it again updates your variables.** It does not make duplicates.
+- **Manual edits are replaced.** If you changed the value of one of the plugin's variables by hand, Generate tokens sets it back.
+- **Nothing is deleted.** Variables and modes the plugin no longer makes stay in your file, and the report lists them as `orphan_variable` and `orphan_mode`.
 
----
-
-## 7. Safety rules
-
-- Test in a separate test file first. Check the result before running the plugin in a real design file.
-- The plugin never deletes variables or modes. It reports extra ones and leaves them alone.
-- If a test fails, don't skip it. Find out why first.
-- The rules in `spec/` change only on purpose. Ask before editing them.
-
----
-
-## 8. Common problems
+## Common problems
 
 | Problem | What to do |
 |---|---|
-| `node: command not found` | Node.js is not installed, or the terminal was open during the install. Close and reopen the terminal. |
-| `esbuild: command not found` or `tsc: command not found` | Run `npm install` in the project folder. |
-| The plugin still shows old behavior | Run `npm run build`, then close and run the plugin again. |
-| A test prints an error with a file name | Copy the whole message and share it when you ask for help. |
+| Figma cannot load the plugin after you moved or renamed its folder | Import `manifest.json` again from the folder's new location. |
 | The report says "Stopped" | Read the errors in the report. Each one names the token and the mode it is about. |
+
+## For developers
+
+To change the plugin's code, see [DEVELOPMENT.md](DEVELOPMENT.md).
