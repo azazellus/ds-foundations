@@ -1,6 +1,8 @@
-# Design Foundations: a Figma plugin
+# Tokenseed
 
-This plugin creates the color, size, and typography variables of a design system in a Figma file. You pick a few colors and fonts. The plugin builds the full palettes, checks that text stays readable (contrast), and writes the variables into four collections.
+Tokenseed is a Figma plugin to create accessible and maintainable foundation tokens for design systems.
+
+The plugin creates the color, size, and typography variables of a design system in a Figma file. You pick a few colors and fonts. The plugin builds the full palettes, checks that text stays readable (contrast), and writes the variables into four collections.
 
 ---
 
@@ -22,7 +24,7 @@ All the rules live in `spec/`. The plugin follows them exactly.
 ## 2. The files
 
 ```
-tokens-plugin/
+tokenseed/
 ├── README.md            ← this guide
 ├── manifest.json        ← tells Figma the plugin's name and files
 ├── ui.html              ← the plugin window (the form and the report)
@@ -68,7 +70,7 @@ Then open a terminal in this folder and install the project's tools:
 npm install
 ```
 
-To open a terminal: on a Mac, press Cmd + Space, type `Terminal`, and press Enter. On Windows, press the Windows key, type `PowerShell`, and press Enter. Then go to the folder with `cd`, for example `cd ~/Projects/tokens-plugin`.
+To open a terminal: on a Mac, press Cmd + Space, type `Terminal`, and press Enter. On Windows, press the Windows key, type `PowerShell`, and press Enter. Then go to the folder with `cd`, for example `cd ~/Projects/tokenseed`.
 
 ---
 
@@ -91,7 +93,7 @@ A line that says `ExperimentalWarning` is harmless.
 1. Open a test file in the Figma desktop app. Do not use a real design file (see section 7).
 2. In the menu, choose **Plugins → Development → Import plugin from manifest…**
 3. Select `manifest.json` in this folder.
-4. Run it from **Plugins → Development → Design Foundations**.
+4. Run it from **Plugins → Development → Tokenseed**.
 
 After a rebuild, close and run the plugin again to load the new `code.js`.
 

@@ -1,6 +1,6 @@
 {
-  "name": "Design Foundations",
-  "id": "design-foundations-dev",
+  "name": "Tokenseed",
+  "id": "tokenseed-dev",
   "api": "1.0.0",
   "main": "code.js",
   "ui": "ui.html",
