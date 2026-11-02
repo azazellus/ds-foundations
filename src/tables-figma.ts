@@ -1,10 +1,13 @@
-// Draws the color tables described by src/tables.ts on a page called "Color tokens".
+// Draws the color tables described by src/tables.ts, and the ColorScheme color maps described by
+// src/color-maps.ts, on a page called "Color tokens".
 // Figma-specific: this file creates frames and text. It never deletes variables, and on this page it
 // removes only the tables it drew itself on an earlier run (they carry a plugin tag).
 // Sizes, fonts and colors follow the CollectionTitle, GroupHeader and Row components on the
 // "Tables design" page of the Test file.
 
 import type { Cell, Table, TableRow } from "./tables.ts";
+import { MAP_BACKGROUND, MAP_HEIGHT, MAP_WIDTH } from "./color-maps.ts";
+import type { ColorMap } from "./color-maps.ts";
 
 const PAGE_NAME = "Color tokens";
 const PAGE_TAG = "color-tokens-page"; // marks the page, so it is found again even if renamed
@@ -46,8 +49,9 @@ type Ctx = {
 
 // ---------- Entry point ----------
 
-export async function drawColorTables(tables: Table[]): Promise<{ page: string; tables: number }> {
+export async function drawColorTables(tables: Table[], maps: ColorMap[] = []): Promise<{ page: string; tables: number }> {
   const ctx = await loadContext();
+  const mapFont = maps.length > 0 ? await loadMapFont() : null;
 
   // Find the page (by tag, then by name) or create it.
   let page = figma.root.children.find((p) => p.getPluginData(PAGE_TAG) === "1")
@@ -77,6 +81,14 @@ export async function drawColorTables(tables: Table[]): Promise<{ page: string; 
       frame.y = y;
       x += frame.width + TABLE_GAP;
     }
+    // The ColorScheme color maps, in a row to the right of the tables.
+    for (const m of maps) {
+      const frame = drawColorMap(m, ctx, page, mapFont!);
+      drawn.push(frame);
+      frame.x = x;
+      frame.y = y;
+      x += MAP_WIDTH + TABLE_GAP;
+    }
   } catch (e) {
     for (const f of drawn) if (!f.removed) f.remove();
     throw e;
@@ -98,25 +110,86 @@ async function loadContext(): Promise<Ctx> {
   };
 }
 
-// The design uses Inter Display; Inter is used when Inter Display is not installed.
+// The tables use IBM Plex Sans. Inter is only a last resort, for when Figma cannot get that font (offline),
+// so the tables can still be drawn.
 async function loadFonts(): Promise<Fonts> {
   const pick = async (style: string): Promise<FontName> => {
     try {
-      await figma.loadFontAsync({ family: "Inter Display", style });
-      return { family: "Inter Display", style };
+      await figma.loadFontAsync({ family: "IBM Plex Sans", style });
+      return { family: "IBM Plex Sans", style };
     } catch {
       await figma.loadFontAsync({ family: "Inter", style });
       return { family: "Inter", style };
     }
   };
-  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+  const regular = await pick("Regular");
   return {
     bold: await pick("Bold"),
     medium: await pick("Medium"),
-    regular: await pick("Regular"),
+    regular,
     light: await pick("Light"),
-    body: { family: "Inter", style: "Regular" }, // descriptions and info text use plain Inter in the design
+    body: regular, // descriptions and info text
   };
+}
+
+// The maps use Roboto, Android's font; IBM Plex Sans is used when Roboto is not installed.
+async function loadMapFont(): Promise<FontName> {
+  for (const family of ["Roboto", "IBM Plex Sans"]) {
+    try {
+      const font = { family, style: "Regular" };
+      await figma.loadFontAsync(font);
+      return font;
+    } catch {
+      // Not installed: try the next one.
+    }
+  }
+  throw new Error("Neither Roboto nor IBM Plex Sans is available to draw the color maps.");
+}
+
+// ---------- ColorScheme color maps ----------
+
+// One map: a frame in an explicit theme and appearance, on the surface color. Every block and every label
+// is bound to its ColorScheme variable, so the map follows any later change to the variables.
+// The tag goes on last, like the tables: a frame that failed halfway is never taken for a finished one.
+function drawColorMap(map: ColorMap, ctx: Ctx, page: PageNode, font: FontName): FrameNode {
+  const frame = figma.createFrame();
+  page.appendChild(frame);
+  frame.name = map.name;
+  frame.resize(MAP_WIDTH, MAP_HEIGHT);
+  frame.clipsContent = true;
+  const setMode = (collection: string, modeName: string): void => {
+    const col = ctx.collections.get(collection);
+    const mode = col?.modes.find((m) => m.name === modeName);
+    if (col && mode) frame.setExplicitVariableModeForCollection(col, mode.modeId);
+  };
+  setMode("Theme", map.themeMode);
+  setMode("ColorScheme", map.appMode);
+  frame.fills = [roleFill(MAP_BACKGROUND, ctx)];
+
+  for (const b of map.blocks) {
+    const block = figma.createFrame();
+    frame.appendChild(block);
+    block.name = b.label.replace(/\n/g, " ");
+    block.x = b.x;
+    block.y = b.y;
+    block.resize(b.w, b.h);
+    block.clipsContent = true;
+    block.fills = [roleFill(b.role, ctx)];
+    const label = text(block, b.label, font, 28, 34, C.black, b.w - 48);
+    label.name = "Color label";
+    label.x = 24;
+    label.y = 18;
+    label.fills = [roleFill(b.labelRole, ctx)];
+  }
+  frame.setPluginData(TABLE_TAG, "ColorScheme map");
+  return frame;
+}
+
+// A paint bound to a ColorScheme variable. Without that variable it stays plain white.
+function roleFill(role: string, ctx: Ctx): SolidPaint {
+  const variable = ctx.byKey.get(`ColorScheme|${role}`);
+  const paint = solid(C.white);
+  return variable ? figma.variables.setBoundVariableForPaint(paint, "color", variable) : paint;
 }
 
 // ---------- Table parts ----------

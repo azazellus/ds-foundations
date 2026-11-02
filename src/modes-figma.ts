@@ -21,7 +21,9 @@ function plannedModes(plan: Plan, inputs: Inputs): { collection: string; name: s
       let key = name;
       if (c.name === "Theme") key = inputs.themeKeys?.[i] || name;
       // ColorScheme has the same modes as Appearance, with the same keys (section 3.5).
-      if (c.name === "Appearance" || c.name === "ColorScheme") key = (inputs.extraAppearances ?? []).find((e) => e.name?.trim() === name)?.key || name;
+      // The extra appearances are the last modes, in the order of the inputs.
+      const extras = inputs.extraAppearances ?? [];
+      if (c.name === "Appearance" || c.name === "ColorScheme") key = extras[i - (c.modes.length - extras.length)]?.key || name;
       out.push({ collection: c.name, name, key });
     });
   }

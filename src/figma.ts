@@ -5,11 +5,14 @@
 import spec from "../spec/tokens.json";
 import { buildPlan, hueOnlyShifts, namePalettes } from "./foundations.ts";
 import type { CollectionName, Inputs, Plan, ReportEntry, Value, VariableDef } from "./foundations.ts";
+import { appearancePreviews } from "./previews.ts";
+import { fileHasTokens, inputsToShow, readSavedInputs } from "./saved-inputs.ts";
 import { buildTables } from "./tables.ts";
 import { buildAppearanceExport, buildColorSchemeExport, exportFiles, kotlinFiles } from "./export.ts";
 import type { ExportOptions } from "./export.ts";
 import type { TableSource } from "./tables.ts";
 import { drawColorTables } from "./tables-figma.ts";
+import { buildColorMaps } from "./color-maps.ts";
 import { checkRenames, ensureModes, findOrphanModes, matchModes } from "./modes-figma.ts";
 import type { ModeMatch } from "./modes-figma.ts";
 import { plannedPaletteRenames, renamePalettes, storePaletteSources } from "./palettes-figma.ts";
@@ -18,7 +21,10 @@ import { plannedPaletteRenames, renamePalettes, storePaletteSources } from "./pa
 // updated = an existing variable had at least one value or its scopes changed; unchanged = nothing to write.
 type WriteSummary = { created: number; updated: number; unchanged: number; problems: string[]; renamed: string[]; tablesPage?: string };
 
-const STORAGE_KEY = "last-inputs";
+// Where the form's settings are saved: in the file, so each file keeps its own (section 6.3).
+const FILE_INPUTS = "form-inputs";
+// Earlier versions kept one copy per user, in every file. It is only read now, for files they generated.
+const OLDER_STORAGE_KEY = "last-inputs";
 
 figma.showUI(__html__, { width: 960, height: 880 });
 
@@ -35,9 +41,19 @@ async function loadFontStyles(): Promise<Record<string, string[]>> {
   return styles;
 }
 
-// Send the fonts and the last inputs to the form, so the user does not have to type them again.
+// The settings the form opens with: this file's, or the defaults when the file has no tokens (section 6.3).
+async function settingsForThisFile(): Promise<Inputs | null> {
+  const variables = await figma.variables.getLocalVariablesAsync();
+  const collections = await figma.variables.getLocalVariableCollectionsAsync();
+  const nameOf = new Map(collections.map((c) => [c.id, c.name]));
+  const hasTokens = fileHasTokens(variables.map((v) => nameOf.get(v.variableCollectionId)));
+  const older = (await figma.clientStorage.getAsync(OLDER_STORAGE_KEY)) ?? null;
+  return inputsToShow(hasTokens, readSavedInputs(figma.root.getPluginData(FILE_INPUTS)), older);
+}
+
+// Send the fonts and the settings to the form, so the user does not have to type them again.
 (async () => {
-  const saved = await figma.clientStorage.getAsync(STORAGE_KEY);
+  const saved = await settingsForThisFile();
   // Values from spec/tokens.json that the form shows, so the form never holds its own copy.
   const ui = {
     gray: spec.primitives.neutralPalette.steps, // swatches of the canvas dropdowns
@@ -46,7 +62,12 @@ async function loadFontStyles(): Promise<Record<string, string[]>> {
       .map((src) => src.split(".")[1]), // weight styles ticked by default
     lightSteps: spec.inputs.lightCanvasStep.allowed,
     darkSteps: spec.inputs.darkCanvasStep.allowed,
+    lightFillSteps: spec.inputs.lightTextFillStep.allowed,
+    darkFillSteps: spec.inputs.darkTextFillStep.allowed,
     steps: [...spec.primitives.steps].sort((a, b) => a - b), // palette steps, lightest first
+    firstThemeName: spec.collections.Theme.firstModeName, // default names
+    customThemeName: spec.collections.Theme.customModeName,
+    customAppearanceName: spec.inputs.extraAppearances.defaultName,
   };
   figma.ui.postMessage({ type: "saved-inputs", inputs: saved ?? null, fonts: await loadFontStyles(), ui });
 })();
@@ -59,7 +80,6 @@ figma.ui.onmessage = async (msg: {
   if (msg.type === "names") return previewNames(msg.inputs);
   if (msg.type !== "run") return;
   try {
-    await figma.clientStorage.setAsync(STORAGE_KEY, msg.inputs);
     // Each theme's available styles let the plan check the selected weights (section 5.1).
     const fonts = await loadFontStyles();
     const inputs: Inputs = {
@@ -92,10 +112,11 @@ figma.ui.onmessage = async (msg: {
       summary = writePlan(plan, existing, collections, modes);
       summary.renamed = renamedPalettes;
       await storePaletteSources(plan);
+      figma.root.setPluginData(FILE_INPUTS, JSON.stringify(msg.inputs)); // the variables are written, so keep these settings
       // Redraw the color tables on the "Color tokens" page. The variables are already written,
       // so a drawing problem is reported but does not undo anything.
       try {
-        summary.tablesPage = (await drawColorTables(buildTables(spec, plan))).page;
+        summary.tablesPage = (await drawColorTables(buildTables(spec, plan), buildColorMaps(plan))).page;
       } catch (e) {
         summary.problems.push(`Color tables were not drawn: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -130,7 +151,7 @@ function previewNames(inputs: Inputs): void {
       notes.push({ theme: h.theme, role: h.role, note: `Only the hue of this color is used. Its palette will be closer to ${h.stepHex} (step ${h.step}).` });
     }
     // The palette each color will get, as HEX values from the lightest step to the darkest.
-    // These are the same palettes "Create variables" writes. A color with no hue uses the Gray palette.
+    // These are the same palettes "Generate tokens" writes. A color with no hue uses the Gray palette.
     const steps = [...spec.primitives.steps].sort((a, b) => a - b);
     const gray = spec.primitives.neutralPalette.steps as Record<string, string>;
     const palettes = naming.colors.map((c) => {
@@ -142,9 +163,14 @@ function previewNames(inputs: Inputs): void {
       const neutral = naming.neutralStepsOf(i);
       palettes.push({ theme: i, role: "neutral", hexes: steps.map((s) => neutral[s]) });
     }
-    figma.ui.postMessage({ type: "names-result", similar: notes, palettes });
+    // The real colors of each appearance card, from the first theme. A brand with no hue uses Gray.
+    const brandName = naming.paletteOf(0, "brand");
+    const brandPalette = built.find((x) => x.name === brandName);
+    const brandSteps: Record<string, string> = Object.fromEntries(steps.map((s) => [s, brandPalette ? brandPalette.steps[s].hex : gray[String(s)]]));
+    const previews = appearancePreviews(spec, inputs, naming.neutralStepsOf(0) as unknown as Record<string, string>, brandSteps);
+    figma.ui.postMessage({ type: "names-result", similar: notes, palettes, previews });
   } catch {
-    figma.ui.postMessage({ type: "names-result", similar: [], palettes: [] });
+    figma.ui.postMessage({ type: "names-result", similar: [], palettes: [], previews: [] });
   }
 }
 
@@ -156,10 +182,10 @@ async function updateTablesOnly(): Promise<void> {
     const names = source.collections.map((c) => c.name);
     const missing = ["Primitives", "Theme", "Appearance", "ColorScheme"].filter((n) => !names.includes(n as CollectionName));
     if (names.length === 0) {
-      figma.ui.postMessage({ type: "failure", message: "No Primitives, Theme or Appearance collection in this file. Create variables first." });
+      figma.ui.postMessage({ type: "failure", message: "No Primitives, Theme or Appearance collection in this file. Generate tokens first." });
       return;
     }
-    const result = await drawColorTables(buildTables(spec, source));
+    const result = await drawColorTables(buildTables(spec, source), buildColorMaps(source));
     figma.ui.postMessage({ type: "tables-result", page: result.page, tables: result.tables, missing });
     figma.notify(`Color tables updated on "${result.page}".`);
   } catch (e) {
@@ -306,6 +332,12 @@ function writePlan(plan: Plan, existing: Variable[], allCollections: VariableCol
     let changed = false;
     if (!sameScopes(variable.scopes, def.scopes)) {
       variable.scopes = def.scopes as VariableScope[];
+      changed = true;
+    }
+
+    // Only tokens with a description in the spec get one; others keep whatever the file has.
+    if (def.description !== undefined && variable.description !== def.description) {
+      variable.description = def.description;
       changed = true;
     }
 

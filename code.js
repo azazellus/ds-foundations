@@ -22,13 +22,13 @@
 
   // spec/tokens.json
   var tokens_default = {
-    version: "1.15.0",
+    version: "1.21.0",
     description: "Source of truth for the design foundations specification (foundations-spec.md). Palette HEX values are user inputs and palette names come from primitives.paletteNaming; this file defines the rules, inputs, Theme mappings, alpha tokens, Appearance mappings, and ColorScheme mappings.",
     collections: {
       Primitives: { modes: ["Default"] },
       Theme: {
-        modePattern: "Theme {letter}",
-        letters: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        firstModeName: "Main theme",
+        customModeName: "Custom theme",
         modeCount: "input:numberOfThemes",
         modeNames: "input:themeNames"
       },
@@ -40,7 +40,7 @@
       },
       ColorScheme: {
         modesFrom: "Appearance",
-        description: "Same modes as Appearance: Light, Dark when included, and every extra appearance, each with the same base and canvas step."
+        description: "Same modes as Appearance: Light, Dark when included, and every extra appearance, each with the same base, canvas step, and text fill step."
       },
       modeRules: {
         rename: "When a theme or an extra appearance is renamed, the plugin renames its existing Figma mode in place, so its values and any layer that uses it are kept. It never creates a second mode for a renamed one.",
@@ -59,16 +59,16 @@
         "500": 0.519,
         "400": 0.638,
         "300": 0.754,
-        "200": 0.854,
-        "150": 0.897,
-        "100": 0.935,
-        "50": 0.97
+        "200": 0.852,
+        "150": 0.892,
+        "100": 0.928,
+        "50": 0.96
       },
       chromaMultiplier: {
-        "50": 0.11,
-        "100": 0.25,
-        "150": 0.42,
-        "200": 0.59,
+        "50": 0.3,
+        "100": 0.43,
+        "150": 0.55,
+        "200": 0.68,
         "300": 0.87,
         "400": 1,
         "500": 0.93,
@@ -259,7 +259,7 @@
         similarRule: "After the palettes are generated, each palette is compared with every palette made before it in the naming order. When no step differs from the same step of an earlier palette by more than similarMaxStepDifference (OKLab distance, the measure of hueOnlyPalette.shiftNotice), it is reported as similar_palette (warning) against the closest such palette: the two palettes look almost the same. Hues are not compared, because HSL hues are uneven around the circle. The plugin form shows the same notice next to the color.",
         rename: "The plugin remembers which color (theme and role) made each palette. When a later run gives that color's palette a new name, and the old name is not used by any palette of the new run, the plugin renames the old palette's variables in place (Color/Old/{step} becomes Color/New/{step}), so layers and aliases that use them are kept. If a variable with the new name already exists, the old palette is not renamed and is reported as orphan_variable. Nothing is deleted."
       },
-      contrastPairsRule: "backgroundPalette neutral is the neutral palette of the theme that uses the palette being checked: Color/Gray, or that theme's tinted neutral (neutralTint). A palette used by several themes must meet each pairing against the neutral of every one of them. self is the palette itself.",
+      contrastPairsRule: "backgroundPalette neutral is the neutral palette of the theme that uses the palette being checked: Color/Gray, or that theme's tinted neutral (neutralTint). A palette used by several themes must meet each pairing against the neutral of every one of them. self is the palette itself. The brand HEX never changes: when the brand fails a self pairing at its own step, the background step of that pairing gets lighter instead (section 5.4 step 2).",
       contrastPairs: [
         { text: 500, background: 100, backgroundPalette: "neutral", minimum: 4.5, target: 4.7 },
         { text: 700, background: 200, backgroundPalette: "neutral", minimum: 7, target: 8 },
@@ -282,17 +282,17 @@
         scope: "global",
         requirement: "optional",
         type: "list of string, one per theme",
-        default: "collections.Theme.modePattern for each theme: Theme A, Theme B, ...",
+        default: "collections.Theme.firstModeName for the first theme; collections.Theme.customModeName for the others, numbered from the second: Custom theme, Custom theme 2, Custom theme 3, ...",
         namePattern: "^[A-Za-z0-9]+( [A-Za-z0-9]+)*$",
         unique: true,
-        rule: "Theme n is named by the n-th entry. An empty or missing entry uses the default name. Renaming follows collections.modeRules.rename."
+        rule: "Theme n is named by the n-th entry. An empty or missing entry uses the default name, with the lowest number that is free. Renaming follows collections.modeRules.rename."
       },
       includeDark: {
         scope: "global",
         requirement: "optional",
         type: "boolean",
         default: true,
-        rule: "When false, the Appearance collection has no Dark mode: no Dark values are written and every check in the Dark mode is skipped. darkCanvasStep is then ignored. Dark-based extra appearances are still allowed; they copy the Dark values of appearance.tokens."
+        rule: "When false, the Appearance collection has no Dark mode: no Dark values are written and every check in the Dark mode is skipped. darkCanvasStep and darkTextFillStep are then ignored. Dark-based extra appearances are still allowed; they copy the Dark values of appearance.tokens."
       },
       brandColor: {
         scope: "theme",
@@ -341,7 +341,7 @@
       darkCanvasStep: {
         scope: "global",
         requirement: "optional",
-        allowed: [950, 900, 850],
+        allowed: [950, 900, 850, "black"],
         default: 950
       },
       lightCanvasStep: {
@@ -350,6 +350,20 @@
         allowed: ["white", 50],
         default: "white",
         rule: "Applies to Light. See appearance.lightCanvas."
+      },
+      lightTextFillStep: {
+        scope: "global",
+        requirement: "optional",
+        allowed: [700, 800, 850, 900, 950, "black"],
+        default: 700,
+        rule: "Applies to Light. See appearance.textFill."
+      },
+      darkTextFillStep: {
+        scope: "global",
+        requirement: "optional",
+        allowed: [150, 100, 50, "white"],
+        default: 150,
+        rule: "Applies to Dark. See appearance.textFill."
       },
       customRoles: {
         scope: "global",
@@ -387,17 +401,22 @@
       extraAppearances: {
         scope: "global",
         requirement: "optional",
-        type: "list of { name, base, canvasStep }",
+        type: "list of { name, base, canvasStep, textFillStep }",
         default: [],
+        defaultName: "Custom appearance",
         namePattern: "^[A-Za-z0-9]+( [A-Za-z0-9]+)*$",
         reservedNames: ["Light", "Dark"],
         unique: true,
         bases: ["Light", "Dark"],
         canvasStep: {
           Light: { allowed: ["white", 50], default: "white" },
-          Dark: { allowed: [950, 900, 850], default: 950 }
+          Dark: { allowed: [950, 900, 850, "black"], default: 950 }
         },
-        rule: "An extra appearance copies the Light or Dark value of every Appearance token. A Light-based one applies appearance.lightCanvas and a Dark-based one applies appearance.darkCanvas, each with its own canvasStep. Renaming follows collections.modeRules.rename."
+        textFillStep: {
+          Light: { allowed: [700, 800, 850, 900, 950, "black"], default: 700 },
+          Dark: { allowed: [150, 100, 50, "white"], default: 150 }
+        },
+        rule: "An empty or missing name uses defaultName, numbered like theme names: Custom appearance, Custom appearance 2, Custom appearance 3, ... An extra appearance copies the Light or Dark value of every Appearance token. A Light-based one applies appearance.lightCanvas and a Dark-based one applies appearance.darkCanvas, each with its own canvasStep. Each one also applies appearance.textFill with its own textFillStep. Renaming follows collections.modeRules.rename."
       },
       reservedHueNames: ["Gray", "Black", "White"]
     },
@@ -607,7 +626,7 @@
         emphasis: ["bolder", "bold", "accent", "soft", "softer", "softest"]
       },
       darkCanvas: {
-        description: "The Dark mode values in appearance.tokens are for the default canvas step (inputs.darkCanvasStep.default). When the user picks another step, canvasTokens use color/neutral/{step} in Dark, and every followingToken moves its Dark step lighter by the same number of steps along primitives.steps.",
+        description: "The Dark mode values in appearance.tokens are for the default canvas step (inputs.darkCanvasStep.default). When the user picks another step, canvasTokens use color/neutral/{step} in Dark, and every followingToken moves its Dark step lighter by the same number of steps along primitives.steps. The step black is not on that scale: with it, the following tokens keep the values they have at 950.",
         canvasTokens: ["color/bg/base", "color/elevation/surface/canvas"],
         followingTokens: [
           "color/bg/brand/softest",
@@ -636,6 +655,22 @@
           "color/elevation/surface/raised"
         ],
         customRoleFollowingTokens: ["color/bg/{role}/softest", "color/bg/{role}/softer", "color/bg/{role}/soft"]
+      },
+      textFill: {
+        description: "The bolder text and icon step of an appearance. The values in appearance.tokens are for the default steps (inputs.lightTextFillStep.default and inputs.darkTextFillStep.default). With another step, every token below uses that step in that mode, in its own color family. Only neutral has black and white: every other family uses the step in stepsWithoutColor. Bold tokens and color/bg/neutral/bolder do not change. ColorScheme tokens with sameAs follow these tokens as usual.",
+        tokens: [
+          "color/icon/brand/bolder",
+          "color/icon/neutral/bolder",
+          "color/text/brand/bolder",
+          "color/text/danger/bolder",
+          "color/text/info/bolder",
+          "color/text/neutral/bolder",
+          "color/text/selected/bolder",
+          "color/text/success/bolder",
+          "color/text/warning/bolder"
+        ],
+        customRoleTokens: ["color/text/{role}/bolder"],
+        stepsWithoutColor: { black: 950, white: 50 }
       },
       lightCanvas: {
         description: "The Light mode values in appearance.tokens are for the default canvas (inputs.lightCanvasStep.default, white). With canvas 50, canvasTokens use color/neutral/50 in Light, and the tokens in valuesByStep.50 take the listed values. No other token changes, and the contrast checks are unchanged.",
@@ -799,9 +834,11 @@
         "{secondary}": 0,
         "{tertiary}": 1
       },
-      sameAsRule: "A token with sameAs takes, in every mode, the Theme token that this Appearance token has in that mode, after the canvas rules (appearance.lightCanvas, appearance.darkCanvas). So it always matches the Appearance token. When the Appearance token is not generated (a status role turned off), the ColorScheme token is not generated either.",
-      ownRule: "A token with Light and Dark lists its own Theme tokens. Every mode uses the value of its base (Light or Dark). With followsDarkCanvas, the Dark value moves lighter by as many steps as the dark canvas step moved from its default, like appearance.darkCanvas.followingTokens.",
+      sameAsRule: "A token with sameAs takes, in every mode, the Theme token that this Appearance token has in that mode, after the canvas and text fill rules (appearance.lightCanvas, appearance.darkCanvas, appearance.textFill). So it always matches the Appearance token. When the Appearance token is not generated (a status role turned off), the ColorScheme token is not generated either.",
+      ownRule: "A token with Light and Dark lists its own Theme tokens. Every mode uses the value of its base (Light or Dark). With followsDarkCanvas, the Dark value moves lighter by as many steps as the dark canvas step moved from its default, like appearance.darkCanvas.followingTokens, but never lighter than followsDarkCanvasLimit. With the step black they keep the values they have at the default.",
+      followsDarkCanvasLimit: 600,
       roleRule: "role names the input role a token belongs to. The token is generated only when that role exists: brand always, danger when it is a status role in use, {secondary} and {tertiary} when that custom role exists. A token without role is always generated.",
+      descriptionRule: "Each token's description says what the role is for, in this project's words, based on the Compose ColorScheme documentation. The plugin writes it as the Figma variable's description.",
       contrastRule: "Every pair in contrastRequired is checked in every theme and every mode, on the resolved HEX values (section 5.7), like appearance.contrastRequired. A failure is contrast_minimum (error) for collection ColorScheme and stops generation. A pair whose text or background token is not generated (no tertiary, danger turned off) is skipped. documented: the Compose ColorScheme documentation says the text role is used on top of the background role. usage: Material components use the pair, but the documentation does not name it.",
       contrastRequired: [
         { text: "onPrimary", background: "primary", minimum: 4.5, source: "documented" },
@@ -846,54 +883,54 @@
         { text: "onSurfaceVariant", background: "surfaceContainerHighest", minimum: 4.5, source: "usage" }
       ],
       tokens: [
-        { name: "primary", group: "primary", kind: "bg", role: "brand", sameAs: "color/bg/brand/bold" },
-        { name: "onPrimary", group: "primary", kind: "content", role: "brand", sameAs: "color/text/inverse" },
-        { name: "primaryContainer", group: "primary", kind: "bg", role: "brand", sameAs: "color/bg/brand/soft" },
-        { name: "onPrimaryContainer", group: "primary", kind: "content", role: "brand", sameAs: "color/text/brand/bolder" },
-        { name: "inversePrimary", group: "primary", kind: "bg", role: "brand", Light: "color/brand/300", Dark: "color/brand/500" },
-        { name: "secondary", group: "secondary", kind: "bg", role: "{secondary}", sameAs: "color/bg/{secondary}/bold" },
-        { name: "onSecondary", group: "secondary", kind: "content", role: "{secondary}", sameAs: "color/text/inverse" },
-        { name: "secondaryContainer", group: "secondary", kind: "bg", role: "{secondary}", sameAs: "color/bg/{secondary}/soft" },
-        { name: "onSecondaryContainer", group: "secondary", kind: "content", role: "{secondary}", sameAs: "color/text/{secondary}/bolder" },
-        { name: "tertiary", group: "tertiary", kind: "bg", role: "{tertiary}", sameAs: "color/bg/{tertiary}/bold" },
-        { name: "onTertiary", group: "tertiary", kind: "content", role: "{tertiary}", sameAs: "color/text/inverse" },
-        { name: "tertiaryContainer", group: "tertiary", kind: "bg", role: "{tertiary}", sameAs: "color/bg/{tertiary}/soft" },
-        { name: "onTertiaryContainer", group: "tertiary", kind: "content", role: "{tertiary}", sameAs: "color/text/{tertiary}/bolder" },
-        { name: "background", group: "surface", kind: "bg", sameAs: "color/bg/base" },
-        { name: "onBackground", group: "surface", kind: "content", sameAs: "color/text/neutral/bolder" },
-        { name: "surface", group: "surface", kind: "bg", sameAs: "color/elevation/surface/canvas" },
-        { name: "onSurface", group: "surface", kind: "content", sameAs: "color/text/neutral/bolder" },
-        { name: "surfaceVariant", group: "surface", kind: "bg", sameAs: "color/bg/neutral/soft" },
-        { name: "onSurfaceVariant", group: "surface", kind: "content", Light: "color/neutral/600", Dark: "color/neutral/200" },
-        { name: "surfaceTint", group: "surface", kind: "bg", role: "brand", sameAs: "color/bg/brand/bold" },
-        { name: "inverseSurface", group: "surface", kind: "bg", Light: "color/neutral/700", Dark: "color/neutral/100" },
-        { name: "inverseOnSurface", group: "surface", kind: "content", sameAs: "color/text/inverse" },
-        { name: "error", group: "error", kind: "bg", role: "danger", sameAs: "color/bg/danger/bold" },
-        { name: "onError", group: "error", kind: "content", role: "danger", sameAs: "color/text/inverse" },
-        { name: "errorContainer", group: "error", kind: "bg", role: "danger", sameAs: "color/bg/danger/soft" },
-        { name: "onErrorContainer", group: "error", kind: "content", role: "danger", sameAs: "color/text/danger/bolder" },
-        { name: "outline", group: "outline", kind: "line", sameAs: "color/border/neutral/heavy" },
-        { name: "outlineVariant", group: "outline", kind: "line", sameAs: "color/border/neutral/light" },
-        { name: "scrim", group: "outline", kind: "bg", sameAs: "color/elevation/surface/scrim" },
-        { name: "surfaceBright", group: "surface container", kind: "bg", Light: "color/neutral/white", Dark: "color/neutral/800", followsDarkCanvas: true },
-        { name: "surfaceContainer", group: "surface container", kind: "bg", Light: "color/neutral/100", Dark: "color/neutral/850", followsDarkCanvas: true },
-        { name: "surfaceContainerHigh", group: "surface container", kind: "bg", Light: "color/neutral/150", Dark: "color/neutral/800", followsDarkCanvas: true },
-        { name: "surfaceContainerHighest", group: "surface container", kind: "bg", Light: "color/neutral/200", Dark: "color/neutral/800", followsDarkCanvas: true },
-        { name: "surfaceContainerLow", group: "surface container", kind: "bg", Light: "color/neutral/50", Dark: "color/neutral/900", followsDarkCanvas: true },
-        { name: "surfaceContainerLowest", group: "surface container", kind: "bg", sameAs: "color/elevation/surface/canvas" },
-        { name: "surfaceDim", group: "surface container", kind: "bg", Light: "color/neutral/200", Dark: "color/neutral/950", followsDarkCanvas: true },
-        { name: "primaryFixed", group: "fixed", kind: "bg", role: "brand", Light: "color/brand/100", Dark: "color/brand/100" },
-        { name: "primaryFixedDim", group: "fixed", kind: "bg", role: "brand", Light: "color/brand/200", Dark: "color/brand/200" },
-        { name: "onPrimaryFixed", group: "fixed", kind: "content", role: "brand", Light: "color/brand/900", Dark: "color/brand/900" },
-        { name: "onPrimaryFixedVariant", group: "fixed", kind: "content", role: "brand", Light: "color/brand/700", Dark: "color/brand/700" },
-        { name: "secondaryFixed", group: "fixed", kind: "bg", role: "{secondary}", Light: "color/{secondary}/100", Dark: "color/{secondary}/100" },
-        { name: "secondaryFixedDim", group: "fixed", kind: "bg", role: "{secondary}", Light: "color/{secondary}/200", Dark: "color/{secondary}/200" },
-        { name: "onSecondaryFixed", group: "fixed", kind: "content", role: "{secondary}", Light: "color/{secondary}/900", Dark: "color/{secondary}/900" },
-        { name: "onSecondaryFixedVariant", group: "fixed", kind: "content", role: "{secondary}", Light: "color/{secondary}/700", Dark: "color/{secondary}/700" },
-        { name: "tertiaryFixed", group: "fixed", kind: "bg", role: "{tertiary}", Light: "color/{tertiary}/100", Dark: "color/{tertiary}/100" },
-        { name: "tertiaryFixedDim", group: "fixed", kind: "bg", role: "{tertiary}", Light: "color/{tertiary}/200", Dark: "color/{tertiary}/200" },
-        { name: "onTertiaryFixed", group: "fixed", kind: "content", role: "{tertiary}", Light: "color/{tertiary}/900", Dark: "color/{tertiary}/900" },
-        { name: "onTertiaryFixedVariant", group: "fixed", kind: "content", role: "{tertiary}", Light: "color/{tertiary}/700", Dark: "color/{tertiary}/700" }
+        { name: "primary", group: "primary", kind: "bg", role: "brand", sameAs: "color/bg/brand/bold", description: "Main accent: the color seen most often across screens and components." },
+        { name: "onPrimary", group: "primary", kind: "content", role: "brand", sameAs: "color/text/inverse", description: "Text and icons on primary." },
+        { name: "primaryContainer", group: "primary", kind: "bg", role: "brand", sameAs: "color/bg/brand/soft", description: "Softer primary fill for containers." },
+        { name: "onPrimaryContainer", group: "primary", kind: "content", role: "brand", sameAs: "color/text/brand/bolder", description: "Text and icons on primaryContainer." },
+        { name: "inversePrimary", group: "primary", kind: "bg", role: "brand", Light: "color/brand/300", Dark: "color/brand/500", description: "Primary color for places using inverse colors, like a snackbar button." },
+        { name: "secondary", group: "secondary", kind: "bg", role: "{secondary}", sameAs: "color/bg/{secondary}/bold", description: "Second accent, to add variety and tell parts of the product apart." },
+        { name: "onSecondary", group: "secondary", kind: "content", role: "{secondary}", sameAs: "color/text/inverse", description: "Text and icons on secondary." },
+        { name: "secondaryContainer", group: "secondary", kind: "bg", role: "{secondary}", sameAs: "color/bg/{secondary}/soft", description: "Softer secondary fill for containers." },
+        { name: "onSecondaryContainer", group: "secondary", kind: "content", role: "{secondary}", sameAs: "color/text/{secondary}/bolder", description: "Text and icons on secondaryContainer." },
+        { name: "tertiary", group: "tertiary", kind: "bg", role: "{tertiary}", sameAs: "color/bg/{tertiary}/bold", description: "Third accent, to balance the others or draw attention to an element." },
+        { name: "onTertiary", group: "tertiary", kind: "content", role: "{tertiary}", sameAs: "color/text/inverse", description: "Text and icons on tertiary." },
+        { name: "tertiaryContainer", group: "tertiary", kind: "bg", role: "{tertiary}", sameAs: "color/bg/{tertiary}/soft", description: "Softer tertiary fill for containers." },
+        { name: "onTertiaryContainer", group: "tertiary", kind: "content", role: "{tertiary}", sameAs: "color/text/{tertiary}/bolder", description: "Text and icons on tertiaryContainer." },
+        { name: "background", group: "surface", kind: "bg", sameAs: "color/bg/base", description: "Color behind scrollable content." },
+        { name: "onBackground", group: "surface", kind: "content", sameAs: "color/text/neutral/bolder", description: "Text and icons on background." },
+        { name: "surface", group: "surface", kind: "bg", sameAs: "color/elevation/surface/canvas", description: "Color of component surfaces, such as cards, sheets and menus." },
+        { name: "onSurface", group: "surface", kind: "content", sameAs: "color/text/neutral/bolder", description: "Text and icons on surface." },
+        { name: "surfaceVariant", group: "surface", kind: "bg", sameAs: "color/bg/neutral/soft", description: "Alternative to surface, for similar uses." },
+        { name: "onSurfaceVariant", group: "surface", kind: "content", Light: "color/neutral/600", Dark: "color/neutral/200", description: "Secondary text and icons on surface." },
+        { name: "surfaceTint", group: "surface", kind: "bg", role: "brand", sameAs: "color/bg/brand/bold", description: "Tint laid over surface by components with tonal elevation." },
+        { name: "inverseSurface", group: "surface", kind: "bg", Light: "color/neutral/700", Dark: "color/neutral/100", description: "Strong contrast with surface, for elements sitting on top of it." },
+        { name: "inverseOnSurface", group: "surface", kind: "content", sameAs: "color/text/inverse", description: "Text and icons on inverseSurface." },
+        { name: "error", group: "error", kind: "bg", role: "danger", sameAs: "color/bg/danger/bold", description: "Signals errors in components, such as invalid text in a field." },
+        { name: "onError", group: "error", kind: "content", role: "danger", sameAs: "color/text/inverse", description: "Text and icons on error." },
+        { name: "errorContainer", group: "error", kind: "bg", role: "danger", sameAs: "color/bg/danger/soft", description: "Softer error fill for containers." },
+        { name: "onErrorContainer", group: "error", kind: "content", role: "danger", sameAs: "color/text/danger/bolder", description: "Text and icons on errorContainer." },
+        { name: "outline", group: "outline", kind: "line", sameAs: "color/border/neutral/heavy", description: "Subtle boundary color that adds contrast for accessibility." },
+        { name: "outlineVariant", group: "outline", kind: "line", sameAs: "color/border/neutral/light", description: "Decorative boundary color, where strong contrast is not needed." },
+        { name: "scrim", group: "outline", kind: "bg", sameAs: "color/elevation/surface/scrim", description: "Color of a scrim that covers content behind a layer." },
+        { name: "surfaceBright", group: "surface container", kind: "bg", Light: "color/neutral/white", Dark: "color/neutral/700", followsDarkCanvas: true, description: "Surface variant that is always brighter than surface." },
+        { name: "surfaceContainer", group: "surface container", kind: "bg", Light: "color/neutral/100", Dark: "color/neutral/850", followsDarkCanvas: true, description: "Surface variant for component containers, such as cards and menus." },
+        { name: "surfaceContainerHigh", group: "surface container", kind: "bg", Light: "color/neutral/150", Dark: "color/neutral/800", followsDarkCanvas: true, description: "Surface container with more emphasis than surfaceContainer." },
+        { name: "surfaceContainerHighest", group: "surface container", kind: "bg", Light: "color/neutral/200", Dark: "color/neutral/700", followsDarkCanvas: true, description: "Surface container with more emphasis than surfaceContainerHigh." },
+        { name: "surfaceContainerLow", group: "surface container", kind: "bg", Light: "color/neutral/50", Dark: "color/neutral/900", followsDarkCanvas: true, description: "Surface container with less emphasis than surfaceContainer." },
+        { name: "surfaceContainerLowest", group: "surface container", kind: "bg", sameAs: "color/elevation/surface/canvas", description: "Surface container with less emphasis than surfaceContainerLow." },
+        { name: "surfaceDim", group: "surface container", kind: "bg", Light: "color/neutral/200", Dark: "color/neutral/950", followsDarkCanvas: true, description: "Surface variant that is always dimmer than surface." },
+        { name: "primaryFixed", group: "fixed", kind: "bg", role: "brand", Light: "color/brand/100", Dark: "color/brand/100", description: "Primary fill that keeps the same color in light and dark." },
+        { name: "primaryFixedDim", group: "fixed", kind: "bg", role: "brand", Light: "color/brand/200", Dark: "color/brand/200", description: "Stronger version of primaryFixed, the same in light and dark." },
+        { name: "onPrimaryFixed", group: "fixed", kind: "content", role: "brand", Light: "color/brand/900", Dark: "color/brand/900", description: "Text and icons on primaryFixed or primaryFixedDim." },
+        { name: "onPrimaryFixedVariant", group: "fixed", kind: "content", role: "brand", Light: "color/brand/700", Dark: "color/brand/700", description: "Lower-emphasis version of onPrimaryFixed." },
+        { name: "secondaryFixed", group: "fixed", kind: "bg", role: "{secondary}", Light: "color/{secondary}/100", Dark: "color/{secondary}/100", description: "Secondary fill that keeps the same color in light and dark." },
+        { name: "secondaryFixedDim", group: "fixed", kind: "bg", role: "{secondary}", Light: "color/{secondary}/200", Dark: "color/{secondary}/200", description: "Stronger version of secondaryFixed, the same in light and dark." },
+        { name: "onSecondaryFixed", group: "fixed", kind: "content", role: "{secondary}", Light: "color/{secondary}/900", Dark: "color/{secondary}/900", description: "Text and icons on secondaryFixed or secondaryFixedDim." },
+        { name: "onSecondaryFixedVariant", group: "fixed", kind: "content", role: "{secondary}", Light: "color/{secondary}/700", Dark: "color/{secondary}/700", description: "Lower-emphasis version of onSecondaryFixed." },
+        { name: "tertiaryFixed", group: "fixed", kind: "bg", role: "{tertiary}", Light: "color/{tertiary}/100", Dark: "color/{tertiary}/100", description: "Tertiary fill that keeps the same color in light and dark." },
+        { name: "tertiaryFixedDim", group: "fixed", kind: "bg", role: "{tertiary}", Light: "color/{tertiary}/200", Dark: "color/{tertiary}/200", description: "Stronger version of tertiaryFixed, the same in light and dark." },
+        { name: "onTertiaryFixed", group: "fixed", kind: "content", role: "{tertiary}", Light: "color/{tertiary}/900", Dark: "color/{tertiary}/900", description: "Text and icons on tertiaryFixed or tertiaryFixedDim." },
+        { name: "onTertiaryFixedVariant", group: "fixed", kind: "content", role: "{tertiary}", Light: "color/{tertiary}/700", Dark: "color/{tertiary}/700", description: "Lower-emphasis version of onTertiaryFixed." }
       ]
     },
     validation: {
@@ -1026,16 +1063,16 @@
     500: 0.519,
     400: 0.638,
     300: 0.754,
-    200: 0.854,
-    150: 0.897,
-    100: 0.935,
-    50: 0.97
+    200: 0.852,
+    150: 0.892,
+    100: 0.928,
+    50: 0.96
   };
   var CHROMA_MULT = {
-    50: 0.11,
-    100: 0.25,
-    150: 0.42,
-    200: 0.59,
+    50: 0.3,
+    100: 0.43,
+    150: 0.55,
+    200: 0.68,
     300: 0.87,
     400: 1,
     500: 0.93,
@@ -1127,10 +1164,10 @@
     }
     p.steps[s] = { lch: clamped, hex: oklchToHex(clamped) };
   }
-  function fixPair(p, pair, threshold, allowAnchor, allowChroma) {
+  function fixPair(p, pair, threshold, allowChroma) {
     var _a;
     const s = pair.text;
-    if (s === p.anchor && !allowAnchor) return false;
+    if (s === p.anchor) return false;
     const cur = p.steps[s].lch;
     const bgs = pairBackgrounds(p, pair);
     const bgL = hexToOklch(bgs[0]).L;
@@ -1164,6 +1201,21 @@
     }
     return false;
   }
+  function lightenOwnBackground(p, pair, threshold) {
+    const cur = p.steps[pair.bg].lch;
+    const upper = STEPS.filter((x) => p.steps[x].lch.L > cur.L).reduce((a, x) => Math.min(a, p.steps[x].lch.L), 1);
+    const n = Math.round(L_SEARCH_LIMIT / SEARCH_STEP);
+    for (let i = 1; i <= n; i++) {
+      const L = r3(cur.L + i * SEARCH_STEP);
+      if (L >= upper) break;
+      const cand = clampChroma({ L, C: cur.C, H: cur.H });
+      if (contrast(p.steps[pair.text].hex, oklchToHex(cand)) >= threshold) {
+        commit(p, pair.bg, cand);
+        return true;
+      }
+    }
+    return false;
+  }
   function calibrate(p) {
     var _a;
     for (const pair of CONTRAST_PAIRS) {
@@ -1179,7 +1231,8 @@
         });
         return;
       }
-      if (fixPair(p, pair, pair.min, true, true)) {
+      const fixed = pair.text === p.anchor && pair.bgPalette === "self" ? lightenOwnBackground(p, pair, pair.min) : fixPair(p, pair, pair.min, true);
+      if (fixed) {
         p.adjustments++;
       } else {
         p.errors.push({
@@ -1196,7 +1249,7 @@
       const ratio = measure(p, pair);
       if (ratio >= pair.target) continue;
       const respaced = ((_a = p.respaced) != null ? _a : []).includes(pair.text);
-      if (!respaced && p.adjustments < MAX_ADJUSTMENTS && fixPair(p, pair, pair.target, false, false)) {
+      if (!respaced && p.adjustments < MAX_ADJUSTMENTS && fixPair(p, pair, pair.target, false)) {
         p.adjustments++;
       } else {
         p.warnings.push({
@@ -1218,9 +1271,11 @@
     const H = r1(src.H);
     const p = { name, anchor, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
     for (const s of STEPS) {
-      const L = s === anchor ? src.L : TARGET_L[s];
-      const C2 = s === anchor ? src.C : Math.max(Math.min(C400 * CHROMA_MULT[s], (_a = CHROMA_CEILING[s]) != null ? _a : Infinity), MIN_CHROMA);
-      commit(p, s, { L, C: C2, H });
+      if (s === anchor) {
+        p.steps[s] = { lch: { L: src.L, C: src.C, H }, hex: hex.toUpperCase() };
+        continue;
+      }
+      commit(p, s, { L: TARGET_L[s], C: Math.max(Math.min(C400 * CHROMA_MULT[s], (_a = CHROMA_CEILING[s]) != null ? _a : Infinity), MIN_CHROMA), H });
     }
     if (anchor !== placed.closest) respaceAroundAnchor(p, anchor, src.L);
     calibrate(p);
@@ -1406,6 +1461,40 @@
   function canvasStepOf(v) {
     return typeof v === "string" && /^\d+$/.test(v) ? Number(v) : v;
   }
+  function appearanceModes(spec, inputs) {
+    var _a, _b, _c, _d, _e;
+    const si = spec.inputs;
+    const xa = si.extraAppearances;
+    const extras = (_a = inputs.extraAppearances) != null ? _a : [];
+    const extraNames = extraAppearanceNames(spec, extras);
+    return [
+      { name: "Light", base: "Light", canvasStep: canvasStepOf((_b = inputs.lightCanvasStep) != null ? _b : si.lightCanvasStep.default), textFillStep: canvasStepOf((_c = inputs.lightTextFillStep) != null ? _c : si.lightTextFillStep.default) },
+      ...inputs.includeDark !== false ? [{ name: "Dark", base: "Dark", canvasStep: canvasStepOf((_d = inputs.darkCanvasStep) != null ? _d : si.darkCanvasStep.default), textFillStep: canvasStepOf((_e = inputs.darkTextFillStep) != null ? _e : si.darkTextFillStep.default) }] : [],
+      ...extras.map((a, i) => {
+        var _a2, _b2, _c2, _d2;
+        return {
+          name: extraNames[i],
+          base: a.base,
+          canvasStep: canvasStepOf((_b2 = a.canvasStep) != null ? _b2 : (_a2 = xa.canvasStep[a.base]) == null ? void 0 : _a2.default),
+          textFillStep: canvasStepOf((_d2 = a.textFillStep) != null ? _d2 : (_c2 = xa.textFillStep[a.base]) == null ? void 0 : _c2.default)
+        };
+      })
+    ];
+  }
+  function appearanceValueFor(spec, name, value, mode, customRoles) {
+    const canvased = canvasValueFor(spec, name, value, mode.base, mode.canvasStep, customRoles);
+    return textFillValueFor(spec, name, canvased, mode.textFillStep, customRoles);
+  }
+  function textFillValueFor(spec, name, value, step, customRoles) {
+    var _a;
+    const rule = spec.appearance.textFill;
+    const listed = rule.tokens.includes(name) || customRoles.some((r) => rule.customRoleTokens.some((t) => t.replace("{role}", r) === name));
+    if (!listed) return value;
+    const family = (_a = value.match(/^color\/([^/]+)\/\d+$/)) == null ? void 0 : _a[1];
+    if (!family) return value;
+    if (typeof step === "number") return `color/${family}/${step}`;
+    return family === "neutral" ? `color/neutral/${step}` : `color/${family}/${rule.stepsWithoutColor[step]}`;
+  }
   function canvasValueFor(spec, name, value, base, step, customRoles) {
     var _a, _b, _c;
     const rule = base === "Dark" ? spec.appearance.darkCanvas : spec.appearance.lightCanvas;
@@ -1424,11 +1513,16 @@
   }
   function shiftWithDarkCanvas(spec, value, step) {
     const steps = spec.primitives.steps;
+    if (!steps.includes(step)) return value;
     const shift = steps.indexOf(step) - steps.indexOf(spec.inputs.darkCanvasStep.default);
     const m = value.match(/^(.*\/)(\d+)$/);
     if (!m || shift === 0) return value;
     const moved = steps[steps.indexOf(Number(m[2])) + shift];
     return `${m[1]}${moved != null ? moved : "out-of-scale"}`;
+  }
+  function limitDarkShift(value, limit) {
+    const m = value.match(/^(.*\/)(\d+)$/);
+    return m && Number(m[2]) < limit ? `${m[1]}${limit}` : value;
   }
   function weightSlotOf(style) {
     return style.replace(/\s+/g, "").toLowerCase();
@@ -1536,7 +1630,7 @@
     return out;
   }
   function buildPlan(spec, inputs) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const report = [];
     const add = (check, collection, token, mode, expected, actual, message) => {
       report.push({ check, severity: severityOf(spec, check), collection, token, mode, expected, actual, message });
@@ -1680,13 +1774,24 @@
       const allowed = spec.inputs.darkCanvasStep.allowed.join(", ");
       add("missing_input", "Appearance", "darkCanvasStep", "Global", allowed, String(darkStep), `Dark canvas step must be one of ${allowed}.`);
     }
+    const lightFill = canvasStepOf((_f = inputs.lightTextFillStep) != null ? _f : spec.inputs.lightTextFillStep.default);
+    if (!spec.inputs.lightTextFillStep.allowed.includes(lightFill)) {
+      const allowed = spec.inputs.lightTextFillStep.allowed.join(", ");
+      add("missing_input", "Appearance", "lightTextFillStep", "Global", allowed, String(lightFill), `Light text fill step must be one of ${allowed}.`);
+    }
+    const darkFill = canvasStepOf((_g = inputs.darkTextFillStep) != null ? _g : spec.inputs.darkTextFillStep.default);
+    if (includeDark && !spec.inputs.darkTextFillStep.allowed.includes(darkFill)) {
+      const allowed = spec.inputs.darkTextFillStep.allowed.join(", ");
+      add("missing_input", "Appearance", "darkTextFillStep", "Global", allowed, String(darkFill), `Dark text fill step must be one of ${allowed}.`);
+    }
     const xa = spec.inputs.extraAppearances;
-    const extras = [];
+    const extraNames = [];
     const seenModes = new Set(xa.reservedNames);
-    ((_f = inputs.extraAppearances) != null ? _f : []).forEach((a, i) => {
-      var _a2, _b2, _c2;
+    const filledNames = extraAppearanceNames(spec, (_h = inputs.extraAppearances) != null ? _h : []);
+    ((_i = inputs.extraAppearances) != null ? _i : []).forEach((a, i) => {
+      var _a2, _b2;
       const label = `extra appearance ${i + 1}`;
-      const name = (_b2 = (_a2 = a == null ? void 0 : a.name) == null ? void 0 : _a2.trim()) != null ? _b2 : "";
+      const name = filledNames[i];
       if (!new RegExp(xa.namePattern).test(name)) {
         add(
           "missing_input",
@@ -1695,7 +1800,7 @@
           "Global",
           "letters, numbers and single spaces",
           name,
-          name ? `"${name}" is not a valid appearance name.` : `The ${label} needs a name.`
+          `"${name}" is not a valid appearance name.`
         );
       } else if (seenModes.has(name)) {
         add("missing_input", "Appearance", label, "Global", "unique, not Light or Dark", name, `"${name}" is already an appearance.`);
@@ -1706,7 +1811,7 @@
         add("missing_input", "Appearance", label, "Global", xa.bases.join(" or "), String(a == null ? void 0 : a.base), `The base of "${name}" must be Light or Dark.`);
         return;
       }
-      const step = canvasStepOf((_c2 = a.canvasStep) != null ? _c2 : rule.default);
+      const step = canvasStepOf((_a2 = a.canvasStep) != null ? _a2 : rule.default);
       if (!rule.allowed.includes(step)) {
         add(
           "missing_input",
@@ -1718,7 +1823,20 @@
           `The canvas of "${name}" must be one of ${rule.allowed.join(", ")}.`
         );
       }
-      extras.push({ name, base: a.base, canvasStep: step });
+      const fillRule = xa.textFillStep[a.base];
+      const fill2 = canvasStepOf((_b2 = a.textFillStep) != null ? _b2 : fillRule.default);
+      if (!fillRule.allowed.includes(fill2)) {
+        add(
+          "missing_input",
+          "Appearance",
+          label,
+          "Global",
+          fillRule.allowed.join(", "),
+          String(fill2),
+          `The text fill of "${name}" must be one of ${fillRule.allowed.join(", ")}.`
+        );
+      }
+      extraNames.push(name);
     });
     if (hasErrors()) return stop();
     const naming = namePalettes(spec, inputs);
@@ -1755,7 +1873,7 @@
         if (f.check === "gamut_clamp") {
           add(f.check, "Primitives", token, "Default", "inside sRGB", "chroma reduced", f.message);
         } else {
-          add(f.check, "Primitives", token, "Default", (_g = f.expected) != null ? _g : "", (_h = f.actual) != null ? _h : "", f.message);
+          add(f.check, "Primitives", token, "Default", (_j = f.expected) != null ? _j : "", (_k = f.actual) != null ? _k : "", f.message);
         }
       }
     }
@@ -1763,7 +1881,7 @@
     const vars = [];
     const primMode = spec.collections.Primitives.modes[0];
     const baseModes = spec.collections.Appearance.modes.filter((m) => includeDark || m !== "Dark");
-    const appModes = [...baseModes, ...extras.map((e) => e.name)];
+    const appModes = [...baseModes, ...extraNames];
     const everyTheme = (v) => Object.fromEntries(themeModes.map((m) => [m, v]));
     const prim = (name, type, value, scopes = []) => {
       vars.push({ collection: "Primitives", name, type, scopes, values: { [primMode]: value } });
@@ -1851,16 +1969,12 @@
       }
     }
     const appNames = [...appMaps.keys()];
-    const modeBases = [
-      { name: "Light", base: "Light", canvasStep: lightStep },
-      ...includeDark ? [{ name: "Dark", base: "Dark", canvasStep: darkStep }] : [],
-      ...extras
-    ];
+    const modeBases = appearanceModes(spec, inputs);
     for (const name of appearanceOrder(spec, appNames)) {
       const map = appMaps.get(name);
       const values = {};
       for (const m of modeBases) {
-        values[m.name] = { alias: canvasValueFor(spec, name, map[m.base], m.base, m.canvasStep, customRoles) };
+        values[m.name] = { alias: appearanceValueFor(spec, name, map[m.base], m, customRoles) };
       }
       vars.push({ collection: "Appearance", name, type: "COLOR", scopes: scopesFor(name), values });
     }
@@ -1884,10 +1998,10 @@
       } else {
         for (const m of modeBases) {
           const own = fill(t[m.base]);
-          values[m.name] = { alias: t.followsDarkCanvas && m.base === "Dark" ? shiftWithDarkCanvas(spec, own, m.canvasStep) : own };
+          values[m.name] = { alias: t.followsDarkCanvas && m.base === "Dark" ? limitDarkShift(shiftWithDarkCanvas(spec, own, m.canvasStep), cs.followsDarkCanvasLimit) : own };
         }
       }
-      vars.push({ collection: "ColorScheme", name: t.name, type: "COLOR", scopes: cs.scopesByKind[t.kind], values });
+      vars.push({ collection: "ColorScheme", name: t.name, type: "COLOR", scopes: cs.scopesByKind[t.kind], values, description: t.description });
     }
     const collections = [
       { name: "Primitives", modes: [primMode] },
@@ -2083,9 +2197,22 @@
   }
   function themeModeNames(spec, n, names = []) {
     const t = spec.collections.Theme;
-    return [...t.letters.slice(0, n)].map((l, i) => {
-      var _a;
-      return ((_a = names[i]) == null ? void 0 : _a.trim()) || t.modePattern.replace("{letter}", l);
+    const wanted = Array.from({ length: n }, (_, i) => names[i]);
+    return fillDefaultNames(wanted, (i) => i === 0 ? t.firstModeName : t.customModeName);
+  }
+  function extraAppearanceNames(spec, extras) {
+    return fillDefaultNames(extras.map((a) => a == null ? void 0 : a.name), () => spec.inputs.extraAppearances.defaultName);
+  }
+  function fillDefaultNames(names, defaultOf) {
+    const used = new Set(names.map((x) => x == null ? void 0 : x.trim()).filter(Boolean));
+    return names.map((x, i) => {
+      const typed = x == null ? void 0 : x.trim();
+      if (typed) return typed;
+      const base = defaultOf(i);
+      let name = base;
+      for (let k = 2; used.has(name); k++) name = `${base} ${k}`;
+      used.add(name);
+      return name;
     });
   }
   function followsGrammar(v) {
@@ -2096,6 +2223,54 @@
     if (v.collection === "Theme") return lower && ["color", "typography", "size"].includes(parts[0]);
     if (v.collection === "ColorScheme") return parts.length === 1 && /^[a-z][A-Za-z]*$/.test(parts[0]);
     return lower && parts[0] === "color" && ["elevation", "bg", "text", "border", "icon"].includes(parts[1]);
+  }
+
+  // src/previews.ts
+  var alphaHex = (percent) => Math.round(percent / 100 * 255).toString(16).padStart(2, "0").toUpperCase();
+  function appearancePreviews(spec, inputs, neutral, brand) {
+    const black = spec.primitives.baseColors["Color/Black"];
+    const white = spec.primitives.baseColors["Color/White"];
+    const hexOf = (alias) => {
+      const alpha = alias.match(/^color\/neutral\/alpha\/(black|white)\/a(\d+)$/);
+      if (alpha) return (alpha[1] === "black" ? black : white) + alphaHex(Number(alpha[2]));
+      if (alias === "color/neutral/black") return black;
+      if (alias === "color/neutral/white") return white;
+      const step = alias.match(/^color\/(neutral|brand)\/(\d+)$/);
+      return step ? (step[1] === "neutral" ? neutral : brand)[step[2]] : "";
+    };
+    return appearanceModes(spec, inputs).map((mode) => {
+      const color = (name) => hexOf(appearanceValueFor(spec, name, spec.appearance.tokens[name][mode.base], mode, []));
+      return {
+        canvas: color("color/bg/base"),
+        input: color("color/bg/input"),
+        border: color("color/border/neutral/light"),
+        icon: color("color/icon/neutral/bolder"),
+        text: color("color/text/neutral/bolder"),
+        textBold: color("color/text/neutral/bold"),
+        brandBolder: color("color/text/brand/bolder"),
+        brandBold: color("color/text/brand/bold"),
+        softNeutral: color("color/bg/neutral/softest"),
+        softBrand: color("color/bg/brand/softest")
+      };
+    });
+  }
+
+  // src/saved-inputs.ts
+  var TOKEN_COLLECTIONS = ["Primitives", "Theme", "Appearance", "ColorScheme"];
+  function fileHasTokens(collectionOfEachVariable) {
+    return collectionOfEachVariable.some((name) => TOKEN_COLLECTIONS.includes(name != null ? name : ""));
+  }
+  function readSavedInputs(text2) {
+    try {
+      return text2 ? JSON.parse(text2) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function inputsToShow(hasTokens, fileInputs, olderInputs) {
+    var _a;
+    if (!hasTokens) return null;
+    return (_a = fileInputs != null ? fileInputs : olderInputs) != null ? _a : null;
   }
 
   // src/tables.ts
@@ -2176,7 +2351,7 @@
       modesLabel: many ? "EXPLICIT MODES" : "EXPLICIT MODE",
       modes: themeModes.join(" / "),
       notation: "Primitive color token, primitive opacity token (optional)",
-      info: (many ? `Each row is one source variable. The ${countWord(themeModes.length).toLowerCase()} columns resolve that same variable in ${listOf(themeModes)}. ` : `Each row is one source variable, resolved in ${(_a = themeModes[0]) != null ? _a : "Theme A"}. `) + "Arrows show exact alias targets; literal alpha colors retain their source opacity. Swatches sit on a light neutral substrate.",
+      info: (many ? `Each row is one source variable. The ${countWord(themeModes.length).toLowerCase()} columns resolve that same variable in ${listOf(themeModes)}. ` : `Each row is one source variable, resolved in ${(_a = themeModes[0]) != null ? _a : "the first theme"}. `) + "Arrows show exact alias targets; literal alpha colors retain their source opacity. Swatches sit on a light neutral substrate.",
       nameHeader: "TOKEN NAME AND DESCRIPTION",
       columns: themeModes.map((m) => m.toUpperCase()),
       groups: groupBy(colors("Theme"), (v) => firstTwo(v.name), (v) => ({
@@ -2275,7 +2450,7 @@
       const value = v ? Object.values(v.values)[0] : void 0;
       return typeof value === "string" && /^#[0-9A-F]{6}([0-9A-F]{2})?$/i.test(value) ? value.toUpperCase() : null;
     };
-    const alphaHex = (name) => {
+    const alphaHex2 = (name) => {
       const v = prim.get(name);
       const value = v ? Object.values(v.values)[0] : void 0;
       if (typeof value !== "number") return null;
@@ -2289,7 +2464,7 @@
       const base = value.alias.startsWith("#") ? value.alias.toUpperCase() : primHex(value.alias);
       if (!base) return null;
       if (value.opacityAlias === void 0) return base;
-      const a = alphaHex(value.opacityAlias);
+      const a = alphaHex2(value.opacityAlias);
       return a === null ? null : base.slice(0, 7) + (a === "FF" ? "" : a);
     };
     return themeHex;
@@ -2303,8 +2478,8 @@
     };
     const themeModes = modesOf("Theme");
     const appModes = modesOf("Appearance");
-    if (appModes.length === 0) return { data, problems: ["There is no Appearance collection in this file. Create variables first."] };
-    if (themeModes.length === 0) return { data, problems: ["There is no Theme collection in this file. Create variables first."] };
+    if (appModes.length === 0) return { data, problems: ["There is no Appearance collection in this file. Generate tokens first."] };
+    if (themeModes.length === 0) return { data, problems: ["There is no Theme collection in this file. Generate tokens first."] };
     const themeHex = themeResolver(source);
     const appearance = source.variables.filter((v) => v.collection === "Appearance" && v.type === "COLOR").sort((a, b) => exportName(a.name, options).localeCompare(exportName(b.name, options)));
     const seen = /* @__PURE__ */ new Map();
@@ -2356,8 +2531,8 @@
     };
     const themeModes = modesOf("Theme");
     const modes = modesOf("ColorScheme");
-    if (modes.length === 0) return { data, dark, problems: ["There is no ColorScheme collection in this file. Create variables first."] };
-    if (themeModes.length === 0) return { data, dark, problems: ["There is no Theme collection in this file. Create variables first."] };
+    if (modes.length === 0) return { data, dark, problems: ["There is no ColorScheme collection in this file. Generate tokens first."] };
+    if (themeModes.length === 0) return { data, dark, problems: ["There is no Theme collection in this file. Generate tokens first."] };
     const themeHex = themeResolver(source);
     const roles = source.variables.filter((v) => v.collection === "ColorScheme" && v.type === "COLOR");
     for (const t of themeModes) {
@@ -2430,6 +2605,82 @@ import androidx.compose.ui.graphics.Color
     return { files, problems };
   }
 
+  // src/color-maps.ts
+  var MAP_WIDTH = 1872;
+  var MAP_HEIGHT = 1272;
+  var MAP_BACKGROUND = "surfaceContainer";
+  function accentColumn(role, Role, x) {
+    const on = `on${Role}`;
+    const container = `${role}Container`;
+    const onContainer = `on${Role}Container`;
+    return [
+      { role, labelRole: on, label: Role, x, y: 104, w: 392, h: 102 },
+      { role: on, labelRole: role, label: `On ${Role}`, x, y: 206, w: 392, h: 80 },
+      { role: container, labelRole: onContainer, label: `${Role} Container`, x, y: 294, w: 392, h: 102 },
+      { role: onContainer, labelRole: on, label: `On ${Role} Container`, x, y: 396, w: 392, h: 80 }
+    ];
+  }
+  function fixedColumn(role, Role, x) {
+    const fixed = `${role}Fixed`;
+    const onFixed = `on${Role}Fixed`;
+    return [
+      { role: fixed, labelRole: onFixed, label: `${Role}
+Fixed`, x, y: 508, w: 196, h: 112 },
+      { role: `${role}FixedDim`, labelRole: onFixed, label: `${Role}
+Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
+      { role: onFixed, labelRole: fixed, label: `On ${Role} Fixed`, x, y: 620, w: 392, h: 72 },
+      { role: `on${Role}FixedVariant`, labelRole: fixed, label: `On ${Role} Fixed Variant`, x, y: 692, w: 392, h: 72 }
+    ];
+  }
+  var MAP_BLOCKS = [
+    ...accentColumn("primary", "Primary", 128),
+    ...accentColumn("secondary", "Secondary", 528),
+    ...accentColumn("tertiary", "Tertiary", 928),
+    ...accentColumn("error", "Error", 1352),
+    ...fixedColumn("primary", "Primary", 128),
+    ...fixedColumn("secondary", "Secondary", 528),
+    ...fixedColumn("tertiary", "Tertiary", 928),
+    // Surfaces.
+    { role: "surfaceDim", labelRole: "onSurface", label: "Surface Dim", x: 128, y: 796, w: 397.333, h: 130 },
+    { role: "surface", labelRole: "onSurface", label: "Surface", x: 525.333, y: 796, w: 397.333, h: 130 },
+    { role: "surfaceBright", labelRole: "onSurface", label: "Surface Bright", x: 922.667, y: 796, w: 397.333, h: 130 },
+    { role: "surfaceContainerLowest", labelRole: "onSurface", label: "Surface\nContainer\nLowest", x: 128, y: 934, w: 238.4, h: 146 },
+    { role: "surfaceContainerLow", labelRole: "onSurface", label: "Surface\nContainer Low", x: 366.4, y: 934, w: 238.4, h: 146 },
+    { role: "surfaceContainer", labelRole: "onSurface", label: "Surface\nContainer", x: 604.8, y: 934, w: 238.4, h: 146 },
+    { role: "surfaceContainerHigh", labelRole: "onSurface", label: "Surface\nContainer High", x: 843.2, y: 934, w: 238.4, h: 146 },
+    { role: "surfaceContainerHighest", labelRole: "onSurface", label: "Surface\nContainer\nHighest", x: 1081.6, y: 934, w: 238.4, h: 146 },
+    // Text and lines on surfaces.
+    { role: "onSurface", labelRole: "inverseOnSurface", label: "On Surface", x: 128, y: 1088, w: 298, h: 80 },
+    { role: "onSurfaceVariant", labelRole: "inverseOnSurface", label: "On Surface Variant", x: 426, y: 1088, w: 298, h: 80 },
+    { role: "outline", labelRole: "inverseOnSurface", label: "Outline", x: 724, y: 1088, w: 298, h: 80 },
+    { role: "outlineVariant", labelRole: "onSurface", label: "Outline Variant", x: 1022, y: 1088, w: 298, h: 80 },
+    // The right column: surface variant, background, tint, inverse roles and the scrim.
+    { role: "surfaceVariant", labelRole: "onSurface", label: "Surface Variant", x: 1352, y: 542, w: 392, h: 72 },
+    { role: "background", labelRole: "onBackground", label: "Background", x: 1352, y: 622, w: 392, h: 72 },
+    { role: "onBackground", labelRole: "background", label: "On Background", x: 1352, y: 694, w: 392, h: 72 },
+    { role: "surfaceTint", labelRole: "inverseOnSurface", label: "Surface Tint", x: 1352, y: 774, w: 392, h: 72 },
+    { role: "inverseSurface", labelRole: "inverseOnSurface", label: "Inverse Surface", x: 1352, y: 854, w: 392, h: 72 },
+    { role: "inverseOnSurface", labelRole: "onSurface", label: "Inverse On Surface", x: 1352, y: 928, w: 392, h: 72 },
+    { role: "inversePrimary", labelRole: "onPrimaryContainer", label: "Inverse Primary", x: 1352, y: 1008, w: 392, h: 72 },
+    { role: "scrim", labelRole: "primaryFixed", label: "Scrim", x: 1352, y: 1088, w: 392, h: 80 }
+  ];
+  function buildColorMaps(source) {
+    const modesOf = (c) => {
+      var _a, _b;
+      return (_b = (_a = source.collections.find((x) => x.name === c)) == null ? void 0 : _a.modes) != null ? _b : [];
+    };
+    const themes = modesOf("Theme");
+    const roles = new Set(source.variables.filter((v) => v.collection === "ColorScheme" && v.type === "COLOR").map((v) => v.name));
+    const blocks = MAP_BLOCKS.filter((b) => roles.has(b.role) && roles.has(b.labelRole));
+    return themes.flatMap((themeMode) => modesOf("ColorScheme").map((appMode) => ({
+      // With one theme the name is the design's; with more, it also says which theme it shows.
+      name: themes.length > 1 ? `ColorScheme map - ${themeMode} ${appMode}` : `ColorScheme map - ${appMode}`,
+      themeMode,
+      appMode,
+      blocks
+    })));
+  }
+
   // src/tables-figma.ts
   var PAGE_NAME = "Color tokens";
   var PAGE_TAG = "color-tokens-page";
@@ -2457,9 +2708,10 @@ import androidx.compose.ui.graphics.Color
   var PRIM_ROW_H = 48;
   var TILE = 40;
   var CHECK = 10;
-  async function drawColorTables(tables) {
+  async function drawColorTables(tables, maps = []) {
     var _a;
     const ctx = await loadContext();
+    const mapFont = maps.length > 0 ? await loadMapFont() : null;
     let page = (_a = figma.root.children.find((p) => p.getPluginData(PAGE_TAG) === "1")) != null ? _a : figma.root.children.find((p) => p.name === PAGE_NAME);
     if (!page) {
       page = figma.createPage();
@@ -2478,6 +2730,13 @@ import androidx.compose.ui.graphics.Color
         frame.x = x;
         frame.y = y;
         x += frame.width + TABLE_GAP;
+      }
+      for (const m of maps) {
+        const frame = drawColorMap(m, ctx, page, mapFont);
+        drawn.push(frame);
+        frame.x = x;
+        frame.y = y;
+        x += MAP_WIDTH + TABLE_GAP;
       }
     } catch (e) {
       for (const f of drawn) if (!f.removed) f.remove();
@@ -2504,22 +2763,70 @@ import androidx.compose.ui.graphics.Color
   async function loadFonts() {
     const pick = async (style) => {
       try {
-        await figma.loadFontAsync({ family: "Inter Display", style });
-        return { family: "Inter Display", style };
+        await figma.loadFontAsync({ family: "IBM Plex Sans", style });
+        return { family: "IBM Plex Sans", style };
       } catch (e) {
         await figma.loadFontAsync({ family: "Inter", style });
         return { family: "Inter", style };
       }
     };
-    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+    const regular = await pick("Regular");
     return {
       bold: await pick("Bold"),
       medium: await pick("Medium"),
-      regular: await pick("Regular"),
+      regular,
       light: await pick("Light"),
-      body: { family: "Inter", style: "Regular" }
-      // descriptions and info text use plain Inter in the design
+      body: regular
+      // descriptions and info text
     };
+  }
+  async function loadMapFont() {
+    for (const family of ["Roboto", "IBM Plex Sans"]) {
+      try {
+        const font = { family, style: "Regular" };
+        await figma.loadFontAsync(font);
+        return font;
+      } catch (e) {
+      }
+    }
+    throw new Error("Neither Roboto nor IBM Plex Sans is available to draw the color maps.");
+  }
+  function drawColorMap(map, ctx, page, font) {
+    const frame = figma.createFrame();
+    page.appendChild(frame);
+    frame.name = map.name;
+    frame.resize(MAP_WIDTH, MAP_HEIGHT);
+    frame.clipsContent = true;
+    const setMode = (collection, modeName) => {
+      const col = ctx.collections.get(collection);
+      const mode = col == null ? void 0 : col.modes.find((m) => m.name === modeName);
+      if (col && mode) frame.setExplicitVariableModeForCollection(col, mode.modeId);
+    };
+    setMode("Theme", map.themeMode);
+    setMode("ColorScheme", map.appMode);
+    frame.fills = [roleFill(MAP_BACKGROUND, ctx)];
+    for (const b of map.blocks) {
+      const block = figma.createFrame();
+      frame.appendChild(block);
+      block.name = b.label.replace(/\n/g, " ");
+      block.x = b.x;
+      block.y = b.y;
+      block.resize(b.w, b.h);
+      block.clipsContent = true;
+      block.fills = [roleFill(b.role, ctx)];
+      const label = text(block, b.label, font, 28, 34, C.black, b.w - 48);
+      label.name = "Color label";
+      label.x = 24;
+      label.y = 18;
+      label.fills = [roleFill(b.labelRole, ctx)];
+    }
+    frame.setPluginData(TABLE_TAG, "ColorScheme map");
+    return frame;
+  }
+  function roleFill(role, ctx) {
+    const variable = ctx.byKey.get(`ColorScheme|${role}`);
+    const paint = solid(C.white);
+    return variable ? figma.variables.setBoundVariableForPaint(paint, "color", variable) : paint;
   }
   function drawTable(t, ctx, page) {
     const cellCount = t.collection === "Primitives" ? 0 : t.columns.length;
@@ -2819,10 +3126,8 @@ import androidx.compose.ui.graphics.Color
         var _a, _b, _c;
         let key = name;
         if (c.name === "Theme") key = ((_a = inputs.themeKeys) == null ? void 0 : _a[i]) || name;
-        if (c.name === "Appearance" || c.name === "ColorScheme") key = ((_c = ((_b = inputs.extraAppearances) != null ? _b : []).find((e) => {
-          var _a2;
-          return ((_a2 = e.name) == null ? void 0 : _a2.trim()) === name;
-        })) == null ? void 0 : _c.key) || name;
+        const extras = (_b = inputs.extraAppearances) != null ? _b : [];
+        if (c.name === "Appearance" || c.name === "ColorScheme") key = ((_c = extras[i - (c.modes.length - extras.length)]) == null ? void 0 : _c.key) || name;
         out.push({ collection: c.name, name, key });
       });
     }
@@ -2947,7 +3252,8 @@ import androidx.compose.ui.graphics.Color
   }
 
   // src/figma.ts
-  var STORAGE_KEY = "last-inputs";
+  var FILE_INPUTS = "form-inputs";
+  var OLDER_STORAGE_KEY = "last-inputs";
   figma.showUI(__html__, { width: 960, height: 880 });
   var fontStyles = null;
   async function loadFontStyles() {
@@ -2961,8 +3267,17 @@ import androidx.compose.ui.graphics.Color
     fontStyles = styles;
     return styles;
   }
+  async function settingsForThisFile() {
+    var _a;
+    const variables = await figma.variables.getLocalVariablesAsync();
+    const collections = await figma.variables.getLocalVariableCollectionsAsync();
+    const nameOf = new Map(collections.map((c) => [c.id, c.name]));
+    const hasTokens = fileHasTokens(variables.map((v) => nameOf.get(v.variableCollectionId)));
+    const older = (_a = await figma.clientStorage.getAsync(OLDER_STORAGE_KEY)) != null ? _a : null;
+    return inputsToShow(hasTokens, readSavedInputs(figma.root.getPluginData(FILE_INPUTS)), older);
+  }
   (async () => {
-    const saved = await figma.clientStorage.getAsync(STORAGE_KEY);
+    const saved = await settingsForThisFile();
     const ui = {
       gray: tokens_default.primitives.neutralPalette.steps,
       // swatches of the canvas dropdowns
@@ -2970,8 +3285,14 @@ import androidx.compose.ui.graphics.Color
       // weight styles ticked by default
       lightSteps: tokens_default.inputs.lightCanvasStep.allowed,
       darkSteps: tokens_default.inputs.darkCanvasStep.allowed,
-      steps: [...tokens_default.primitives.steps].sort((a, b) => a - b)
+      lightFillSteps: tokens_default.inputs.lightTextFillStep.allowed,
+      darkFillSteps: tokens_default.inputs.darkTextFillStep.allowed,
+      steps: [...tokens_default.primitives.steps].sort((a, b) => a - b),
       // palette steps, lightest first
+      firstThemeName: tokens_default.collections.Theme.firstModeName,
+      // default names
+      customThemeName: tokens_default.collections.Theme.customModeName,
+      customAppearanceName: tokens_default.inputs.extraAppearances.defaultName
     };
     figma.ui.postMessage({ type: "saved-inputs", inputs: saved != null ? saved : null, fonts: await loadFontStyles(), ui });
   })();
@@ -2982,7 +3303,6 @@ import androidx.compose.ui.graphics.Color
     if (msg.type === "names") return previewNames(msg.inputs);
     if (msg.type !== "run") return;
     try {
-      await figma.clientStorage.setAsync(STORAGE_KEY, msg.inputs);
       const fonts = await loadFontStyles();
       const inputs = __spreadProps(__spreadValues({}, msg.inputs), {
         themes: ((_a = msg.inputs.themes) != null ? _a : []).map((t) => {
@@ -3012,8 +3332,9 @@ import androidx.compose.ui.graphics.Color
         summary = writePlan(plan, existing, collections, modes);
         summary.renamed = renamedPalettes;
         await storePaletteSources(plan);
+        figma.root.setPluginData(FILE_INPUTS, JSON.stringify(msg.inputs));
         try {
-          summary.tablesPage = (await drawColorTables(buildTables(tokens_default, plan))).page;
+          summary.tablesPage = (await drawColorTables(buildTables(tokens_default, plan), buildColorMaps(plan))).page;
         } catch (e) {
           summary.problems.push(`Color tables were not drawn: ${e instanceof Error ? e.message : String(e)}`);
         }
@@ -3052,9 +3373,13 @@ import androidx.compose.ui.graphics.Color
         const neutral = naming.neutralStepsOf(i);
         palettes.push({ theme: i, role: "neutral", hexes: steps.map((s) => neutral[s]) });
       }
-      figma.ui.postMessage({ type: "names-result", similar: notes, palettes });
+      const brandName = naming.paletteOf(0, "brand");
+      const brandPalette = built.find((x) => x.name === brandName);
+      const brandSteps = Object.fromEntries(steps.map((s) => [s, brandPalette ? brandPalette.steps[s].hex : gray[String(s)]]));
+      const previews = appearancePreviews(tokens_default, inputs, naming.neutralStepsOf(0), brandSteps);
+      figma.ui.postMessage({ type: "names-result", similar: notes, palettes, previews });
     } catch (e) {
-      figma.ui.postMessage({ type: "names-result", similar: [], palettes: [] });
+      figma.ui.postMessage({ type: "names-result", similar: [], palettes: [], previews: [] });
     }
   }
   async function updateTablesOnly() {
@@ -3063,10 +3388,10 @@ import androidx.compose.ui.graphics.Color
       const names = source.collections.map((c) => c.name);
       const missing = ["Primitives", "Theme", "Appearance", "ColorScheme"].filter((n) => !names.includes(n));
       if (names.length === 0) {
-        figma.ui.postMessage({ type: "failure", message: "No Primitives, Theme or Appearance collection in this file. Create variables first." });
+        figma.ui.postMessage({ type: "failure", message: "No Primitives, Theme or Appearance collection in this file. Generate tokens first." });
         return;
       }
-      const result = await drawColorTables(buildTables(tokens_default, source));
+      const result = await drawColorTables(buildTables(tokens_default, source), buildColorMaps(source));
       figma.ui.postMessage({ type: "tables-result", page: result.page, tables: result.tables, missing });
       figma.notify(`Color tables updated on "${result.page}".`);
     } catch (e) {
@@ -3185,6 +3510,10 @@ import androidx.compose.ui.graphics.Color
       let changed = false;
       if (!sameScopes(variable.scopes, def.scopes)) {
         variable.scopes = def.scopes;
+        changed = true;
+      }
+      if (def.description !== void 0 && variable.description !== def.description) {
+        variable.description = def.description;
         changed = true;
       }
       const modes2 = modeIds.get(def.collection);

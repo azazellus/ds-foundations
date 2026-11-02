@@ -38,17 +38,23 @@ export type ThemeInput = {
 };
 
 // An extra appearance mode (section 5.1): copies Light or Dark, with its own canvas step
-// ("white" or 50 for Light, 950/900/850 for Dark). "key" identifies it across renames (Figma layer only).
-export type AppearanceInput = { name: string; base: string; canvasStep?: number | string; key?: string };
+// ("white" or 50 for Light, 950/900/850/"black" for Dark) and text fill step.
+// "key" identifies it across renames (Figma layer only).
+export type AppearanceInput = { name: string; base: string; canvasStep?: number | string; textFillStep?: number | string; key?: string };
+
+// What one Appearance mode needs to get its values: its base and its two steps.
+export type AppearanceMode = { name: string; base: string; canvasStep: number | string; textFillStep: number | string };
 
 export type Inputs = {
   numberOfThemes: number; // 1 to 26
   themes: ThemeInput[];
-  themeNames?: string[]; // optional; "Theme A", "Theme B", ... for missing or empty entries
+  themeNames?: string[]; // optional; "Main theme", "Custom theme", "Custom theme 2", ... for missing or empty entries
   themeKeys?: string[]; // identifies each theme across renames (Figma layer only)
   includeDark?: boolean; // optional; true when omitted
   lightCanvasStep?: number | string; // optional; "white" when omitted. Applies to Light itself.
-  darkCanvasStep?: number; // optional; 950 when omitted. Applies to Dark itself.
+  darkCanvasStep?: number | string; // optional; 950 when omitted. Applies to Dark itself.
+  lightTextFillStep?: number | string; // optional; 700 when omitted. Applies to Light itself.
+  darkTextFillStep?: number | string; // optional; 150 when omitted. Applies to Dark itself.
   customRoles?: string[]; // optional; extra color roles such as "promo", treated like status roles
   extraAppearances?: AppearanceInput[]; // optional; besides Light and Dark
   statusRoles?: string[]; // optional; which of success, danger, warning, info exist (all four when omitted)
@@ -70,6 +76,7 @@ export type VariableDef = {
   scopes: string[];
   values: Record<string, Value>; // mode name -> value
   alpha?: boolean; // true for alpha tokens (section 2.1): color link plus opacity link; never contrast-checked
+  description?: string; // written as the Figma variable's description (ColorScheme tokens, section 3.5)
 };
 
 export type ReportEntry = {
@@ -116,10 +123,51 @@ function canvasStepOf(v: unknown): number | string {
   return typeof v === "string" && /^\d+$/.test(v) ? Number(v) : (v as number | string);
 }
 
+// Every Appearance mode with its steps: Light, Dark when included, and the extra appearances (section 5.1).
+// An omitted step takes its default.
+export function appearanceModes(spec: Spec, inputs: Inputs): AppearanceMode[] {
+  const si = spec.inputs;
+  const xa = si.extraAppearances;
+  const extras = inputs.extraAppearances ?? [];
+  const extraNames = extraAppearanceNames(spec, extras);
+  return [
+    { name: "Light", base: "Light", canvasStep: canvasStepOf(inputs.lightCanvasStep ?? si.lightCanvasStep.default), textFillStep: canvasStepOf(inputs.lightTextFillStep ?? si.lightTextFillStep.default) },
+    ...(inputs.includeDark !== false
+      ? [{ name: "Dark", base: "Dark", canvasStep: canvasStepOf(inputs.darkCanvasStep ?? si.darkCanvasStep.default), textFillStep: canvasStepOf(inputs.darkTextFillStep ?? si.darkTextFillStep.default) }]
+      : []),
+    ...extras.map((a, i) => ({
+      name: extraNames[i],
+      base: a.base,
+      canvasStep: canvasStepOf(a.canvasStep ?? xa.canvasStep[a.base]?.default),
+      textFillStep: canvasStepOf(a.textFillStep ?? xa.textFillStep[a.base]?.default),
+    })),
+  ];
+}
+
+// The value of an Appearance token in one mode, from its value in appearance.tokens: first the canvas
+// rules, then the text fill rule (section 5.1).
+export function appearanceValueFor(spec: Spec, name: string, value: string, mode: AppearanceMode, customRoles: string[]): string {
+  const canvased = canvasValueFor(spec, name, value, mode.base, mode.canvasStep, customRoles);
+  return textFillValueFor(spec, name, canvased, mode.textFillStep, customRoles);
+}
+
+// Section 5.1, appearance.textFill in tokens.json: a bolder text or icon token uses the mode's text fill
+// step, in its own color family. Black and white exist only in neutral; other families use a step instead.
+function textFillValueFor(spec: Spec, name: string, value: string, step: number | string, customRoles: string[]): string {
+  const rule = spec.appearance.textFill;
+  const listed = rule.tokens.includes(name) || customRoles.some((r) => rule.customRoleTokens.some((t: string) => t.replace("{role}", r) === name));
+  if (!listed) return value;
+  const family = value.match(/^color\/([^/]+)\/\d+$/)?.[1];
+  if (!family) return value;
+  if (typeof step === "number") return `color/${family}/${step}`;
+  return family === "neutral" ? `color/neutral/${step}` : `color/${family}/${rule.stepsWithoutColor[step]}`;
+}
+
 // Section 5.1, appearance.lightCanvas and appearance.darkCanvas in tokens.json: the value of an
 // Appearance token in a Light- or Dark-based mode for that mode's canvas step. Canvas tokens use the
 // step itself. In Dark, following tokens move lighter along primitives.steps by as many steps as the
-// canvas moved from 950. Light has no following tokens, only fixed values per step (valuesByStep).
+// canvas moved from 950 (black is not on that scale, so they stay as at 950). Light has no following
+// tokens, only fixed values per step (valuesByStep).
 // Other tokens keep their value.
 // customRoles fills in the {role} following tokens.
 function canvasValueFor(
@@ -142,12 +190,20 @@ function canvasValueFor(
 // default (950). Used by ColorScheme tokens with followsDarkCanvas (section 3.5).
 function shiftWithDarkCanvas(spec: Spec, value: string, step: number | string): string {
   const steps: number[] = spec.primitives.steps; // darkest first: 950, 900, 850, ...
+  if (!steps.includes(step as number)) return value; // black: as at the default step (section 5.1)
   const shift = steps.indexOf(step as number) - steps.indexOf(spec.inputs.darkCanvasStep.default); // toward 50
   const m = value.match(/^(.*\/)(\d+)$/);
   if (!m || shift === 0) return value;
   const moved = steps[steps.indexOf(Number(m[2])) + shift];
   // Past either end of the scale there is nothing to point to; the alias check then reports it.
   return `${m[1]}${moved ?? "out-of-scale"}`;
+}
+
+// A ColorScheme surface that follows the dark canvas never gets lighter than this step (section 3.5).
+// Lower step numbers are lighter.
+function limitDarkShift(value: string, limit: number): string {
+  const m = value.match(/^(.*\/)(\d+)$/);
+  return m && Number(m[2]) < limit ? `${m[1]}${limit}` : value;
 }
 
 // The weight slot a style fills: its name without spaces, in lowercase ("Semi Bold" -> "semibold").
@@ -284,7 +340,7 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
       `Number of themes must be a whole number from ${minimum} to ${maximum}.`);
     return stop();
   }
-  // Theme mode names: the user's names, or Theme A, Theme B, ... (section 5.1).
+  // Theme mode names: the user's names, or the default names (section 5.1).
   const themeModes = themeModeNames(spec, n, inputs.themeNames);
   const namePattern = new RegExp(spec.inputs.themeNames.namePattern);
   themeModes.forEach((name, i) => {
@@ -392,22 +448,34 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
     const allowed = spec.inputs.lightCanvasStep.allowed.join(", ");
     add("missing_input", "Appearance", "lightCanvasStep", "Global", allowed, String(lightStep), `Light canvas step must be one of ${allowed}.`);
   }
-  const darkStep = canvasStepOf(inputs.darkCanvasStep ?? spec.inputs.darkCanvasStep.default) as number;
+  const darkStep = canvasStepOf(inputs.darkCanvasStep ?? spec.inputs.darkCanvasStep.default);
   if (includeDark && !spec.inputs.darkCanvasStep.allowed.includes(darkStep)) {
     const allowed = spec.inputs.darkCanvasStep.allowed.join(", ");
     add("missing_input", "Appearance", "darkCanvasStep", "Global", allowed, String(darkStep), `Dark canvas step must be one of ${allowed}.`);
   }
+  // Text fill steps (section 5.1).
+  const lightFill = canvasStepOf(inputs.lightTextFillStep ?? spec.inputs.lightTextFillStep.default);
+  if (!spec.inputs.lightTextFillStep.allowed.includes(lightFill)) {
+    const allowed = spec.inputs.lightTextFillStep.allowed.join(", ");
+    add("missing_input", "Appearance", "lightTextFillStep", "Global", allowed, String(lightFill), `Light text fill step must be one of ${allowed}.`);
+  }
+  const darkFill = canvasStepOf(inputs.darkTextFillStep ?? spec.inputs.darkTextFillStep.default);
+  if (includeDark && !spec.inputs.darkTextFillStep.allowed.includes(darkFill)) {
+    const allowed = spec.inputs.darkTextFillStep.allowed.join(", ");
+    add("missing_input", "Appearance", "darkTextFillStep", "Global", allowed, String(darkFill), `Dark text fill step must be one of ${allowed}.`);
+  }
 
   // Extra appearances: user-named modes based on Light or Dark, each with its own canvas step.
   const xa = spec.inputs.extraAppearances;
-  const extras: { name: string; base: string; canvasStep: number | string }[] = [];
+  const extraNames: string[] = [];
   const seenModes = new Set<string>(xa.reservedNames);
+  const filledNames = extraAppearanceNames(spec, inputs.extraAppearances ?? []);
   (inputs.extraAppearances ?? []).forEach((a, i) => {
     const label = `extra appearance ${i + 1}`;
-    const name = a?.name?.trim() ?? "";
+    const name = filledNames[i];
     if (!new RegExp(xa.namePattern).test(name)) {
       add("missing_input", "Appearance", label, "Global", "letters, numbers and single spaces", name,
-        name ? `"${name}" is not a valid appearance name.` : `The ${label} needs a name.`);
+        `"${name}" is not a valid appearance name.`);
     } else if (seenModes.has(name)) {
       add("missing_input", "Appearance", label, "Global", "unique, not Light or Dark", name, `"${name}" is already an appearance.`);
     }
@@ -422,7 +490,13 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
       add("missing_input", "Appearance", label, "Global", rule.allowed.join(", "), String(step),
         `The canvas of "${name}" must be one of ${rule.allowed.join(", ")}.`);
     }
-    extras.push({ name, base: a.base, canvasStep: step });
+    const fillRule = xa.textFillStep[a.base];
+    const fill = canvasStepOf(a.textFillStep ?? fillRule.default);
+    if (!fillRule.allowed.includes(fill)) {
+      add("missing_input", "Appearance", label, "Global", fillRule.allowed.join(", "), String(fill),
+        `The text fill of "${name}" must be one of ${fillRule.allowed.join(", ")}.`);
+    }
+    extraNames.push(name);
   });
 
   if (hasErrors()) return stop();
@@ -466,7 +540,7 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
   const primMode: string = spec.collections.Primitives.modes[0];
   // Light, Dark (when included), then the extra appearances in the order given.
   const baseModes: string[] = spec.collections.Appearance.modes.filter((m: string) => includeDark || m !== "Dark");
-  const appModes: string[] = [...baseModes, ...extras.map((e) => e.name)];
+  const appModes: string[] = [...baseModes, ...extraNames];
 
   // Same value in every Theme mode.
   const everyTheme = (v: Value): Record<string, Value> =>
@@ -577,18 +651,14 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
   }
   const appNames = [...appMaps.keys()];
 
-  // Every mode copies its base (Light or Dark) and applies its own canvas step (section 5.1).
-  const modeBases = [
-    { name: "Light", base: "Light", canvasStep: lightStep },
-    ...(includeDark ? [{ name: "Dark", base: "Dark", canvasStep: darkStep as number | string }] : []),
-    ...extras,
-  ];
+  // Every mode copies its base (Light or Dark) and applies its own canvas and text fill steps (section 5.1).
+  const modeBases = appearanceModes(spec, inputs);
   // Created in appearance.order, so a new collection lists them in that order in Figma.
   for (const name of appearanceOrder(spec, appNames)) {
     const map = appMaps.get(name)!;
     const values: Record<string, Value> = {};
     for (const m of modeBases) {
-      values[m.name] = { alias: canvasValueFor(spec, name, map[m.base], m.base, m.canvasStep, customRoles) };
+      values[m.name] = { alias: appearanceValueFor(spec, name, map[m.base], m, customRoles) };
     }
     vars.push({ collection: "Appearance", name, type: "COLOR", scopes: scopesFor(name), values });
   }
@@ -614,10 +684,10 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
     } else {
       for (const m of modeBases) {
         const own = fill(t[m.base]);
-        values[m.name] = { alias: t.followsDarkCanvas && m.base === "Dark" ? shiftWithDarkCanvas(spec, own, m.canvasStep) : own };
+        values[m.name] = { alias: t.followsDarkCanvas && m.base === "Dark" ? limitDarkShift(shiftWithDarkCanvas(spec, own, m.canvasStep), cs.followsDarkCanvasLimit) : own };
       }
     }
-    vars.push({ collection: "ColorScheme", name: t.name, type: "COLOR", scopes: cs.scopesByKind[t.kind], values });
+    vars.push({ collection: "ColorScheme", name: t.name, type: "COLOR", scopes: cs.scopesByKind[t.kind], values, description: t.description });
   }
 
   const collections: Plan["collections"] = [
@@ -814,12 +884,32 @@ export function appearanceOrder(spec: Spec, names: string[]): string[] {
   });
 }
 
-// Theme mode names: the user's name for each theme, or "Theme A", "Theme B", ... from the pattern
-// in tokens.json (collections.Theme) when a name is missing or empty.
+// Theme mode names: the user's name for each theme, or the default names in tokens.json
+// (collections.Theme) when a name is missing or empty.
 export function themeModeNames(spec: Spec, n: number, names: string[] = []): string[] {
   const t = spec.collections.Theme;
-  return [...t.letters.slice(0, n)].map((l: string, i: number) =>
-    names[i]?.trim() || t.modePattern.replace("{letter}", l));
+  const wanted = Array.from({ length: n }, (_, i) => names[i]);
+  return fillDefaultNames(wanted, (i) => (i === 0 ? t.firstModeName : t.customModeName));
+}
+
+// Names of the extra appearances: the user's names, or the default names (section 5.1).
+export function extraAppearanceNames(spec: Spec, extras: AppearanceInput[]): string[] {
+  return fillDefaultNames(extras.map((a) => a?.name), () => spec.inputs.extraAppearances.defaultName);
+}
+
+// Fills every empty name with its default, followed by the lowest number that is free ("Custom theme",
+// "Custom theme 2", ...). Names the user typed are never changed, and keep their number free of defaults.
+function fillDefaultNames(names: (string | undefined)[], defaultOf: (i: number) => string): string[] {
+  const used = new Set(names.map((x) => x?.trim()).filter(Boolean));
+  return names.map((x, i) => {
+    const typed = x?.trim();
+    if (typed) return typed;
+    const base = defaultOf(i);
+    let name = base;
+    for (let k = 2; used.has(name); k++) name = `${base} ${k}`;
+    used.add(name);
+    return name;
+  });
 }
 
 // Naming grammar per collection (sections 1, 2 and 3.2).

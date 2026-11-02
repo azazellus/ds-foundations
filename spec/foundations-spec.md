@@ -18,8 +18,8 @@ Sections 1 to 3 describe what the collections contain. Section 5 describes how t
 | 3 | Appearance collection: tokens, scopes, contrast pairings | `appearance` |
 | 3.5 | ColorScheme collection (Android) | `colorScheme` |
 | 4 | Accessibility reference | — |
-| 5 | Generation: inputs, palettes, contrast adjustment, chroma, modes | `inputs`, `primitives` |
-| 6 | Outputs (manifest, report, color tables, developer exports), checks, failure conditions, implementation steps | `validation` |
+| 5 | Generation: inputs, canvas and text fill rules, palettes, contrast adjustment, chroma, modes | `inputs`, `appearance.darkCanvas`, `appearance.lightCanvas`, `appearance.textFill`, `primitives` |
+| 6 | Outputs (manifest, report, color tables and maps, developer exports), checks, failure conditions, implementation steps | `validation` |
 
 ### Terms
 
@@ -28,12 +28,13 @@ Sections 1 to 3 describe what the collections contain. Section 5 describes how t
 | Token | A Figma variable defined by this specification. |
 | Collection | A Figma variable collection: Primitives, Theme, Appearance, or ColorScheme. |
 | Mode | A column of values in a collection. Theme modes are called themes; Appearance and ColorScheme modes are called appearances. |
-| Theme | A mode of the Theme collection, such as Theme A. Each theme has its own palettes and fonts. |
+| Theme | A mode of the Theme collection, such as Main theme. Each theme has its own palettes and fonts. |
 | Appearance | A mode of the Appearance and ColorScheme collections: Light, Dark, or an extra appearance based on one of them. |
 | Role | The meaning of a color: neutral, brand, a status role (success, danger, warning, info), or a custom role added by the user. |
 | Step | A shade of a palette, from 950 (darkest) to 50 (lightest). |
 | Anchor | The step of the brand palette that keeps the brand color's exact HEX (section 5.2). |
 | Canvas | The base surface of an appearance: color/elevation/surface/canvas and color/bg/base. |
+| Text fill | The step of the bolder text and icons of an appearance (section 5.1). |
 | Alpha token | A Theme color token made of a color link and an opacity link (section 2.1). Never contrast-checked. |
 | Alias | A variable value that links to another variable instead of storing a raw value. |
 
@@ -44,7 +45,7 @@ Sections 1 to 3 describe what the collections contain. Section 5 describes how t
 In Figma, designs are built with variables called **tokens**. Tokens store values such as color codes, numbers, and strings. Tokens are organized in three layers, each stored as a separate Figma variable collection, plus a fourth collection for Android:
 
 1. **Primitives**: raw values. Not semantic. One mode.
-2. **Theme**: semantic roles mapped to Primitives. One mode per theme (Theme A, Theme B, Theme C, and so on).
+2. **Theme**: semantic roles mapped to Primitives. One mode per theme (Main theme, Custom theme, Custom theme 2, and so on).
 3. **Appearance**: the tokens UI components use. One mode per appearance: Light, Dark, and any extra appearances (section 5.1).
 4. **ColorScheme**: the Material 3 color roles for Android apps (Jetpack Compose `ColorScheme`). Parallel to Appearance: same modes, values reference Theme tokens (section 3.5).
 
@@ -123,10 +124,10 @@ Each step has a target lightness (OKLCH L). The brand palette keeps the brand co
 | 500 | 0.519 |
 | 400 | 0.638 |
 | 300 | 0.754 |
-| 200 | 0.854 |
-| 150 | 0.897 |
-| 100 | 0.935 |
-| 50 | 0.97 |
+| 200 | 0.852 |
+| 150 | 0.892 |
+| 100 | 0.928 |
+| 50 | 0.96 |
 
 #### 1.1.5 Contrast requirements
 
@@ -140,7 +141,7 @@ Each row pairs a text step of the palette under validation with a background ste
 | 150 | 700 | Theme neutral | 7:1 | 9.5:1 |
 | 500 | 100 | Same palette (self) | 4.5:1 | 4.5:1 |
 
-> Note: The same-palette pairing protects `color/text/{role}/bold` on `color/bg/{role}/softer` in Light (section 3.4). Step 100 of a palette can be darker than neutral step 100, for example when the supplied color is very light and becomes the anchor at step 100.
+> Note: The same-palette pairing protects `color/text/{role}/bold` on `color/bg/{role}/softer` in Light (section 3.4). Step 100 of a palette is usually a little darker than neutral step 100, because its target L is lower. It is much darker when the supplied color is very light and becomes the anchor at step 100.
 
 Minimum ratios are hard requirements. Target ratios are optimization goals. The method for calculating contrast is defined in section 5.7.
 
@@ -192,7 +193,7 @@ Rules, applied to the colors one at a time in a fixed order: theme by theme, and
 1. **No hue.** A HEX whose R, G, and B are equal (white, black, pure grays) uses the fixed Color/Gray palette. No palette is generated for it.
 2. **Same hue.** A status or custom color whose hue is within 1° of a palette already named uses that palette, in any theme. For example, two shades of the same green share one palette. The palette is generated from the first color that made it. A brand color keeps its exact HEX (section 5.2), so it only shares a palette made by a brand color with the same HEX; otherwise it makes its own palette (rules 3 and 4).
 3. **New palette.** Otherwise the color makes a new palette, named after its hue's range. If that name is already taken, it takes the nearest free name in the list. If the two nearest free names are equally far, the one closer to 240° (the colder side) wins. If all 60 names are taken, generation stops as `missing_input`.
-4. **Similar palettes.** After the palettes are generated, each one is compared with the palettes made before it. When no step differs from the same step of an earlier palette by more than 0.03 (OKLab distance, as in section 5.3 step 5), it is reported as `similar_palette` (warning), because the two palettes look almost the same. The finished palettes are compared, not the hues: HSL hues are uneven around the circle, so two colors far apart in HSL can still make almost the same palette (for example `#FF0026` and `#BD4242`, 8.9° apart). The plugin form shows the same notice next to the color before anything is generated.
+4. **Similar palettes.** After the palettes are generated, each one is compared with the palettes made before it. When no step differs from the same step of an earlier palette by more than 0.03 (OKLab distance, as in section 5.3 step 5), it is reported as `similar_palette` (warning), because the two palettes look almost the same. The finished palettes are compared, not the hues: HSL hues are uneven around the circle, so two colors far apart in HSL can still make almost the same palette (for example `#FF0026` and `#BD4242` as status or custom colors, 8.9° apart). The plugin form shows the same notice next to the color before anything is generated.
 5. **Renamed palettes.** The plugin remembers which color (theme and role) made each palette. When a later run gives that color's palette a new name, and no palette of the new run uses the old name, the plugin renames the old palette's variables in place: `Color/Old/{step}` becomes `Color/New/{step}`. Layers and aliases that use them are kept. If a variable with the new name already exists, the old palette is not renamed and is reported as `orphan_variable`. Nothing is deleted.
 
 #### 1.1.9 Tinted neutral palettes
@@ -338,7 +339,7 @@ Theme tokens are the first semantic layer. Their names describe a general role, 
 
 Every theme resolves the same token names to different Primitives. The palettes for each theme come from user input (section 5.1). The neutral role resolves to Color/Gray, unless the theme has a tinted neutral (section 1.1.9).
 
-> Note: The tables in this section show Theme A and Theme B as examples. Each further theme (Theme C, Theme D, and so on) follows the same rule as the columns shown. These are the default mode names. The user can rename any theme (section 5.1); a renamed theme keeps its Figma mode (section 5.8).
+> Note: The tables in this section show Main theme and Custom theme as examples. Each further theme (Custom theme 2, Custom theme 3, and so on) follows the same rule as the columns shown. These are the default mode names. The user can rename any theme (section 5.1); a renamed theme keeps its Figma mode (section 5.8).
 
 ```
 color
@@ -370,7 +371,7 @@ Naming: `color/{role}/{step}`, in lowercase, where `{role}` is always a single w
 
 #### Roles and palette mapping
 
-| Role | Purpose | Theme A palette | Theme B palette |
+| Role | Purpose | Main theme palette | Custom theme palette |
 |---|---|---|---|
 | neutral | Grays, including black and white | Color/Gray or a tinted neutral | Color/Gray or a tinted neutral |
 | brand | Primary brand hue | User input | User input |
@@ -422,7 +423,7 @@ Naming: `typography/{category}/{variant}`.
 
 All Theme typography tokens have all variable scopes disabled. Figma type: STRING.
 
-| Token name | Theme A value | Theme B value |
+| Token name | Main theme value | Custom theme value |
 |---|---|---|
 | typography/font-family | User input (font family) | User input (font family) |
 | typography/font-weight/light | Typography/Font-weight/{Light} | Typography/Font-weight/{Light} |
@@ -443,7 +444,7 @@ Size values can differ between themes, but are usually the same. Naming: `size/{
 
 Padding tokens are used for both padding and gap. Scope: GAP.
 
-| Token name | Theme A value | Theme B value |
+| Token name | Main theme value | Custom theme value |
 |---|---|---|
 | size/padding/none | Size/0 | Size/0 |
 | size/padding/3xs | Size/2 | Size/2 |
@@ -461,7 +462,7 @@ Padding tokens are used for both padding and gap. Scope: GAP.
 
 Border radius tokens are used for corner radii. Scope: CORNER_RADIUS.
 
-| Token name | Theme A value | Theme B value |
+| Token name | Main theme value | Custom theme value |
 |---|---|---|
 | size/border-radius/none | Size/0 | Size/0 |
 | size/border-radius/3xs | Size/2 | Size/2 |
@@ -484,7 +485,7 @@ Border radius tokens are used for corner radii. Scope: CORNER_RADIUS.
 
 Border tokens control the thickness of strokes. Scope: STROKE_FLOAT.
 
-| Token name | Theme A value | Theme B value |
+| Token name | Main theme value | Custom theme value |
 |---|---|---|
 | size/border/sm | Size/0-5 | Size/0-5 |
 | size/border/md | Size/1 | Size/1 |
@@ -558,7 +559,7 @@ Do not create additional no-emphasis variants. Do not mix emphasis systems withi
 
 ### 3.3 Appearance tokens
 
-Each row references one Theme token per appearance. Alpha tokens are referenced by their Theme name.
+Each row references one Theme token per appearance. Alpha tokens are referenced by their Theme name. The values are for the default canvas and text fill steps; the rules for the other steps are in section 5.1.
 
 The table is sorted alphabetically for reading. In Figma, and in the color tables, Appearance tokens follow this order (`appearance.order` in `tokens.json`):
 
@@ -715,12 +716,12 @@ Status pairings are validated after generation. A failure stops generation and i
 
 ### 3.5 ColorScheme collection
 
-The ColorScheme collection holds the Material 3 color roles that Android apps read through Jetpack Compose (`MaterialTheme.colorScheme`). It is parallel to the Appearance collection: it has the same modes (Light, Dark when included, and every extra appearance, each with the same base and canvas step), and its values are aliases to Theme tokens. Token names are the Compose names, such as `primary` or `onSurfaceVariant`. Figma type: COLOR. The list is in `tokens.json`, under `colorScheme`, in Compose order.
+The ColorScheme collection holds the Material 3 color roles that Android apps read through Jetpack Compose (`MaterialTheme.colorScheme`). It is parallel to the Appearance collection: it has the same modes (Light, Dark when included, and every extra appearance, each with the same base, canvas step, and text fill step), and its values are aliases to Theme tokens. Token names are the Compose names, such as `primary` or `onSurfaceVariant`. Figma type: COLOR. The list is in `tokens.json`, under `colorScheme`, in Compose order.
 
 Each token gets its value in one of two ways:
 
-- **Same as an Appearance token.** The token takes, in every mode, the Theme token that the Appearance token has in that mode, after the canvas rules (section 5.1). For example, `primary` is the same as `color/bg/brand/bold`: `color/brand/500` in Light and `color/brand/300` in Dark. The two can never drift apart. When the Appearance token is not generated (a status role turned off), the ColorScheme token is not generated either.
-- **Own values.** The token lists its own Theme tokens for Light and Dark. Every mode uses the value of its base. Tokens marked "follows the dark canvas" move their Dark value lighter by as many steps as the dark canvas step moved from 950, like the following tokens of section 5.1.
+- **Same as an Appearance token.** The token takes, in every mode, the Theme token that the Appearance token has in that mode, after the canvas and text fill rules (section 5.1). For example, `primary` is the same as `color/bg/brand/bold`: `color/brand/500` in Light and `color/brand/300` in Dark. The two can never drift apart. When the Appearance token is not generated (a status role turned off), the ColorScheme token is not generated either.
+- **Own values.** The token lists its own Theme tokens for Light and Dark. Every mode uses the value of its base. Tokens marked "follows the dark canvas" move their Dark value lighter by as many steps as the dark canvas step moved from 950, like the following tokens of section 5.1, but never lighter than step 600. With a black canvas they keep the values they have at 950. Lighter surfaces would fail the contrast pairings in section 3.5.1.
 
 Roles and slots:
 
@@ -731,58 +732,60 @@ Scopes depend on the kind of token: backgrounds (`bg`) FRAME_FILL and SHAPE_FILL
 
 Tokens that are the same as an Appearance token are also checked through that token (section 3.4). The ColorScheme text and icon roles are also checked against the backgrounds they are used on (section 3.5.1).
 
+Each token has a description of what the role is for, in this project's words, based on the Compose `ColorScheme` documentation (https://developer.android.com/reference/kotlin/androidx/compose/material3/ColorScheme). The plugin writes it as the Figma variable's description, so a description edited by hand in Figma is set back on the next run.
+
 In the table, a token either names the Appearance token it copies (its Light and Dark values then come from that token) or lists its own Light and Dark values. `{secondary}` and `{tertiary}` stand for the first and second custom role.
 
-| Token | Role | Same as Appearance token | Own Light value | Own Dark value |
-|---|---|---|---|---|
-| primary | brand | color/bg/brand/bold | — | — |
-| onPrimary | brand | color/text/inverse | — | — |
-| primaryContainer | brand | color/bg/brand/soft | — | — |
-| onPrimaryContainer | brand | color/text/brand/bolder | — | — |
-| inversePrimary | brand | — | color/brand/300 | color/brand/500 |
-| secondary | {secondary} | color/bg/{secondary}/bold | — | — |
-| onSecondary | {secondary} | color/text/inverse | — | — |
-| secondaryContainer | {secondary} | color/bg/{secondary}/soft | — | — |
-| onSecondaryContainer | {secondary} | color/text/{secondary}/bolder | — | — |
-| tertiary | {tertiary} | color/bg/{tertiary}/bold | — | — |
-| onTertiary | {tertiary} | color/text/inverse | — | — |
-| tertiaryContainer | {tertiary} | color/bg/{tertiary}/soft | — | — |
-| onTertiaryContainer | {tertiary} | color/text/{tertiary}/bolder | — | — |
-| background | — | color/bg/base | — | — |
-| onBackground | — | color/text/neutral/bolder | — | — |
-| surface | — | color/elevation/surface/canvas | — | — |
-| onSurface | — | color/text/neutral/bolder | — | — |
-| surfaceVariant | — | color/bg/neutral/soft | — | — |
-| onSurfaceVariant | — | — | color/neutral/600 | color/neutral/200 |
-| surfaceTint | brand | color/bg/brand/bold | — | — |
-| inverseSurface | — | — | color/neutral/700 | color/neutral/100 |
-| inverseOnSurface | — | color/text/inverse | — | — |
-| error | danger | color/bg/danger/bold | — | — |
-| onError | danger | color/text/inverse | — | — |
-| errorContainer | danger | color/bg/danger/soft | — | — |
-| onErrorContainer | danger | color/text/danger/bolder | — | — |
-| outline | — | color/border/neutral/heavy | — | — |
-| outlineVariant | — | color/border/neutral/light | — | — |
-| scrim | — | color/elevation/surface/scrim | — | — |
-| surfaceBright | — | — | color/neutral/white | color/neutral/800 (follows the dark canvas) |
-| surfaceContainer | — | — | color/neutral/100 | color/neutral/850 (follows the dark canvas) |
-| surfaceContainerHigh | — | — | color/neutral/150 | color/neutral/800 (follows the dark canvas) |
-| surfaceContainerHighest | — | — | color/neutral/200 | color/neutral/800 (follows the dark canvas) |
-| surfaceContainerLow | — | — | color/neutral/50 | color/neutral/900 (follows the dark canvas) |
-| surfaceContainerLowest | — | color/elevation/surface/canvas | — | — |
-| surfaceDim | — | — | color/neutral/200 | color/neutral/950 (follows the dark canvas) |
-| primaryFixed | brand | — | color/brand/100 | color/brand/100 |
-| primaryFixedDim | brand | — | color/brand/200 | color/brand/200 |
-| onPrimaryFixed | brand | — | color/brand/900 | color/brand/900 |
-| onPrimaryFixedVariant | brand | — | color/brand/700 | color/brand/700 |
-| secondaryFixed | {secondary} | — | color/{secondary}/100 | color/{secondary}/100 |
-| secondaryFixedDim | {secondary} | — | color/{secondary}/200 | color/{secondary}/200 |
-| onSecondaryFixed | {secondary} | — | color/{secondary}/900 | color/{secondary}/900 |
-| onSecondaryFixedVariant | {secondary} | — | color/{secondary}/700 | color/{secondary}/700 |
-| tertiaryFixed | {tertiary} | — | color/{tertiary}/100 | color/{tertiary}/100 |
-| tertiaryFixedDim | {tertiary} | — | color/{tertiary}/200 | color/{tertiary}/200 |
-| onTertiaryFixed | {tertiary} | — | color/{tertiary}/900 | color/{tertiary}/900 |
-| onTertiaryFixedVariant | {tertiary} | — | color/{tertiary}/700 | color/{tertiary}/700 |
+| Token | Role | Same as Appearance token | Own Light value | Own Dark value | Description |
+|---|---|---|---|---|---|
+| primary | brand | color/bg/brand/bold | — | — | Main accent: the color seen most often across screens and components. |
+| onPrimary | brand | color/text/inverse | — | — | Text and icons on primary. |
+| primaryContainer | brand | color/bg/brand/soft | — | — | Softer primary fill for containers. |
+| onPrimaryContainer | brand | color/text/brand/bolder | — | — | Text and icons on primaryContainer. |
+| inversePrimary | brand | — | color/brand/300 | color/brand/500 | Primary color for places using inverse colors, like a snackbar button. |
+| secondary | {secondary} | color/bg/{secondary}/bold | — | — | Second accent, to add variety and tell parts of the product apart. |
+| onSecondary | {secondary} | color/text/inverse | — | — | Text and icons on secondary. |
+| secondaryContainer | {secondary} | color/bg/{secondary}/soft | — | — | Softer secondary fill for containers. |
+| onSecondaryContainer | {secondary} | color/text/{secondary}/bolder | — | — | Text and icons on secondaryContainer. |
+| tertiary | {tertiary} | color/bg/{tertiary}/bold | — | — | Third accent, to balance the others or draw attention to an element. |
+| onTertiary | {tertiary} | color/text/inverse | — | — | Text and icons on tertiary. |
+| tertiaryContainer | {tertiary} | color/bg/{tertiary}/soft | — | — | Softer tertiary fill for containers. |
+| onTertiaryContainer | {tertiary} | color/text/{tertiary}/bolder | — | — | Text and icons on tertiaryContainer. |
+| background | — | color/bg/base | — | — | Color behind scrollable content. |
+| onBackground | — | color/text/neutral/bolder | — | — | Text and icons on background. |
+| surface | — | color/elevation/surface/canvas | — | — | Color of component surfaces, such as cards, sheets and menus. |
+| onSurface | — | color/text/neutral/bolder | — | — | Text and icons on surface. |
+| surfaceVariant | — | color/bg/neutral/soft | — | — | Alternative to surface, for similar uses. |
+| onSurfaceVariant | — | — | color/neutral/600 | color/neutral/200 | Secondary text and icons on surface. |
+| surfaceTint | brand | color/bg/brand/bold | — | — | Tint laid over surface by components with tonal elevation. |
+| inverseSurface | — | — | color/neutral/700 | color/neutral/100 | Strong contrast with surface, for elements sitting on top of it. |
+| inverseOnSurface | — | color/text/inverse | — | — | Text and icons on inverseSurface. |
+| error | danger | color/bg/danger/bold | — | — | Signals errors in components, such as invalid text in a field. |
+| onError | danger | color/text/inverse | — | — | Text and icons on error. |
+| errorContainer | danger | color/bg/danger/soft | — | — | Softer error fill for containers. |
+| onErrorContainer | danger | color/text/danger/bolder | — | — | Text and icons on errorContainer. |
+| outline | — | color/border/neutral/heavy | — | — | Subtle boundary color that adds contrast for accessibility. |
+| outlineVariant | — | color/border/neutral/light | — | — | Decorative boundary color, where strong contrast is not needed. |
+| scrim | — | color/elevation/surface/scrim | — | — | Color of a scrim that covers content behind a layer. |
+| surfaceBright | — | — | color/neutral/white | color/neutral/700 (follows the dark canvas) | Surface variant that is always brighter than surface. |
+| surfaceContainer | — | — | color/neutral/100 | color/neutral/850 (follows the dark canvas) | Surface variant for component containers, such as cards and menus. |
+| surfaceContainerHigh | — | — | color/neutral/150 | color/neutral/800 (follows the dark canvas) | Surface container with more emphasis than surfaceContainer. |
+| surfaceContainerHighest | — | — | color/neutral/200 | color/neutral/700 (follows the dark canvas) | Surface container with more emphasis than surfaceContainerHigh. |
+| surfaceContainerLow | — | — | color/neutral/50 | color/neutral/900 (follows the dark canvas) | Surface container with less emphasis than surfaceContainer. |
+| surfaceContainerLowest | — | color/elevation/surface/canvas | — | — | Surface container with less emphasis than surfaceContainerLow. |
+| surfaceDim | — | — | color/neutral/200 | color/neutral/950 (follows the dark canvas) | Surface variant that is always dimmer than surface. |
+| primaryFixed | brand | — | color/brand/100 | color/brand/100 | Primary fill that keeps the same color in light and dark. |
+| primaryFixedDim | brand | — | color/brand/200 | color/brand/200 | Stronger version of primaryFixed, the same in light and dark. |
+| onPrimaryFixed | brand | — | color/brand/900 | color/brand/900 | Text and icons on primaryFixed or primaryFixedDim. |
+| onPrimaryFixedVariant | brand | — | color/brand/700 | color/brand/700 | Lower-emphasis version of onPrimaryFixed. |
+| secondaryFixed | {secondary} | — | color/{secondary}/100 | color/{secondary}/100 | Secondary fill that keeps the same color in light and dark. |
+| secondaryFixedDim | {secondary} | — | color/{secondary}/200 | color/{secondary}/200 | Stronger version of secondaryFixed, the same in light and dark. |
+| onSecondaryFixed | {secondary} | — | color/{secondary}/900 | color/{secondary}/900 | Text and icons on secondaryFixed or secondaryFixedDim. |
+| onSecondaryFixedVariant | {secondary} | — | color/{secondary}/700 | color/{secondary}/700 | Lower-emphasis version of onSecondaryFixed. |
+| tertiaryFixed | {tertiary} | — | color/{tertiary}/100 | color/{tertiary}/100 | Tertiary fill that keeps the same color in light and dark. |
+| tertiaryFixedDim | {tertiary} | — | color/{tertiary}/200 | color/{tertiary}/200 | Stronger version of tertiaryFixed, the same in light and dark. |
+| onTertiaryFixed | {tertiary} | — | color/{tertiary}/900 | color/{tertiary}/900 | Text and icons on tertiaryFixed or tertiaryFixedDim. |
+| onTertiaryFixedVariant | {tertiary} | — | color/{tertiary}/700 | color/{tertiary}/700 | Lower-emphasis version of onTertiaryFixed. |
 
 #### 3.5.1 ColorScheme contrast pairings
 
@@ -855,7 +858,7 @@ The plugin asks for each input below. Every palette input is a HEX value. The pl
 | Input | Scope | Requirement | Format | Default when omitted |
 |---|---|---|---|---|
 | Number of themes | Global | Mandatory | Integer, 1 to 26 | None |
-| Theme names | Global | Optional | One name per theme | Theme A, Theme B, ... |
+| Theme names | Global | Optional | One name per theme | Main theme, then Custom theme, Custom theme 2, ... |
 | Brand color | Per theme | Mandatory | HEX | None |
 | Neutral color | Per theme | Optional | HEX (only its hue is used) | #808080 (plain gray: Color/Gray) |
 | Status roles | Global | Optional | Any of: success, danger, warning, info | All four |
@@ -866,8 +869,10 @@ The plugin asks for each input below. Every palette input is a HEX value. The pl
 | Custom colors | Per theme | Mandatory for each custom role | HEX, each | None |
 | Dark | Global | Optional | Include or not | Included |
 | Light canvas step | Global | Optional | white or 50 | white |
-| Dark canvas step | Global | Optional | 950, 900, or 850 | 950 |
-| Extra appearances | Global | Optional | Zero or more: name, base (Light or Dark), and a canvas step (white or 50 for a Light base; 950, 900, or 850 for a Dark base) | None added |
+| Dark canvas step | Global | Optional | 950, 900, 850, or black | 950 |
+| Light text fill step | Global | Optional | 700, 800, 850, 900, 950, or black | 700 |
+| Dark text fill step | Global | Optional | 150, 100, 50, or white | 150 |
+| Extra appearances | Global | Optional | Zero or more: name, base (Light or Dark), a canvas step (white or 50 for a Light base; 950, 900, 850, or black for a Dark base), and a text fill step (the Light or Dark list above, by base) | None added |
 
 Rules for inputs:
 
@@ -876,14 +881,14 @@ Rules for inputs:
 - Palette names are not inputs. The plugin chooses them from the list in section 1.1.8. A missing or invalid HEX stops generation as `missing_input` or `invalid_hex`.
 - Defaults apply only to optional inputs. A missing mandatory input stops generation (section 6.2).
 - Per-theme inputs must be supplied for every theme. Each theme needs a brand color, a color for each status role in use, a color for each custom role, and a font family.
-- Theme modes are named Theme A, Theme B, Theme C, and so on, one letter per theme, unless the user names them. A theme name uses letters, numbers, and single spaces and is unique. An invalid or duplicated name stops generation as `missing_input`. Only the themes requested exist; for example, with one theme there is no Theme B.
-- Dark is optional. Without it, the Appearance collection has no Dark mode, no Dark value is written, every check in Dark is skipped, and the dark canvas step is ignored. Dark-based extra appearances are still allowed: they copy the Dark values of section 3.3.
+- The first theme is named Main theme unless the user names it. Every other theme the user does not name is named Custom theme, then Custom theme 2, Custom theme 3, and so on, with the lowest number that is free. A theme name uses letters, numbers, and single spaces and is unique. An invalid or duplicated name stops generation as `missing_input`. Only the themes requested exist.
+- Dark is optional. Without it, the Appearance collection has no Dark mode, no Dark value is written, every check in Dark is skipped, and the dark canvas and text fill steps are ignored. Dark-based extra appearances are still allowed: they copy the Dark values of section 3.3.
 - Custom roles add colors beyond brand and the status roles, such as `promo`. A role name is lowercase letters only, unique, and not one of: neutral, brand, success, danger, warning, info, base, disabled, input, selected, focus, inverse, shadow, surface, fixed, link. Each theme supplies its own HEX for every custom role. A custom role generates the same tokens and checks as a status role: a Primitive palette per hue (section 5.3), the Theme tokens `color/{role}/{step}` and `color/{role}/alpha/a{NN}` (section 2.1), the Appearance tokens in section 3.3, and the checks in section 3.4.
 - Font weights are chosen from the styles that the theme's font family has in Figma. Italic styles are not offered. Every selected style becomes a Primitive `Typography/Font-weight/{Style}`. Each weight slot in section 2.2 uses the selected style whose name matches the slot when spaces and letter case are ignored. A slot that matches in no theme is not created. A slot that matches in some themes but not in others stops generation as `missing_input`; the report names the slot and the font families without a match. A selected style that the family does not have also stops generation as `missing_input`.
-- Extra appearances are named by the user. A name uses letters, numbers, and single spaces, is unique, and is not Light or Dark. A missing or invalid name stops generation as `missing_input`.
-- An extra appearance copies the value of every Appearance token from its base. It also has its own canvas step: white or 50 for a Light base (default white), and 950, 900, or 850 for a Dark base (default 950). The light or dark canvas rule below applies to it with that step. The light and dark canvas step inputs apply to Light and Dark themselves.
-- The dark canvas step changes `color/bg/base` (Dark) and `color/elevation/surface/canvas` (Dark). Both use the chosen step instead of 950.
-- The Dark backgrounds and surfaces above the canvas follow it, so they always stay lighter than the canvas. The Dark values in section 3.3 are for the default step, 950. With another step, each following token moves its Dark step lighter by the same number of steps along the shade scale (section 1.1.3) as the canvas moved from 950. The following tokens are `color/bg/{role}/softest`, `color/bg/{role}/softer`, and `color/bg/{role}/soft` for brand, danger, info, neutral, selected, success, warning, and every custom role, plus `color/elevation/surface/overlay`, `color/elevation/surface/menu`, and `color/elevation/surface/raised`. The full list is in `tokens.json`, under `appearance.darkCanvas`.
+- Extra appearances are named by the user. One the user does not name is named Custom appearance, then Custom appearance 2, Custom appearance 3, and so on, with the lowest number that is free. A name uses letters, numbers, and single spaces, is unique, and is not Light or Dark. An invalid or duplicated name stops generation as `missing_input`.
+- An extra appearance copies the value of every Appearance token from its base. It also has its own canvas step: white or 50 for a Light base (default white), and 950, 900, 850, or black for a Dark base (default 950). The light or dark canvas rule below applies to it with that step. The light and dark canvas step inputs apply to Light and Dark themselves. It has its own text fill step too (default 700 for a Light base and 150 for a Dark base), and the text fill rules below apply to it with that step.
+- The dark canvas step changes `color/bg/base` (Dark) and `color/elevation/surface/canvas` (Dark). Both use the chosen step instead of 950. With black, both use `color/neutral/black`.
+- The Dark backgrounds and surfaces above the canvas follow it, so they always stay lighter than the canvas. The Dark values in section 3.3 are for the default step, 950. With another step, each following token moves its Dark step lighter by the same number of steps along the shade scale (section 1.1.3) as the canvas moved from 950. With black, which is not on the shade scale, they keep the values they have at 950. The following tokens are `color/bg/{role}/softest`, `color/bg/{role}/softer`, and `color/bg/{role}/soft` for brand, danger, info, neutral, selected, success, warning, and every custom role, plus `color/elevation/surface/overlay`, `color/elevation/surface/menu`, and `color/elevation/surface/raised`. The full list is in `tokens.json`, under `appearance.darkCanvas`.
 
 Dark values of the following tokens for each dark canvas step:
 
@@ -892,6 +897,7 @@ Dark values of the following tokens for each dark canvas step:
 | 950 | 900 | 850 | 800 | 900 | 850 |
 | 900 | 850 | 800 | 700 | 850 | 800 |
 | 850 | 800 | 700 | 600 | 800 | 700 |
+| black | 900 | 850 | 800 | 900 | 850 |
 
 Light canvas rules:
 
@@ -905,6 +911,24 @@ Light values for each light canvas step:
 |---|---|---|---|---|
 | white | white | 50 | 50 | as in section 3.3 |
 | 50 | 50 | white | 100 | as in section 3.3 |
+
+Text fill rules:
+
+- The text fill step sets how strong the bolder text and icons are in an appearance. Each appearance has its own step. The values in section 3.3 are for the default steps, 700 in Light and 150 in Dark.
+- With another step, these tokens use it in that mode, in their own color family: `color/text/{role}/bolder` for brand, danger, info, neutral, selected, success, warning, and every custom role, plus `color/icon/neutral/bolder` and `color/icon/brand/bolder`. The list is in `tokens.json`, under `appearance.textFill`.
+- Only neutral has black and white. Where neutral uses black, the other families use step 950. Where neutral uses white, they use step 50.
+- Bold tokens and `color/bg/neutral/bolder` do not change. ColorScheme tokens that are the same as a bolder token follow it (section 3.5). The contrast checks in section 3.4 run on the chosen values.
+
+Values for each text fill step:
+
+| Text fill step | color/text/neutral/bolder | Other families |
+|---|---|---|
+| 700 (Light default) | color/neutral/700 | color/{role}/700 |
+| 800, 850, 900, or 950 | color/neutral/{step} | color/{role}/{step} |
+| black | color/neutral/black | color/{role}/950 |
+| 150 (Dark default) | color/neutral/150 | color/{role}/150 |
+| 100 or 50 | color/neutral/{step} | color/{role}/{step} |
+| white | color/neutral/white | color/{role}/50 |
 
 ### 5.2 Brand palette
 
@@ -963,13 +987,14 @@ This procedure applies to every palette and uses one order everywhere:
    - Limit: at most 0.150 away from the starting L.
    - Bounds: a candidate must stay strictly between the L values of the nearest darker and lighter steps in the same palette. It must also stay within 0 to 1.
    - Accept the first candidate whose contrast meets the threshold. Each candidate's color is gamut-clamped (section 5.5) before its contrast is measured.
-   - The anchor's L stays fixed unless the anchor is the failing foreground step. Because of the moved anchor (section 5.2 step 1), the brand color never fails a Gray pairing at its own step; only the same-palette pairing (500 on its own 100) can still move it. Status and custom palettes have no anchor.
+   - The anchor never changes, so the brand color keeps its exact HEX. Because of the moved anchor (section 5.2 step 1), it never fails a neutral pairing at its own step. Status and custom palettes have no anchor.
+   - **Brand color on its own step 100.** Only the same-palette pairing (500 on its own 100) can still fail at the anchor. The palette's step 100 then gets lighter instead, with the same search: 0.001 per candidate, at most 0.150 away from its starting L, and strictly below the L of the next lighter step. Its chroma and hue stay the same, and each candidate is gamut-clamped. If no candidate passes, generation stops as `contrast_minimum`.
 3. **Adjust chroma second.** If no lightness candidate passes, search chroma at the step's current L and hue, in 0.001 steps:
    - First, descending from the current chroma to 0.01.
    - Then, ascending from the current chroma to the maximum in-gamut chroma at that L and hue, or to the step's chroma ceiling (section 5.5) when it is lower.
    - Accept the first candidate whose contrast meets the threshold.
-   - The anchor follows the same rule as step 2.
-4. **Re-validate.** One adjustment is one accepted candidate in step 2 or 3. After each adjustment, recalculate the pairing it changed. If the palette needs more than 50 adjustments, stop and report a failure. Only foreground steps are adjusted, and no foreground step is used as a background (section 1.1.5). Step 500 is the foreground in two pairings, and both of its backgrounds (neutral step 100 and the palette's own step 100) are lighter than it. Darkening step 500 for one pairing therefore never lowers the contrast of the other.
+   - The anchor is never changed.
+4. **Re-validate.** One adjustment is one accepted candidate in step 2 or 3. After each adjustment, recalculate the pairing it changed. If the palette needs more than 50 adjustments, stop and report a failure. Only foreground steps are adjusted, apart from the brand color's own step 100 (step 2), and no foreground step is used as a background (section 1.1.5). Step 500 is the foreground in two pairings, and both of its backgrounds (neutral step 100 and the palette's own step 100) are lighter than it. Darkening step 500 for one pairing therefore never lowers the contrast of the other.
 5. **Aim for targets.** After all minimums pass, apply the lightness search of step 2 with each target in place of its minimum. Targets never use the chroma search of step 3, never move the anchor, and never move the steps re-spaced around a moved anchor (section 5.2 step 3), because they are optimization goals. Never move a value below a minimum to reach a target. A target that cannot be reached is reported as a warning (`contrast_target`).
 
 ### 5.5 Chroma and hue
@@ -982,10 +1007,10 @@ This procedure applies to every palette and uses one order everywhere:
 
 | Tone | Multiplier |
 |---:|---:|
-| 50 | 0.11 |
-| 100 | 0.25 |
-| 150 | 0.42 |
-| 200 | 0.59 |
+| 50 | 0.30 |
+| 100 | 0.43 |
+| 150 | 0.55 |
+| 200 | 0.68 |
 | 300 | 0.87 |
 | 400 | 1.00 |
 | 500 | 0.93 |
@@ -1058,7 +1083,7 @@ Contrast is WCAG 2.x contrast on sRGB. Compute it from the rounded HEX values th
 
 ### 6.1 Outputs
 
-The plugin produces five outputs. The first three come from Check only and Create variables, and are shown in the plugin's report; when generation stops, only the validation report is produced (section 6.2). The color tables are drawn after the variables are written. The developer exports are made on request.
+The plugin produces five outputs. The first three come from Check only and Generate tokens, and are shown in the plugin's report; when generation stops, only the validation report is produced (section 6.2). The color tables are drawn after the variables are written. The developer exports are made on request.
 
 1. **Token manifest (JSON).** One entry per token:
    - `collection` (Primitives, Theme, Appearance, or ColorScheme)
@@ -1066,7 +1091,7 @@ The plugin produces five outputs. The first three come from Check only and Creat
    - `type` (COLOR, FLOAT, or STRING)
    - `value`: an alias (`{ "alias": "<token name>" }`) or a raw value
    - `scopes`
-   - `mode` (Default, a theme such as Theme A, or an appearance such as Light, Dark, or an extra appearance)
+   - `mode` (Default, a theme such as Main theme, or an appearance such as Light, Dark, or an extra appearance)
    - `resolved_hex` for color tokens. Alpha tokens, and Appearance and ColorScheme tokens that link to one, have none: they are transparent, so they have no single HEX.
    - `contrast`: results for applicable pairings (sections 3.4 and 3.5.1), excluding alpha tokens and alpha-based tokens
 2. **Validation report (JSON).** One entry per finding:
@@ -1104,7 +1129,7 @@ The plugin produces five outputs. The first three come from Check only and Creat
    | `hue_only_shift` | warning |
 
 3. **Figma-ready variable definitions**, grouped by collection and mode.
-4. **Color tables** (section 6.1.1), drawn in the Figma file.
+4. **Color tables and ColorScheme color maps** (section 6.1.1), drawn in the Figma file.
 5. **Developer exports** (section 6.1.2): Appearance tokens as JSON, and ColorScheme tokens as JSON or Kotlin.
 
 Do not invent hues, roles, emphasis levels, font weights, or Appearance tokens that this specification does not define.
@@ -1113,7 +1138,7 @@ Do not invent hues, roles, emphasis levels, font weights, or Appearance tokens t
 
 The plugin draws one table per color collection on a page called "Color tokens", so people can see every color token and what it links to.
 
-- **When.** After Create variables writes the variables, and when the user presses Update tables. Update tables reads the variables as they are in the file, including changes made by hand, and changes no variable.
+- **When.** After Generate tokens writes the variables, and when the user presses Update tables. Update tables reads the variables as they are in the file, including changes made by hand, and changes no variable.
 - **Page.** The plugin finds the page it made before (it carries a hidden tag, so it is found even if renamed), or a page named "Color tokens". Otherwise it creates one.
 - **Tables.** One table per collection that exists in the file, in this order: Primitives, Theme, Appearance, ColorScheme. A collection that is missing has no table.
 - **Replacing.** The new tables are drawn first. The tables drawn by an earlier run (they carry a hidden tag) are removed only once all new ones are finished. If drawing fails, the earlier tables stay. Nothing else on the page is touched.
@@ -1127,6 +1152,14 @@ The plugin draws one table per color collection on a page called "Color tokens",
 | ColorScheme | Every ColorScheme token, in the order of section 3.5, grouped by role family (primary, secondary, surface, error, …) | One per theme and appearance, as for Appearance |
 
 A theme and appearance column is drawn on a black panel when its canvas color is dark (WCAG relative luminance below 0.18). So a Dark-based extra appearance is shown as dark, whatever its name.
+
+**ColorScheme color maps.** To the right of the tables, the plugin draws one color map per theme and appearance in the ColorScheme collection, like Material's own color scheme chart. Maps are drawn and replaced together with the tables, under the same rules.
+
+- **Frame.** 1872 × 1272, in an explicit theme and appearance, with the surfaceContainer role as its background.
+- **Blocks.** One labeled block per ColorScheme role. Each block's fill and its label are bound to ColorScheme variables, usually the role and its "on" role, so a map follows later changes to the variables.
+- **Missing roles.** A role that is not generated (no tertiary, danger turned off) leaves its place empty, and the other blocks do not move.
+- **Names.** With one theme, a map is named after its appearance, such as "ColorScheme map - Light". With more themes, the name also says the theme, such as "ColorScheme map - Main theme Light".
+- **Font.** Roboto, or IBM Plex Sans when Roboto is not installed.
 
 #### 6.1.2 Developer exports
 
@@ -1154,7 +1187,7 @@ Both JSON exports use the same structure:
 {
   "version": 1,
   "themes": {
-    "Theme A": {
+    "Main theme": {
       "appearances": {
         "Light": { "color/bg/base": "#FFFFFF" },
         "Dark": { "color/bg/base": "#0D0D0D" }
@@ -1166,13 +1199,13 @@ Both JSON exports use the same structure:
 
 | Export | One file | One file per theme |
 |---|---|---|
-| Appearance JSON | `appearance-tokens.json` | `appearance-tokens-{theme}.json`, such as `appearance-tokens-theme-a.json` |
+| Appearance JSON | `appearance-tokens.json` | `appearance-tokens-{theme}.json`, such as `appearance-tokens-main-theme.json` |
 | ColorScheme JSON | `colorscheme-tokens.json` | `colorscheme-tokens-{theme}.json` |
-| ColorScheme Kotlin | `ColorSchemes.kt` | `{Theme}ColorScheme.kt`, such as `ThemeAColorScheme.kt` |
+| ColorScheme Kotlin | `ColorSchemes.kt` | `{Theme}ColorScheme.kt`, such as `MainThemeColorScheme.kt` |
 
 **ColorScheme tokens (Kotlin).** A Kotlin file for Jetpack Compose, in the package the user types (default `com.example.ui.theme`; an invalid package name is replaced by the default and listed as a problem).
 
-- Each theme and appearance becomes one value, named after both: Theme A in Light becomes `ThemeALightColorScheme`.
+- Each theme and appearance becomes one value, named after both: Main theme in Light becomes `MainThemeLightColorScheme`.
 - The value uses `darkColorScheme(...)` when the appearance's `surface` color is dark (WCAG relative luminance below 0.18), and `lightColorScheme(...)` otherwise. So a Dark-based extra appearance gets a dark scheme.
 - Each role is written as `role = Color(0xAARRGGBB)`. Compose puts the alpha first, so `#RRGGBB` becomes `0xFFRRGGBB` and `#RRGGBBAA` becomes `0xAARRGGBB`.
 - A role that is not in `colorScheme.tokens` (one added by hand in Figma) would not compile. It is left out and listed as a problem.
@@ -1226,10 +1259,21 @@ Steps are sequential.
 7. Create or update alpha tokens (section 2.1).
 8. Create or update Appearance tokens, with aliases pointing to Theme IDs.
 9. Create or update ColorScheme tokens, with aliases pointing to Theme IDs.
-10. Redraw the color tables (section 6.1.1).
-11. Show the manifest, the report, and a summary of what was created, updated, unchanged, and renamed.
+10. Redraw the color tables and the ColorScheme color maps (section 6.1.1).
+11. Save the form's settings in the file (see "Saved settings" below).
+12. Show the manifest, the report, and a summary of what was created, updated, unchanged, and renamed.
 
 Variables in the file that are not in the manifest are reported as `orphan_variable`. Modes that the inputs do not list are reported as `orphan_mode`. The plugin never deletes either.
+
+#### Saved settings
+
+The plugin saves the form's settings inside the Figma file when Generate tokens writes the variables. Check only does not save them. Each file keeps its own settings.
+
+When the plugin opens:
+
+- **The file has no tokens** (no variable in the Primitives, Theme, Appearance, or ColorScheme collections): the form shows the default settings. This covers a new file and a file whose tokens were all deleted.
+- **The file has tokens and saved settings:** the form shows them.
+- **The file has tokens but no saved settings** (generated by an earlier version of the plugin): the form shows the settings that version kept for the user, if any. Otherwise it shows the default settings.
 
 #### Source of truth
 

@@ -9,12 +9,12 @@ export const STEPS = [950, 900, 850, 800, 700, 600, 500, 400, 300, 200, 150, 100
 // Section 1.1.4: a smooth ease-in-out curve (tokens.json primitives.targetL)
 export const TARGET_L: Record<number, number> = {
   950: 0.16, 900: 0.189, 850: 0.22, 800: 0.251, 700: 0.323, 600: 0.412,
-  500: 0.519, 400: 0.638, 300: 0.754, 200: 0.854, 150: 0.897, 100: 0.935, 50: 0.97,
+  500: 0.519, 400: 0.638, 300: 0.754, 200: 0.852, 150: 0.892, 100: 0.928, 50: 0.96,
 };
 
 // Section 5.5 step 3: a smooth bell that peaks at 400 (tokens.json primitives.chromaMultiplier)
 export const CHROMA_MULT: Record<number, number> = {
-  50: 0.11, 100: 0.25, 150: 0.42, 200: 0.59, 300: 0.87, 400: 1.0,
+  50: 0.3, 100: 0.43, 150: 0.55, 200: 0.68, 300: 0.87, 400: 1.0,
   500: 0.93, 600: 0.76, 700: 0.56, 800: 0.38, 850: 0.32, 900: 0.28, 950: 0.27,
 };
 
@@ -150,9 +150,9 @@ function commit(p: Palette, s: number, cand: Lch): void {
 }
 
 // Section 5.4 steps 2 and 3. Returns true if a candidate was accepted.
-function fixPair(p: Palette, pair: ContrastPair, threshold: number, allowAnchor: boolean, allowChroma: boolean): boolean {
+function fixPair(p: Palette, pair: ContrastPair, threshold: number, allowChroma: boolean): boolean {
   const s = pair.text;
-  if (s === p.anchor && !allowAnchor) return false;
+  if (s === p.anchor) return false; // the brand color never changes (section 5.2)
 
   const cur = p.steps[s].lch;
   const bgs = pairBackgrounds(p, pair); // a candidate must pass against every one of them
@@ -195,6 +195,25 @@ function fixPair(p: Palette, pair: ContrastPair, threshold: number, allowAnchor:
   return false;
 }
 
+// Section 5.4 step 2. The brand color fails on the palette's own background (500 on its own 100), and it must
+// keep its exact HEX, so that background gets lighter instead, staying below the next lighter step.
+// Returns true if a candidate was accepted.
+function lightenOwnBackground(p: Palette, pair: ContrastPair, threshold: number): boolean {
+  const cur = p.steps[pair.bg].lch;
+  const upper = STEPS.filter((x) => p.steps[x].lch.L > cur.L).reduce((a, x) => Math.min(a, p.steps[x].lch.L), 1);
+  const n = Math.round(L_SEARCH_LIMIT / SEARCH_STEP);
+  for (let i = 1; i <= n; i++) {
+    const L = r3(cur.L + i * SEARCH_STEP);
+    if (L >= upper) break;
+    const cand = clampChroma({ L, C: cur.C, H: cur.H });
+    if (contrast(p.steps[pair.text].hex, oklchToHex(cand)) >= threshold) {
+      commit(p, pair.bg, cand);
+      return true;
+    }
+  }
+  return false;
+}
+
 // Section 5.4: minimums first (hard), then targets (optimization, warnings only).
 function calibrate(p: Palette): void {
   for (const pair of CONTRAST_PAIRS) {
@@ -207,7 +226,10 @@ function calibrate(p: Palette): void {
       });
       return;
     }
-    if (fixPair(p, pair, pair.min, true, true)) {
+    const fixed = pair.text === p.anchor && pair.bgPalette === "self"
+      ? lightenOwnBackground(p, pair, pair.min)
+      : fixPair(p, pair, pair.min, true);
+    if (fixed) {
       p.adjustments++;
     } else {
       p.errors.push({
@@ -227,7 +249,7 @@ function calibrate(p: Palette): void {
     const ratio = measure(p, pair);
     if (ratio >= pair.target) continue;
     const respaced = (p.respaced ?? []).includes(pair.text); // stays where the brand rule put it
-    if (!respaced && p.adjustments < MAX_ADJUSTMENTS && fixPair(p, pair, pair.target, false, false)) {
+    if (!respaced && p.adjustments < MAX_ADJUSTMENTS && fixPair(p, pair, pair.target, false)) {
       p.adjustments++;
     } else {
       p.warnings.push({
@@ -252,10 +274,13 @@ export function buildPalette(name: string, hex: string, neutrals: Neutral[] = [G
 
   const p: Palette = { name, anchor, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
   for (const s of STEPS) {
-    const L = s === anchor ? src.L : TARGET_L[s];
-    // The anchor keeps the brand color's chroma; the other steps stay under the ceiling.
-    const C = s === anchor ? src.C : Math.max(Math.min(C400 * CHROMA_MULT[s], CHROMA_CEILING[s] ?? Infinity), MIN_CHROMA);
-    commit(p, s, { L, C, H });
+    // The anchor is the brand color itself, with its exact HEX: converting it would round it by a digit.
+    if (s === anchor) {
+      p.steps[s] = { lch: { L: src.L, C: src.C, H }, hex: hex.toUpperCase() };
+      continue;
+    }
+    // The other steps stay under the ceiling.
+    commit(p, s, { L: TARGET_L[s], C: Math.max(Math.min(C400 * CHROMA_MULT[s], CHROMA_CEILING[s] ?? Infinity), MIN_CHROMA), H });
   }
   if (anchor !== placed.closest) respaceAroundAnchor(p, anchor, src.L);
 

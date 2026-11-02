@@ -76,8 +76,8 @@ export function buildAppearanceExport(source: TableSource, options: ExportOption
   const modesOf = (c: string): string[] => source.collections.find((x) => x.name === c)?.modes ?? [];
   const themeModes = modesOf("Theme");
   const appModes = modesOf("Appearance");
-  if (appModes.length === 0) return { data, problems: ["There is no Appearance collection in this file. Create variables first."] };
-  if (themeModes.length === 0) return { data, problems: ["There is no Theme collection in this file. Create variables first."] };
+  if (appModes.length === 0) return { data, problems: ["There is no Appearance collection in this file. Generate tokens first."] };
+  if (themeModes.length === 0) return { data, problems: ["There is no Theme collection in this file. Generate tokens first."] };
 
   const themeHex = themeResolver(source);
   const appearance = source.variables
@@ -119,7 +119,7 @@ export function buildAppearanceExport(source: TableSource, options: ExportOption
 export type ExportFile = { fileName: string; data?: AppearanceExport; text?: string };
 
 // "all": one file with every theme. "perTheme": one file per theme, each with the same structure and
-// only that theme, named after it ("Theme A" -> appearance-tokens-theme-a.json).
+// only that theme, named after it ("Main theme" -> appearance-tokens-main-theme.json).
 // prefix names the files: "appearance-tokens" (default) or "colorscheme-tokens".
 export function exportFiles(data: AppearanceExport, split: "all" | "perTheme", prefix = "appearance-tokens"): ExportFile[] {
   if (split === "all") return [{ fileName: `${prefix}.json`, data }];
@@ -148,8 +148,8 @@ export function buildColorSchemeExport(source: TableSource): {
   const modesOf = (c: string): string[] => source.collections.find((x) => x.name === c)?.modes ?? [];
   const themeModes = modesOf("Theme");
   const modes = modesOf("ColorScheme");
-  if (modes.length === 0) return { data, dark, problems: ["There is no ColorScheme collection in this file. Create variables first."] };
-  if (themeModes.length === 0) return { data, dark, problems: ["There is no Theme collection in this file. Create variables first."] };
+  if (modes.length === 0) return { data, dark, problems: ["There is no ColorScheme collection in this file. Generate tokens first."] };
+  if (themeModes.length === 0) return { data, dark, problems: ["There is no Theme collection in this file. Generate tokens first."] };
 
   const themeHex = themeResolver(source);
   // In the file's order, which is the Compose order for the tokens this plugin created.
@@ -175,7 +175,7 @@ export function buildColorSchemeExport(source: TableSource): {
   return { data, dark, problems };
 }
 
-// "Theme A" + "Light" -> "ThemeALight": letters and digits only, each word capitalized.
+// "Main theme" + "Light" -> "MainThemeLight": letters and digits only, each word capitalized.
 function kotlinWord(text: string): string {
   return text.split(/[^A-Za-z0-9]+/).filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join("");
 }

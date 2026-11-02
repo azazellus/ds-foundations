@@ -38,7 +38,7 @@ function countWord(n: number): string {
   return WORDS[n] ?? String(n);
 }
 
-// "Theme A and Theme B", "Theme A, Theme B and Theme C".
+// "Main theme and Custom theme", "Main theme, Custom theme and Custom theme 2".
 function listOf(items: string[]): string {
   return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
@@ -135,7 +135,7 @@ export function buildTables(spec: Spec, source: TableSource): Table[] {
     notation: "Primitive color token, primitive opacity token (optional)",
     info: (many
       ? `Each row is one source variable. The ${countWord(themeModes.length).toLowerCase()} columns resolve that same variable in ${listOf(themeModes)}. `
-      : `Each row is one source variable, resolved in ${themeModes[0] ?? "Theme A"}. `) +
+      : `Each row is one source variable, resolved in ${themeModes[0] ?? "the first theme"}. `) +
       "Arrows show exact alias targets; literal alpha colors retain their source opacity. Swatches sit on a light neutral substrate.",
     nameHeader: "TOKEN NAME AND DESCRIPTION",
     columns: themeModes.map((m) => m.toUpperCase()),

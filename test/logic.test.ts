@@ -1,7 +1,7 @@
 // Logic tests. Run with: node --experimental-strip-types test/logic.test.ts
 import assert from "node:assert/strict";
 import { hexToOklch, oklchToHex, contrast, inGamut } from "../src/color.ts";
-import { buildPalette, STEPS, CONTRAST_PAIRS, pairBackgroundHex, buildHuePalette, closestStep, yellowFactor,
+import { CHROMA_MULT, buildPalette, STEPS, CONTRAST_PAIRS, pairBackgroundHex, buildHuePalette, closestStep, yellowFactor,
   CHROMA_CEILING, REFERENCE_C400, YELLOW_BOOST, SHIFT_NOTICE_DISTANCE, placeAnchor, TARGET_L,
   buildNeutralPalette, NEUTRAL_CHROMA, NEUTRAL_FADE, GRAY_HEX, neutralOf } from "../src/palette.ts";
 import { validateHex } from "../src/validate.ts";
@@ -10,6 +10,9 @@ import { readFileSync } from "node:fs";
 import { buildPlan, namePalettes, themeModeNames, weightSlotOf } from "../src/foundations.ts";
 import type { Inputs, Plan, ThemeInput } from "../src/foundations.ts";
 import { buildTables } from "../src/tables.ts";
+import { appearancePreviews } from "../src/previews.ts";
+import { fileHasTokens, inputsToShow, readSavedInputs } from "../src/saved-inputs.ts";
+import { buildColorMaps, MAP_BLOCKS, MAP_HEIGHT, MAP_WIDTH } from "../src/color-maps.ts";
 import { buildAppearanceExport, buildColorSchemeExport, exportFiles, exportName, kotlinFiles } from "../src/export.ts";
 
 // 1. Color math round trip: HEX -> OKLCH -> HEX must return the same value.
@@ -112,14 +115,14 @@ assert.equal(count("Theme"), 15 + 5 * 13 + 30 + 75 + 6 + 32);
 assert.equal(count("Appearance"), Object.keys(spec.appearance.tokens).length);
 
 const find = (c: string, name: string) => plan.variables.find((v) => v.collection === c && v.name === name)!;
-assert.deepEqual(find("Theme", "color/brand/500").values, { "Theme A": { alias: "Color/Purple/500" } });
-assert.deepEqual(find("Theme", "color/neutral/50").values, { "Theme A": { alias: "Color/Gray/50" } });
-assert.deepEqual(find("Theme", "color/danger/alpha/a36").values, { "Theme A": { alias: "Color/Red/500", opacityAlias: "Opacity/36" } });
+assert.deepEqual(find("Theme", "color/brand/500").values, { "Main theme": { alias: "Color/Purple/500" } });
+assert.deepEqual(find("Theme", "color/neutral/50").values, { "Main theme": { alias: "Color/Gray/50" } });
+assert.deepEqual(find("Theme", "color/danger/alpha/a36").values, { "Main theme": { alias: "Color/Red/500", opacityAlias: "Opacity/36" } });
 assert.equal(find("Theme", "color/danger/alpha/a36").alpha, true);
-assert.deepEqual(find("Theme", "color/neutral/alpha/white/a16").values, { "Theme A": { alias: "Color/White", opacityAlias: "Opacity/16" } });
+assert.deepEqual(find("Theme", "color/neutral/alpha/white/a16").values, { "Main theme": { alias: "Color/White", opacityAlias: "Opacity/16" } });
 // Every alpha token links to an Opacity Primitive whose number matches its name (a04 -> Opacity/4).
 for (const v of plan.variables.filter((x) => x.alpha)) {
-  const val = v.values["Theme A"] as { alias: string; opacityAlias?: string };
+  const val = v.values["Main theme"] as { alias: string; opacityAlias?: string };
   assert.equal(val.opacityAlias, "Opacity/" + Number(v.name.slice(-2)), v.name);
 }
 // A missing Opacity Primitive is an unresolved_reference. TEST-ONLY spec copy without Opacity 36.
@@ -128,8 +131,8 @@ noOp36.primitives.opacities = noOp36.primitives.opacities.filter((o: number) => 
 const brokenOp = buildPlan(noOp36, { numberOfThemes: 1, themes: [themeA] });
 assert.equal(brokenOp.ok, false);
 assert.ok(brokenOp.report.some((r) => r.check === "unresolved_reference" && r.expected === "Primitives: Opacity/36"));
-assert.deepEqual(find("Theme", "typography/font-family").values, { "Theme A": { alias: "Typography/Font-family/Inter" } });
-assert.deepEqual(find("Theme", "size/border/sm").values, { "Theme A": { alias: "Size/0-5" } });
+assert.deepEqual(find("Theme", "typography/font-family").values, { "Main theme": { alias: "Typography/Font-family/Inter" } });
+assert.deepEqual(find("Theme", "size/border/sm").values, { "Main theme": { alias: "Size/0-5" } });
 assert.deepEqual(find("Theme", "size/border/sm").scopes, ["STROKE_FLOAT"]);
 assert.deepEqual(find("Primitives", "Opacity/48").scopes, ["OPACITY"]);
 assert.deepEqual(find("Primitives", "Color/Purple/500").scopes, []);
@@ -180,7 +183,7 @@ const themeB: ThemeInput = { ...themeA, brand: { hex: "#2A9D8F" }, fontFamily: "
 const plan2 = buildPlan(spec, { numberOfThemes: 2, themes: [themeA, themeB] });
 assert.equal(plan2.ok, true, JSON.stringify(plan2.report.filter((r) => r.severity === "error")));
 assert.deepEqual(plan2.variables.find((v) => v.name === "color/brand/400")!.values, {
-  "Theme A": { alias: "Color/Purple/400" }, "Theme B": { alias: "Color/Teal/400" },
+  "Main theme": { alias: "Color/Purple/400" }, "Custom theme": { alias: "Color/Teal/400" },
 });
 assert.equal(plan2.variables.filter((v) => v.name === "Color/Red/500").length, 1);
 assert.ok(plan2.variables.some((v) => v.name === "Typography/Font-family/Garamond"));
@@ -197,11 +200,11 @@ const themeC: ThemeInput = { ...themeA, brand: { hex: "#E4572E" }, fontFamily: "
 const extras = [{ name: "Dim", base: "Dark", canvasStep: 850 }, { name: "Paper", base: "Light" }];
 const plan3 = buildPlan(spec, { numberOfThemes: 3, themes: [themeA, themeB, themeC], extraAppearances: extras });
 assert.equal(plan3.ok, true, JSON.stringify(plan3.report.filter((r) => r.severity === "error")));
-assert.deepEqual(plan3.collections.find((c) => c.name === "Theme")!.modes, ["Theme A", "Theme B", "Theme C"]);
+assert.deepEqual(plan3.collections.find((c) => c.name === "Theme")!.modes, ["Main theme", "Custom theme", "Custom theme 2"]);
 assert.deepEqual(plan3.collections.find((c) => c.name === "Appearance")!.modes, ["Light", "Dark", "Dim", "Paper"]);
 const find3 = (c: string, name: string) => plan3.variables.find((v) => v.collection === c && v.name === name)!;
-assert.deepEqual(find3("Theme", "color/brand/500").values["Theme C"], { alias: "Color/Vermilion/500" });
-assert.deepEqual(find3("Theme", "color/neutral/500").values["Theme C"], { alias: "Color/Gray/500" });
+assert.deepEqual(find3("Theme", "color/brand/500").values["Custom theme 2"], { alias: "Color/Vermilion/500" });
+assert.deepEqual(find3("Theme", "color/neutral/500").values["Custom theme 2"], { alias: "Color/Gray/500" });
 // Dim = Dark with canvas 850; Dark keeps the default 950; Paper = Light.
 assert.deepEqual(find3("Appearance", "color/elevation/surface/canvas").values, {
   Light: { alias: "color/neutral/white" }, Dark: { alias: "color/neutral/950" },
@@ -211,9 +214,9 @@ assert.deepEqual(find3("Appearance", "color/bg/success/softer").values.Dim, { al
 assert.deepEqual(find3("Appearance", "color/text/link").values.Paper, find3("Appearance", "color/text/link").values.Light);
 // Every Appearance token has a value in all 4 appearances; checks ran in all 3 × 4 contexts.
 assert.ok(plan3.variables.filter((v) => v.collection === "Appearance").every((v) => Object.keys(v.values).length === 4));
-assert.ok(plan3.manifest.some((e) => e.contrast?.some((c) => c.theme === "Theme C") && e.mode === "Dim"));
+assert.ok(plan3.manifest.some((e) => e.contrast?.some((c) => c.theme === "Custom theme 2") && e.mode === "Dim"));
 // Invalid extra appearances stop generation.
-for (const bad of [[{ name: "Dark", base: "Dark" }], [{ name: "", base: "Light" }], [{ name: "Dim!", base: "Dark" }],
+for (const bad of [[{ name: "Dark", base: "Dark" }], [{ name: "Dim!", base: "Dark" }],
   [{ name: "Dim", base: "Dark" }, { name: "Dim", base: "Light" }], [{ name: "Dim", base: "Sepia" }],
   [{ name: "Dim", base: "Dark", canvasStep: 800 }]]) {
   assert.ok(checksOf({ numberOfThemes: 1, themes: [themeA], extraAppearances: bad }).includes("missing_input"), JSON.stringify(bad));
@@ -272,33 +275,33 @@ const [tPrim, tTheme, tApp] = tables;
 assert.equal(tPrim.groups[0].name, "Color"); // Color/Black and Color/White
 assert.deepEqual(tPrim.groups[0].rows.map((r) => r.name), ["Color/Black", "Color/White"]);
 assert.ok(tPrim.groups.some((g) => g.name === "Color/Purple" && g.rows.length === 13));
-assert.deepEqual(tTheme.columns, ["THEME A", "THEME B"]);
+assert.deepEqual(tTheme.columns, ["MAIN THEME", "CUSTOM THEME"]);
 const brand400 = tTheme.groups.find((g) => g.name === "color/brand")!.rows.find((r) => r.name === "color/brand/400")!;
 assert.deepEqual(brand400.cells.map((c) => c.ref), ["Color/Purple/400", "Color/Teal/400"]);
 assert.equal(brand400.cells[0].opacityRef, undefined);
 const a36 = tTheme.groups.find((g) => g.name === "color/danger")!.rows.find((r) => r.name === "color/danger/alpha/a36")!;
 assert.deepEqual(a36.cells.map((c) => c.opacityRef), ["Opacity/36", "Opacity/36"]);
 assert.deepEqual(tApp.groups.map((g) => g.name), ["color/elevation", "color/bg", "color/text", "color/border", "color/icon"]);
-assert.deepEqual(tApp.columns, ["THEME A LIGHT", "THEME A DARK", "THEME B LIGHT", "THEME B DARK"]);
+assert.deepEqual(tApp.columns, ["MAIN THEME LIGHT", "MAIN THEME DARK", "CUSTOM THEME LIGHT", "CUSTOM THEME DARK"]);
 const appBase = tApp.groups.find((g) => g.name === "color/bg")!.rows.find((r) => r.name === "color/bg/base")!;
 assert.deepEqual(appBase.cells.map((c) => [c.themeMode, c.appMode, c.dark, c.ref]), [
-  ["Theme A", "Light", false, "color/neutral/white"], ["Theme A", "Dark", true, "color/neutral/950"],
-  ["Theme B", "Light", false, "color/neutral/white"], ["Theme B", "Dark", true, "color/neutral/950"],
+  ["Main theme", "Light", false, "color/neutral/white"], ["Main theme", "Dark", true, "color/neutral/950"],
+  ["Custom theme", "Light", false, "color/neutral/white"], ["Custom theme", "Dark", true, "color/neutral/950"],
 ]);
 assert.ok(tApp.info.startsWith("Four contexts"));
 // One theme: two Appearance columns, one Theme column.
 const [, tTheme1, tApp1] = buildTables(spec, plan);
-assert.deepEqual(tTheme1.columns, ["THEME A"]);
-assert.deepEqual(tApp1.columns, ["THEME A LIGHT", "THEME A DARK"]);
+assert.deepEqual(tTheme1.columns, ["MAIN THEME"]);
+assert.deepEqual(tApp1.columns, ["MAIN THEME LIGHT", "MAIN THEME DARK"]);
 assert.ok(tApp1.info.startsWith("Two contexts"));
 // Three themes and four appearances: 12 Appearance columns; Dim is dark by its colors, Paper is not.
 const [, tTheme3, tApp3] = buildTables(spec, plan3);
-assert.deepEqual(tTheme3.columns, ["THEME A", "THEME B", "THEME C"]);
-assert.ok(tTheme3.info.includes("Theme A, Theme B and Theme C"));
+assert.deepEqual(tTheme3.columns, ["MAIN THEME", "CUSTOM THEME", "CUSTOM THEME 2"]);
+assert.ok(tTheme3.info.includes("Main theme, Custom theme and Custom theme 2"));
 assert.equal(tApp3.columns.length, 12);
 assert.ok(tApp3.info.startsWith("Twelve contexts"));
 const canvasRow = tApp3.groups.find((g) => g.name === "color/elevation")!.rows.find((r) => r.name === "color/elevation/surface/canvas")!;
-const darkByMode = Object.fromEntries(canvasRow.cells.filter((c) => c.themeMode === "Theme C").map((c) => [c.appMode, c.dark]));
+const darkByMode = Object.fromEntries(canvasRow.cells.filter((c) => c.themeMode === "Custom theme 2").map((c) => [c.appMode, c.dark]));
 assert.deepEqual(darkByMode, { Light: false, Dark: true, Dim: true, Paper: false });
 
 // 7c. Appearance order (appearance.order): groups elevation, bg, text, border, icon; emphasis bolder to softest.
@@ -321,7 +324,7 @@ assert.deepEqual(tAppShuffled.groups.flatMap((g) => g.rows.map((r) => r.name)), 
 assert.deepEqual(buildTables(spec, failed), []);
 
 // 7b. "Update tables only" uses the variables read from the file, which the user may have edited by hand.
-// Simulated here: color/brand/400 re-pointed in Theme A, no "alpha" flag (live variables have none),
+// Simulated here: color/brand/400 re-pointed in Main theme, no "alpha" flag (live variables have none),
 // and no Appearance or ColorScheme collection yet.
 const live = {
   collections: plan2.collections.filter((c) => c.name !== "Appearance" && c.name !== "ColorScheme"),
@@ -330,7 +333,7 @@ const live = {
     .map((v) => {
       const { alpha, ...rest } = v;
       return v.name === "color/brand/400"
-        ? { ...rest, values: { ...v.values, "Theme A": { alias: "Color/Purple/300" } } }
+        ? { ...rest, values: { ...v.values, "Main theme": { alias: "Color/Purple/300" } } }
         : rest;
     }),
 };
@@ -344,9 +347,9 @@ assert.equal(liveA36.cells[0].opacityRef, "Opacity/36");
 // 8. Theme names (inputs.themeNames): the user's names, defaults for empty entries; invalid or duplicated names stop.
 const planN = buildPlan(spec, { numberOfThemes: 3, themes: [themeA, themeB, themeC], themeNames: ["Acme", "", "Night Shop"] });
 assert.equal(planN.ok, true, JSON.stringify(planN.report.filter((r) => r.severity === "error")));
-assert.deepEqual(planN.collections.find((c) => c.name === "Theme")!.modes, ["Acme", "Theme B", "Night Shop"]);
+assert.deepEqual(planN.collections.find((c) => c.name === "Theme")!.modes, ["Acme", "Custom theme", "Night Shop"]);
 assert.deepEqual(planN.variables.find((v) => v.name === "color/brand/500")!.values["Night Shop"], { alias: "Color/Vermilion/500" });
-assert.deepEqual(themeModeNames(spec, 2), ["Theme A", "Theme B"]);
+assert.deepEqual(themeModeNames(spec, 2), ["Main theme", "Custom theme"]);
 for (const bad of [["Acme", "Acme"], ["Acme!"], ["Two  spaces"]]) {
   assert.ok(checksOf({ numberOfThemes: bad.length, themes: [themeA, themeB].slice(0, bad.length), themeNames: bad }).includes("missing_input"), JSON.stringify(bad));
 }
@@ -400,8 +403,8 @@ const count2 = (c: string) => plan2.variables.filter((v) => v.collection === c).
 assert.equal(countC("Primitives"), count2("Primitives") + 2 * 13); // Cerise and Persimmon
 assert.equal(countC("Theme"), count2("Theme") + 13 + 15);
 assert.equal(countC("Appearance"), count2("Appearance") + 8);
-assert.deepEqual(findC("Theme", "color/promo/500")!.values, { "Theme A": { alias: "Color/Cerise/500" }, "Theme B": { alias: "Color/Persimmon/500" } });
-assert.deepEqual(findC("Theme", "color/promo/alpha/a08")!.values["Theme B"], { alias: "Color/Persimmon/500", opacityAlias: "Opacity/8" });
+assert.deepEqual(findC("Theme", "color/promo/500")!.values, { "Main theme": { alias: "Color/Cerise/500" }, "Custom theme": { alias: "Color/Persimmon/500" } });
+assert.deepEqual(findC("Theme", "color/promo/alpha/a08")!.values["Custom theme"], { alias: "Color/Persimmon/500", opacityAlias: "Opacity/8" });
 assert.deepEqual(findC("Appearance", "color/bg/promo/softer")!.values, { Light: { alias: "color/promo/100" }, Dark: { alias: "color/promo/850" } });
 assert.deepEqual(findC("Appearance", "color/icon/promo")!.scopes, ["SHAPE_FILL", "TEXT_FILL"]);
 // Custom backgrounds follow both canvases.
@@ -429,7 +432,7 @@ assert.ok(checksOf({ numberOfThemes: 2, themes: [promoA, themeB], customRoles: [
 // 12. Font weights follow the family's own styles (inputs.fontWeights).
 const findPlan = (p: any, name: string) => p.variables.find((v: any) => v.name === name);
 assert.ok(findPlan(plan, "Typography/Font-weight/Semi Bold"));
-assert.deepEqual(findPlan(plan, "typography/font-weight/semibold").values, { "Theme A": { alias: "Typography/Font-weight/Semi Bold" } });
+assert.deepEqual(findPlan(plan, "typography/font-weight/semibold").values, { "Main theme": { alias: "Typography/Font-weight/Semi Bold" } });
 assert.equal(findPlan(plan, "Typography/Font-weight/Thin"), undefined); // matches no slot, so not selected by default
 // Different names per family fill the same slot.
 const garamond = { ...themeA, fontFamily: "Garamond", availableWeights: ["Regular", "SemiBold", "Bold", "ExtraBold"], fontWeights: ["Regular", "SemiBold", "Bold", "ExtraBold"] };
@@ -437,7 +440,7 @@ const interPicked = { ...themeA, fontWeights: ["Regular", "Semi Bold", "Bold", "
 const planF = buildPlan(spec, { numberOfThemes: 2, themes: [interPicked, { ...garamond, brand: themeB.brand }] });
 assert.equal(planF.ok, true, JSON.stringify(planF.report.filter((r) => r.severity === "error")));
 assert.deepEqual(findPlan(planF, "typography/font-weight/semibold").values, {
-  "Theme A": { alias: "Typography/Font-weight/Semi Bold" }, "Theme B": { alias: "Typography/Font-weight/SemiBold" },
+  "Main theme": { alias: "Typography/Font-weight/Semi Bold" }, "Custom theme": { alias: "Typography/Font-weight/SemiBold" },
 });
 assert.ok(findPlan(planF, "Typography/Font-weight/Thin") && findPlan(planF, "Typography/Font-weight/ExtraBold")); // Primitives only
 assert.equal(findPlan(planF, "typography/font-weight/light"), undefined); // matched in no theme
@@ -461,29 +464,29 @@ assert.equal(exportName("color/text/on-dark", opts(false, "camel")), "textOnDark
 const ex = buildAppearanceExport(plan2, opts(false, "dot"));
 assert.deepEqual(ex.problems, []);
 assert.equal(ex.data.version, 1);
-assert.deepEqual(Object.keys(ex.data.themes), ["Theme A", "Theme B"]);
-assert.deepEqual(Object.keys(ex.data.themes["Theme A"].appearances), ["Light", "Dark"]);
-const exLight = ex.data.themes["Theme A"].appearances.Light;
+assert.deepEqual(Object.keys(ex.data.themes), ["Main theme", "Custom theme"]);
+assert.deepEqual(Object.keys(ex.data.themes["Main theme"].appearances), ["Light", "Dark"]);
+const exLight = ex.data.themes["Main theme"].appearances.Light;
 assert.equal(Object.keys(exLight).length, count2("Appearance"));
 assert.deepEqual(Object.keys(exLight), [...Object.keys(exLight)].sort((a, b) => a.localeCompare(b))); // alphabetical
 // The HEX values match the plan's own resolution (the manifest), per theme.
 const resolved = (name: string, mode: string, t: string) =>
   (plan2.manifest.find((e) => e.name === name && e.mode === mode)!.resolved_hex as Record<string, string>)[t];
-assert.equal(exLight["bg.brand.bold"], resolved("color/bg/brand/bold", "Light", "Theme A"));
-assert.equal(ex.data.themes["Theme B"].appearances.Dark["text.brand.bold"], resolved("color/text/brand/bold", "Dark", "Theme B"));
-assert.notEqual(ex.data.themes["Theme A"].appearances.Light["bg.brand.bold"], ex.data.themes["Theme B"].appearances.Light["bg.brand.bold"]);
+assert.equal(exLight["bg.brand.bold"], resolved("color/bg/brand/bold", "Light", "Main theme"));
+assert.equal(ex.data.themes["Custom theme"].appearances.Dark["text.brand.bold"], resolved("color/text/brand/bold", "Dark", "Custom theme"));
+assert.notEqual(ex.data.themes["Main theme"].appearances.Light["bg.brand.bold"], ex.data.themes["Custom theme"].appearances.Light["bg.brand.bold"]);
 // Alpha-based tokens become 8-digit HEX: the color source plus its opacity.
 const disabledTarget = (plan2.variables.find((v) => v.name === "color/bg/disabled")!.values.Light as { alias: string }).alias;
-const disabledTheme = plan2.variables.find((v) => v.collection === "Theme" && v.name === disabledTarget)!.values["Theme A"] as { alias: string; opacityAlias: string };
+const disabledTheme = plan2.variables.find((v) => v.collection === "Theme" && v.name === disabledTarget)!.values["Main theme"] as { alias: string; opacityAlias: string };
 const opacity = plan2.variables.find((v) => v.name === disabledTheme.opacityAlias)!.values.Default as number;
 const sourceHex = plan2.variables.find((v) => v.name === disabledTheme.alias)!.values.Default as string;
 assert.equal(exLight["bg.disabled"], sourceHex + Math.round(opacity / 100 * 255).toString(16).padStart(2, "0").toUpperCase());
 // A missing Primitive is reported, and the token is left out.
 const broken = { collections: plan2.collections, variables: plan2.variables.filter((v) => v.name !== "Color/Purple/500") };
 const exBroken = buildAppearanceExport(broken, opts(true, "kebab"));
-assert.ok(exBroken.problems.some((p) => p.includes("color/bg/brand/bold (Theme A, Light)")));
-assert.equal(exBroken.data.themes["Theme A"].appearances.Light["--color-bg-brand-bold"], undefined);
-assert.ok(exBroken.data.themes["Theme B"].appearances.Light["--color-bg-brand-bold"]); // Theme B uses Teal
+assert.ok(exBroken.problems.some((p) => p.includes("color/bg/brand/bold (Main theme, Light)")));
+assert.equal(exBroken.data.themes["Main theme"].appearances.Light["--color-bg-brand-bold"], undefined);
+assert.ok(exBroken.data.themes["Custom theme"].appearances.Light["--color-bg-brand-bold"]); // Custom theme uses Teal
 // No Appearance collection: one clear problem, nothing exported.
 assert.equal(buildAppearanceExport({ collections: [], variables: [] }, opts(true, "dot")).problems.length, 1);
 
@@ -492,12 +495,12 @@ const all = exportFiles(ex.data, "all");
 assert.deepEqual(all.map((f) => f.fileName), ["appearance-tokens.json"]);
 assert.deepEqual(all[0].data, ex.data);
 const per = exportFiles(ex.data, "perTheme");
-assert.deepEqual(per.map((f) => f.fileName), ["appearance-tokens-theme-a.json", "appearance-tokens-theme-b.json"]);
-assert.deepEqual(Object.keys(per[1].data.themes), ["Theme B"]);
-assert.deepEqual(per[1].data.themes["Theme B"], ex.data.themes["Theme B"]);
+assert.deepEqual(per.map((f) => f.fileName), ["appearance-tokens-main-theme.json", "appearance-tokens-custom-theme.json"]);
+assert.deepEqual(Object.keys(per[1].data.themes), ["Custom theme"]);
+assert.deepEqual(per[1].data.themes["Custom theme"], ex.data.themes["Custom theme"]);
 assert.equal(per[0].data.version, 1);
 // Theme names that make the same file name get a number.
-const twin = { version: 1 as const, themes: { "Night Shop": ex.data.themes["Theme A"], "night-shop": ex.data.themes["Theme B"] } };
+const twin = { version: 1 as const, themes: { "Night Shop": ex.data.themes["Main theme"], "night-shop": ex.data.themes["Custom theme"] } };
 assert.deepEqual(exportFiles(twin, "perTheme").map((f) => f.fileName), ["appearance-tokens-night-shop.json", "appearance-tokens-night-shop-2.json"]);
 
 // 14. Palette names (src/naming.ts, section 1.1.8). The plugin names palettes from the HSL hue.
@@ -541,9 +544,9 @@ assert.deepEqual(paletteRenames({ s0: movedName }, moved.palettes, new Set([move
 // In a plan: the order is theme by theme, a gray brand uses Color/Gray, and similar palettes are warned.
 const grayBrand = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, brand: { hex: "#333333" } }] });
 assert.ok(grayBrand.ok);
-assert.deepEqual(grayBrand.variables.find((v) => v.name === "color/brand/500")!.values, { "Theme A": { alias: "Color/Gray/500" } });
+assert.deepEqual(grayBrand.variables.find((v) => v.name === "color/brand/500")!.values, { "Main theme": { alias: "Color/Gray/500" } });
 // Similar palettes (rule 4) are found by comparing the finished palettes, not the hues.
-const paletteOfRole = (plan: Plan, role: string) => (plan.variables.find((v) => v.name === `color/${role}/500`)!.values["Theme A"] as { alias: string }).alias.replace(/\/500$/, "");
+const paletteOfRole = (plan: Plan, role: string) => (plan.variables.find((v) => v.name === `color/${role}/500`)!.values["Main theme"] as { alias: string }).alias.replace(/\/500$/, "");
 const similarOn = (plan: Plan, token: string) => plan.report.filter((r) => r.check === "similar_palette" && r.token === token);
 // #FF0026 and #BD4242 are 8.9° apart in HSL, but as status colors they make almost the same palette.
 const twoReds = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, danger: { hex: "#FF0026" }, warning: { hex: "#BD4242" } }] });
@@ -565,17 +568,17 @@ const neonBrand = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, bra
 assert.equal(similarOn(neonBrand, paletteOfRole(neonBrand, "danger")).length, 0);
 // A status color with the same hue as a brand (#B48ED0 is within 1° of #78449F) uses the brand's palette.
 const shared = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, success: { hex: "#B48ED0" } }] });
-assert.deepEqual(shared.variables.find((v) => v.name === "color/success/500")!.values, { "Theme A": { alias: "Color/Purple/500" } });
-assert.equal(shared.palettes!.find((p) => p.name === "Purple")!.source, "Theme A|brand");
+assert.deepEqual(shared.variables.find((v) => v.name === "color/success/500")!.values, { "Main theme": { alias: "Color/Purple/500" } });
+assert.equal(shared.palettes!.find((p) => p.name === "Purple")!.source, "Main theme|brand");
 assert.equal(shared.palettes!.find((p) => p.name === "Purple")!.hex, "#78449F");
 // Two brands with the same hue but a different HEX: each keeps its HEX, so each gets its own palette.
 const twoBrands = buildPlan(spec, { numberOfThemes: 2, themes: [themeA, { ...themeB, brand: { hex: "#B48ED0" } }] });
-assert.deepEqual(twoBrands.variables.find((v) => v.name === "color/brand/500")!.values["Theme B"], { alias: "Color/Amethyst/500" });
+assert.deepEqual(twoBrands.variables.find((v) => v.name === "color/brand/500")!.values["Custom theme"], { alias: "Color/Amethyst/500" });
 // Their palettes differ by 0.066 at most, so they are not reported as similar.
 assert.equal(similarOn(twoBrands, "Color/Amethyst").length, 0);
 // The same brand HEX in two themes shares one palette.
 const sameBrand = buildPlan(spec, { numberOfThemes: 2, themes: [themeA, { ...themeB, brand: themeA.brand }] });
-assert.deepEqual(sameBrand.variables.find((v) => v.name === "color/brand/500")!.values, { "Theme A": { alias: "Color/Purple/500" }, "Theme B": { alias: "Color/Purple/500" } });
+assert.deepEqual(sameBrand.variables.find((v) => v.name === "color/brand/500")!.values, { "Main theme": { alias: "Color/Purple/500" }, "Custom theme": { alias: "Color/Purple/500" } });
 
 // 15. Palette chroma (sections 5.2, 5.3, 5.5). The constants in palette.ts must match tokens.json.
 assert.deepEqual(CHROMA_CEILING, Object.fromEntries(Object.entries(spec.primitives.chromaCeiling.steps).map(([k, v]) => [Number(k), v])));
@@ -686,7 +689,7 @@ const tScheme = buildTables(spec, twoCustom).find((t) => t.collection === "Color
 assert.equal(tScheme.count, csSpec.length);
 assert.deepEqual(tScheme.groups.flatMap((g) => g.rows.map((r) => r.name)), csSpec.map((t) => t.name).filter((n) => tScheme.groups.some((g) => g.rows.some((r) => r.name === n))));
 assert.equal(tScheme.groups[0].name, "primary");
-assert.deepEqual(tScheme.columns, ["THEME A LIGHT", "THEME A DARK"]);
+assert.deepEqual(tScheme.columns, ["MAIN THEME LIGHT", "MAIN THEME DARK"]);
 
 // 16a. ColorScheme contrast pairs (section 3.5.1): every pair names real roles, the plugin's own mapping
 // passes them (also with a lighter dark canvas), and a failure stops generation.
@@ -697,10 +700,18 @@ assert.ok(csPairs.some((p) => p.text === "onPrimary" && p.background === "primar
 // The fixed mapping (approved with the checks).
 assert.deepEqual(schemeVar(plan, "onSurfaceVariant").values, { Light: { alias: "color/neutral/600" }, Dark: { alias: "color/neutral/200" } });
 assert.deepEqual(schemeVar(plan, "inverseSurface").values, { Light: { alias: "color/neutral/700" }, Dark: { alias: "color/neutral/100" } });
-assert.equal((schemeVar(plan, "surfaceContainerHighest").values.Dark as { alias: string }).alias, "color/neutral/800");
+// High and Highest differ in Dark at canvas 950 and 900. At 850 the limit of step 600 makes them meet.
+const darkStepOf = (p: Plan, role: string) => (schemeVar(p, role).values.Dark as { alias: string }).alias;
+assert.equal(darkStepOf(plan, "surfaceContainerHigh"), "color/neutral/800");
+assert.equal(darkStepOf(plan, "surfaceContainerHighest"), "color/neutral/700");
+assert.equal(darkStepOf(plan, "surfaceBright"), "color/neutral/700");
+assert.equal(darkStepOf(plan900, "surfaceContainerHigh"), "color/neutral/700");
+assert.equal(darkStepOf(plan900, "surfaceContainerHighest"), "color/neutral/600");
 const plan850 = buildPlan(spec, { numberOfThemes: 1, themes: [themeA], darkCanvasStep: 850 });
 assert.equal(plan850.ok, true, JSON.stringify(plan850.report.filter((r) => r.severity === "error")));
-assert.equal((schemeVar(plan850, "surfaceContainerHighest").values.Dark as { alias: string }).alias, "color/neutral/600");
+assert.equal(darkStepOf(plan850, "surfaceContainerHigh"), "color/neutral/600");
+assert.equal(darkStepOf(plan850, "surfaceContainerHighest"), "color/neutral/600");
+assert.equal(darkStepOf(plan850, "surfaceBright"), "color/neutral/600");
 assert.equal(twoCustom.ok, true); // secondary and tertiary pairs pass too
 // Results are kept in the manifest, like Appearance contrast.
 const onPrimaryLight = plan.manifest.find((e) => e.collection === "ColorScheme" && e.name === "onPrimary" && e.mode === "Light")!;
@@ -717,33 +728,33 @@ assert.ok(failing.report.some((r) => r.check === "contrast_minimum" && r.severit
 // 16b. ColorScheme export: JSON with the Compose names, and Kotlin for Jetpack Compose.
 const csExp = buildColorSchemeExport(plan3);
 assert.deepEqual(csExp.problems, []);
-assert.deepEqual(Object.keys(csExp.data.themes), ["Theme A", "Theme B", "Theme C"]);
-assert.deepEqual(Object.keys(csExp.data.themes["Theme A"].appearances), ["Light", "Dark", "Dim", "Paper"]);
-assert.equal(csExp.data.themes["Theme A"].appearances.Light.primary,
-  plan3.manifest.find((e) => e.collection === "ColorScheme" && e.name === "primary" && e.mode === "Light")!.resolved_hex!["Theme A"]);
+assert.deepEqual(Object.keys(csExp.data.themes), ["Main theme", "Custom theme", "Custom theme 2"]);
+assert.deepEqual(Object.keys(csExp.data.themes["Main theme"].appearances), ["Light", "Dark", "Dim", "Paper"]);
+assert.equal(csExp.data.themes["Main theme"].appearances.Light.primary,
+  plan3.manifest.find((e) => e.collection === "ColorScheme" && e.name === "primary" && e.mode === "Light")!.resolved_hex!["Main theme"]);
 // Dark schemes are found by their surface color, so Dark-based extra appearances count as dark.
-assert.equal(csExp.dark["Theme A"].Light, false);
-assert.equal(csExp.dark["Theme A"].Dark, true);
-assert.equal(typeof csExp.dark["Theme A"].Dim, "boolean");
-assert.match(csExp.data.themes["Theme A"].appearances.Light.scrim, /^#000000[0-9A-F]{2}$/); // alpha kept as two digits
+assert.equal(csExp.dark["Main theme"].Light, false);
+assert.equal(csExp.dark["Main theme"].Dark, true);
+assert.equal(typeof csExp.dark["Main theme"].Dim, "boolean");
+assert.match(csExp.data.themes["Main theme"].appearances.Light.scrim, /^#000000[0-9A-F]{2}$/); // alpha kept as two digits
 assert.deepEqual(exportFiles(csExp.data, "all", "colorscheme-tokens").map((f) => f.fileName), ["colorscheme-tokens.json"]);
 assert.deepEqual(exportFiles(csExp.data, "perTheme", "colorscheme-tokens").map((f) => f.fileName),
-  ["colorscheme-tokens-theme-a.json", "colorscheme-tokens-theme-b.json", "colorscheme-tokens-theme-c.json"]);
+  ["colorscheme-tokens-main-theme.json", "colorscheme-tokens-custom-theme.json", "colorscheme-tokens-custom-theme-2.json"]);
 const roleNames = csSpec.map((t) => t.name);
 const kt = kotlinFiles(csExp, "all", "com.acme.theme", roleNames);
 assert.deepEqual(kt.problems, []);
 assert.deepEqual(kt.files.map((f) => f.fileName), ["ColorSchemes.kt"]);
 const ktText = kt.files[0].text!;
 assert.ok(ktText.includes("package com.acme.theme\n"));
-assert.ok(ktText.includes("val ThemeALightColorScheme = lightColorScheme(\n"));
-assert.ok(ktText.includes("val ThemeADarkColorScheme = darkColorScheme(\n"));
-const lightPrimary = csExp.data.themes["Theme A"].appearances.Light.primary.slice(1);
+assert.ok(ktText.includes("val MainThemeLightColorScheme = lightColorScheme(\n"));
+assert.ok(ktText.includes("val MainThemeDarkColorScheme = darkColorScheme(\n"));
+const lightPrimary = csExp.data.themes["Main theme"].appearances.Light.primary.slice(1);
 assert.ok(ktText.includes(`    primary = Color(0xFF${lightPrimary}),`));
 // Compose writes alpha first: #RRGGBBAA becomes 0xAARRGGBB.
-const scrimHex = csExp.data.themes["Theme A"].appearances.Light.scrim.slice(1);
+const scrimHex = csExp.data.themes["Main theme"].appearances.Light.scrim.slice(1);
 assert.ok(ktText.includes(`    scrim = Color(0x${scrimHex.slice(6)}${scrimHex.slice(0, 6)}),`));
 assert.deepEqual(kotlinFiles(csExp, "perTheme", "com.acme.theme", roleNames).files.map((f) => f.fileName),
-  ["ThemeAColorScheme.kt", "ThemeBColorScheme.kt", "ThemeCColorScheme.kt"]);
+  ["MainThemeColorScheme.kt", "CustomThemeColorScheme.kt", "CustomTheme2ColorScheme.kt"]);
 // A bad package name falls back to the default; a role added by hand in Figma is left out of Kotlin.
 assert.equal(kotlinFiles(csExp, "all", "Not A Package", roleNames).problems.length, 1);
 const handAdded = { collections: plan.collections, variables: [...plan.variables, { ...schemeVar(plan, "primary"), name: "brandGlow" }] };
@@ -797,20 +808,20 @@ assert.ok(Math.abs(slate.steps[500].lch.H - hexToOklch("#4785E6").H) < 0.1);
 for (const hex of ["#7F00FF", "#8A8590"]) assert.ok(Math.abs(buildNeutralPalette("x", hex).steps[500].lch.C - NEUTRAL_CHROMA) < 1e-6, hex);
 // In a plan: plain gray (the default) keeps Color/Gray; a tinted neutral gets its own name and palette.
 const neutralAlias = (p: Plan, theme: string) => (p.variables.find((v) => v.collection === "Theme" && v.name === "color/neutral/500")!.values[theme] as { alias: string }).alias;
-assert.equal(neutralAlias(plan, "Theme A"), "Color/Gray/500");
-assert.equal(neutralAlias(buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, neutral: { hex: "#808080" } }] }), "Theme A"), "Color/Gray/500");
+assert.equal(neutralAlias(plan, "Main theme"), "Color/Gray/500");
+assert.equal(neutralAlias(buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, neutral: { hex: "#808080" } }] }), "Main theme"), "Color/Gray/500");
 const tintedInputs = { numberOfThemes: 2, themes: [{ ...themeA, neutral: { hex: "#4785E6" } }, { ...themeB, neutral: { hex: "#C9A27A" } }] };
 const tinted = buildPlan(spec, tintedInputs);
 assert.equal(tinted.ok, true, JSON.stringify(tinted.report.filter((r) => r.severity === "error")));
-assert.equal(neutralAlias(tinted, "Theme A"), "Color/Slate/500"); // HSL hue 216.6°
-assert.equal(neutralAlias(tinted, "Theme B"), "Color/Taupe/500"); // HSL hue 30.4°
+assert.equal(neutralAlias(tinted, "Main theme"), "Color/Slate/500"); // HSL hue 216.6°
+assert.equal(neutralAlias(tinted, "Custom theme"), "Color/Taupe/500"); // HSL hue 30.4°
 assert.ok(tinted.variables.some((v) => v.name === "Color/Slate/50") && tinted.variables.some((v) => v.name === "Color/Gray/50"));
 // Black and white stay pure, and the neutral alpha tokens still link to them.
-assert.deepEqual(tinted.variables.find((v) => v.name === "color/neutral/white")!.values["Theme A"], { alias: "Color/White" });
+assert.deepEqual(tinted.variables.find((v) => v.name === "color/neutral/white")!.values["Main theme"], { alias: "Color/White" });
 // The same tint in two themes shares one palette.
 const sameTint = buildPlan(spec, { numberOfThemes: 2, themes: [{ ...themeA, neutral: { hex: "#4785E6" } }, { ...themeB, neutral: { hex: "#4785E6" } }] });
 assert.equal(sameTint.variables.filter((v) => v.name === "Color/Slate/500").length, 1);
-assert.equal(neutralAlias(sameTint, "Theme B"), "Color/Slate/500");
+assert.equal(neutralAlias(sameTint, "Custom theme"), "Color/Slate/500");
 // A palette shared by themes with different neutrals is calibrated against both (section 1.1.5).
 const sharedNaming = namePalettes(spec, tintedInputs);
 const successPalette = sharedNaming.build().find((p) => p.name === sharedNaming.paletteOf(0, "success"))!;
@@ -829,6 +840,224 @@ for (const hex of ["#4785E6", "#5B6B8C", "#C9A27A", "#48A13F", "#A930FF", "#D466
     const p = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, neutral: { hex } }], ...extra });
     assert.equal(p.ok, true, `${hex} ${JSON.stringify(extra)}: ${JSON.stringify(p.report.filter((r) => r.severity === "error").slice(0, 2))}`);
   }
+}
+
+// 19. ColorScheme color maps (src/color-maps.ts): one chart per theme and appearance.
+assert.equal(MAP_BLOCKS.length, 48);
+const allRoles = (spec.colorScheme.tokens as { name: string }[]).map((t) => t.name);
+for (const b of MAP_BLOCKS) {
+  assert.ok(allRoles.includes(b.role), `${b.role} is a ColorScheme role`);
+  assert.ok(allRoles.includes(b.labelRole), `${b.labelRole} is a ColorScheme role`);
+  assert.ok(b.x >= 0 && b.y >= 0 && b.x + b.w <= MAP_WIDTH && b.y + b.h <= MAP_HEIGHT, `${b.role} stays inside the map`);
+}
+assert.equal(new Set(MAP_BLOCKS.map((b) => b.role)).size, MAP_BLOCKS.length);
+// No two blocks overlap.
+MAP_BLOCKS.forEach((a, i) => MAP_BLOCKS.slice(i + 1).forEach((b) => {
+  assert.ok(a.x + a.w <= b.x + 0.01 || b.x + b.w <= a.x + 0.01 || a.y + a.h <= b.y + 0.01 || b.y + b.h <= a.y + 0.01, `${a.role} overlaps ${b.role}`);
+}));
+// Every role is charted, and the scrim's label uses primaryFixed.
+assert.deepEqual(allRoles.filter((r) => !MAP_BLOCKS.some((b) => b.role === r)), []);
+assert.equal(MAP_BLOCKS.find((b) => b.role === "scrim")!.labelRole, "primaryFixed");
+// One theme: named after the mode. Without added colors, secondary and tertiary leave their places empty.
+const mapsOne = buildColorMaps(plan);
+assert.deepEqual(mapsOne.map((m) => m.name), ["ColorScheme map - Light", "ColorScheme map - Dark"]);
+assert.equal(mapsOne[0].blocks.length, 48 - 16);
+assert.ok(!mapsOne[0].blocks.some((b) => /secondary|tertiary/i.test(b.role)));
+assert.equal(mapsOne[0].blocks.find((b) => b.role === "primary")!.x, 128); // the others do not move
+// Several themes and extra appearances: one map for each combination, named after both.
+const mapsMany = buildColorMaps(plan3);
+assert.equal(mapsMany.length, 3 * 4);
+assert.equal(mapsMany[0].name, "ColorScheme map - Main theme Light");
+assert.deepEqual([mapsMany[0].themeMode, mapsMany[0].appMode], ["Main theme", "Light"]);
+// All roles present with two added colors; danger off removes the error blocks; no collection, no maps.
+assert.equal(buildColorMaps(twoCustom)[0].blocks.length, 48);
+assert.equal(buildColorMaps(noDanger)[0].blocks.filter((b) => /error/i.test(b.role)).length, 0);
+assert.deepEqual(buildColorMaps(live), []);
+
+// 20. ColorScheme descriptions (section 3.5): one per role, in the plan, and in the spec's table.
+const specMd = readFileSync(new URL("../spec/foundations-spec.md", import.meta.url), "utf8");
+for (const t of spec.colorScheme.tokens as { name: string; description: string }[]) {
+  assert.ok(t.description?.length > 0, `${t.name} has a description`);
+  assert.ok(specMd.includes(`| ${t.description} |`), `${t.name}'s description is in section 3.5`);
+}
+assert.equal(schemeVar(twoCustom, "primary").description, spec.colorScheme.tokens.find((t: any) => t.name === "primary").description);
+assert.ok(scheme(twoCustom).every((v) => v.description));
+assert.ok(twoCustom.variables.filter((v) => v.collection === "Appearance").every((v) => v.description === undefined));
+
+// 21. Text fill (section 5.1, tokens.json appearance.textFill): the bolder text and icon step of each appearance.
+{
+  const planOf = (extra: Partial<Inputs>) => buildPlan(spec, { numberOfThemes: 1, themes: [themeA], ...extra });
+  const value = (p: Plan, name: string, mode: string) => {
+    const v = p.variables.find((x) => x.name === name && x.collection !== "Primitives" && x.collection !== "Theme");
+    return (v!.values[mode] as { alias: string }).alias;
+  };
+  // The defaults are the values in appearance.tokens.
+  const plain = planOf({});
+  assert.equal(value(plain, "color/text/neutral/bolder", "Light"), "color/neutral/700");
+  assert.equal(value(plain, "color/text/neutral/bolder", "Dark"), "color/neutral/150");
+  // Another step moves every bolder text and icon token, in its own family, in that mode only.
+  const p900 = planOf({ lightTextFillStep: 900 });
+  assert.equal(p900.ok, true);
+  for (const [name, family] of [["color/text/neutral/bolder", "neutral"], ["color/text/brand/bolder", "brand"], ["color/text/selected/bolder", "brand"],
+    ["color/text/danger/bolder", "danger"], ["color/icon/neutral/bolder", "neutral"], ["color/icon/brand/bolder", "brand"]]) {
+    assert.equal(value(p900, name, "Light"), `color/${family}/900`, name);
+    assert.equal(value(p900, name, "Dark"), value(plain, name, "Dark"), name);
+  }
+  // Nothing else changes: not the bold tokens, and not the bolder background.
+  const moved = new Set([...spec.appearance.textFill.tokens]);
+  for (const v of p900.variables.filter((x) => x.collection === "Appearance" && !moved.has(x.name))) {
+    assert.deepEqual(v.values, plain.variables.find((x) => x.collection === "Appearance" && x.name === v.name)!.values, v.name);
+  }
+  // Black and white exist only in neutral.
+  const ends = planOf({ lightTextFillStep: "black", darkTextFillStep: "white" });
+  assert.equal(ends.ok, true);
+  assert.equal(value(ends, "color/text/neutral/bolder", "Light"), "color/neutral/black");
+  assert.equal(value(ends, "color/text/brand/bolder", "Light"), "color/brand/950");
+  assert.equal(value(ends, "color/text/neutral/bolder", "Dark"), "color/neutral/white");
+  assert.equal(value(ends, "color/text/brand/bolder", "Dark"), "color/brand/50");
+  // ColorScheme tokens that are the same as a bolder token follow it.
+  assert.equal(value(ends, "onSurface", "Light"), "color/neutral/black");
+  assert.equal(value(ends, "onPrimaryContainer", "Dark"), "color/brand/50");
+  // Each extra appearance has its own step, with the default of its base; custom roles follow too.
+  const extra = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, custom: { promo: { hex: "#127681" } } }], customRoles: ["promo"],
+    extraAppearances: [{ name: "Oled", base: "Dark", canvasStep: "black", textFillStep: "white" }, { name: "Dim", base: "Dark" }, { name: "Paper", base: "Light", textFillStep: "850" }] });
+  assert.equal(extra.ok, true, JSON.stringify(extra.report.filter((r) => r.severity === "error")));
+  assert.equal(value(extra, "color/text/neutral/bolder", "Oled"), "color/neutral/white");
+  assert.equal(value(extra, "color/text/promo/bolder", "Oled"), "color/promo/50");
+  assert.equal(value(extra, "color/text/neutral/bolder", "Dim"), "color/neutral/150");
+  assert.equal(value(extra, "color/text/promo/bolder", "Paper"), "color/promo/850");
+  // A step from the other list, or an unknown one, stops generation.
+  for (const bad of [{ lightTextFillStep: 150 }, { lightTextFillStep: "white" }, { darkTextFillStep: 700 }, { darkTextFillStep: "black" },
+    { extraAppearances: [{ name: "Oled", base: "Dark", textFillStep: 700 }] }, { extraAppearances: [{ name: "Paper", base: "Light", textFillStep: 150 }] }]) {
+    assert.ok(checksOf({ numberOfThemes: 1, themes: [themeA], ...bad }).includes("missing_input"), JSON.stringify(bad));
+  }
+  // Without Dark, the dark step is ignored.
+  assert.equal(planOf({ includeDark: false, darkTextFillStep: 700 }).ok, true);
+  // Every step passes every contrast check, for hues that are hard to read, on every canvas.
+  for (const hex of ["#553ADF", "#FFE500", "#00C2FF", "#FF5454", "#808080"]) {
+    const t = { ...themeA, brand: { hex }, warning: { hex: "#FFD400" } };
+    for (const light of spec.inputs.lightTextFillStep.allowed) for (const dark of spec.inputs.darkTextFillStep.allowed) {
+      for (const canvas of spec.inputs.darkCanvasStep.allowed) {
+        const p = buildPlan(spec, { numberOfThemes: 1, themes: [t], lightTextFillStep: light, darkTextFillStep: dark, darkCanvasStep: canvas });
+        assert.equal(p.ok, true, `${hex} ${light} ${dark} ${canvas}: ${JSON.stringify(p.report.filter((r) => r.severity === "error"))}`);
+      }
+    }
+  }
+
+  // 22. Black dark canvas (section 5.1): the canvas is black, and everything above it stays as at 950.
+  const black = planOf({ darkCanvasStep: "black" });
+  assert.equal(black.ok, true);
+  assert.equal(value(black, "color/elevation/surface/canvas", "Dark"), "color/neutral/black");
+  assert.equal(value(black, "color/bg/base", "Dark"), "color/neutral/black");
+  assert.equal(value(black, "surface", "Dark"), "color/neutral/black");
+  const canvasTokens = new Set(spec.appearance.darkCanvas.canvasTokens);
+  for (const v of black.variables.filter((x) => x.collection === "Appearance" && !canvasTokens.has(x.name))) {
+    assert.deepEqual(v.values, plain.variables.find((x) => x.collection === "Appearance" && x.name === v.name)!.values, v.name);
+  }
+  assert.equal(value(black, "surfaceContainer", "Dark"), value(plain, "surfaceContainer", "Dark"));
+  assert.ok(checksOf({ numberOfThemes: 1, themes: [themeA], lightCanvasStep: "black" }).includes("missing_input"));
+  assert.ok(checksOf({ numberOfThemes: 1, themes: [themeA], extraAppearances: [{ name: "Paper", base: "Light", canvasStep: "black" }] }).includes("missing_input"));
+  assert.equal(buildTables(spec, black).length > 0, true);
+
+  // 23. Appearance card colors (src/previews.ts): the real values of the first theme, one per appearance.
+  const inputs: Inputs = { numberOfThemes: 1, themes: [themeA], lightCanvasStep: 50, lightTextFillStep: "black",
+    extraAppearances: [{ name: "Oled", base: "Dark", canvasStep: "black", textFillStep: "white" }] };
+  const n = namePalettes(spec, inputs);
+  const neutral = n.neutralStepsOf(0) as unknown as Record<string, string>;
+  const brandSteps = n.build().find((x) => x.name === n.paletteOf(0, "brand"))!.steps;
+  const brand = Object.fromEntries(STEPS.map((s) => [s, brandSteps[s].hex]));
+  const [light, dark, oled, none] = appearancePreviews(spec, inputs, neutral, brand);
+  assert.equal(none, undefined);
+  assert.equal(light.canvas, neutral[50]);
+  assert.equal(light.input, "#FFFFFF");
+  assert.equal(light.text, "#000000");
+  assert.equal(light.icon, "#000000");
+  assert.equal(light.textBold, neutral[500]);
+  assert.equal(light.brandBolder, brand[950]);
+  assert.equal(light.brandBold, brand[500]);
+  assert.equal(light.softNeutral, neutral[50]);
+  assert.equal(light.softBrand, brand[50]);
+  assert.equal(light.border, "#0000003D");
+  assert.equal(dark.canvas, neutral[950]);
+  assert.equal(dark.text, neutral[150]);
+  assert.equal(dark.border, "#FFFFFF29");
+  assert.equal(oled.canvas, "#000000");
+  assert.equal(oled.text, "#FFFFFF");
+  assert.equal(oled.brandBolder, brand[50]);
+  assert.equal(oled.softNeutral, neutral[900]);
+  // The card shows exactly what the plan writes.
+  const planned = buildPlan(spec, inputs);
+  assert.equal(value(planned, "color/bg/neutral/softest", "Oled"), "color/neutral/900");
+  assert.equal(value(planned, "color/text/brand/bolder", "Light"), "color/brand/950");
+}
+
+// 24. Light steps (sections 1.1.4 and 5.5): the code and tokens.json hold the same curves. Colored palettes get
+// more color in steps 50 to 200 than the neutrals, whose lightness stays on Color/Gray.
+assert.deepEqual(TARGET_L, spec.primitives.targetL);
+assert.deepEqual(CHROMA_MULT, spec.primitives.chromaMultiplier);
+// The window takes the first step of each list as its default.
+for (const rule of [spec.inputs.lightCanvasStep, spec.inputs.darkCanvasStep, spec.inputs.lightTextFillStep, spec.inputs.darkTextFillStep,
+  ...Object.values(spec.inputs.extraAppearances.canvasStep), ...Object.values(spec.inputs.extraAppearances.textFillStep)] as { allowed: unknown[]; default: unknown }[]) {
+  assert.equal(rule.allowed[0], rule.default);
+}
+// The brand keeps its exact HEX: colors that a conversion would round by a digit (section 5.2 step 5).
+for (const hex of ["#EE560C", "#553ADF", "#127681"]) {
+  const b = buildPalette("Brand", hex);
+  assert.equal(b.steps[b.anchor].hex, hex);
+}
+{
+  // A brand that fails on its own step 100 keeps its exact HEX: step 100 gets lighter instead (section 5.4 step 2).
+  for (const hex of ["#CD006C", "#A54D6C", "#C5256D", "#C82462", "#B214CF", "#915495"]) {
+    for (const neutral of [GRAY_HEX, neutralOf(buildNeutralPalette("n", "#3C8B5E"))]) {
+      const b = buildPalette("Brand", hex, [neutral]);
+      assert.equal(b.errors.length, 0, hex);
+      assert.equal(b.steps[b.anchor].hex, hex);
+      assert.ok(contrast(b.steps[500].hex, b.steps[100].hex) >= 4.5, hex);
+      assert.ok(b.steps[100].lch.L < b.steps[50].lch.L, hex);
+    }
+  }
+  assert.ok(buildPalette("Brand", "#CD006C").steps[100].lch.L > TARGET_L[100]);
+  // Gaps between the light steps keep rising from the light end, and the multipliers keep rising to 400.
+  const lightGaps = [[50, 100], [100, 150], [150, 200], [200, 300]].map(([a, b]) => TARGET_L[a] - TARGET_L[b]);
+  for (let i = 1; i < lightGaps.length; i++) assert.ok(lightGaps[i] > lightGaps[i - 1], `gap ${i}`);
+  for (const [a, b] of [[50, 100], [100, 150], [150, 200], [200, 300], [300, 400]]) assert.ok(CHROMA_MULT[a] < CHROMA_MULT[b]);
+  // A tinted neutral does not use these curves: it keeps Gray's lightness.
+  const n = buildNeutralPalette("n", "#DBE1E5");
+  for (const s of STEPS) assert.ok(Math.abs(n.steps[s].lch.L - hexToOklch(GRAY_HEX[s]).L) < 0.006, `neutral ${s}`);
+  // Example from the option the user chose: violet's step 50 at the gamut limit of its new lightness.
+  assert.equal(buildPalette("Violet", "#553ADF").steps[50].hex, "#EFF1FF");
+}
+
+// 25. Default names (section 5.1): Main theme first, then numbered custom themes and appearances.
+assert.deepEqual(themeModeNames(spec, 4), ["Main theme", "Custom theme", "Custom theme 2", "Custom theme 3"]);
+assert.deepEqual(themeModeNames(spec, 3, ["Acme", "", " "]), ["Acme", "Custom theme", "Custom theme 2"]);
+assert.deepEqual(themeModeNames(spec, 3, ["", "Custom theme", ""]), ["Main theme", "Custom theme", "Custom theme 2"]); // a typed name keeps its place
+assert.deepEqual(themeModeNames(spec, 3, ["", "", "Custom theme"]), ["Main theme", "Custom theme 2", "Custom theme"]);
+{
+  const three = buildPlan(spec, { numberOfThemes: 1, themes: [themeA], extraAppearances: [{ name: "", base: "Dark" }, { name: " ", base: "Light" }, { name: "Oled", base: "Dark" }, { base: "Dark" } as never] });
+  assert.equal(three.ok, true, JSON.stringify(three.report.filter((r) => r.severity === "error")));
+  const modes = three.collections.find((c) => c.name === "Appearance")!.modes;
+  assert.deepEqual(modes, ["Light", "Dark", "Custom appearance", "Custom appearance 2", "Oled", "Custom appearance 3"]);
+  assert.deepEqual(three.collections.find((c) => c.name === "ColorScheme")!.modes, modes);
+}
+
+// 26. Saved settings (section 6.3): each file keeps its own, and a file with no tokens starts fresh.
+{
+  const mine = { numberOfThemes: 1, themes: [themeA] };
+  const older = { numberOfThemes: 2, themes: [themeA, themeB] };
+  assert.equal(fileHasTokens([]), false);
+  assert.equal(fileHasTokens(["Brand kit", undefined]), false); // variables of something else are not tokens
+  for (const name of ["Primitives", "Theme", "Appearance", "ColorScheme"]) assert.equal(fileHasTokens(["Other", name]), true);
+  // All tokens deleted, or a new file: defaults, whatever was saved before.
+  assert.equal(inputsToShow(false, mine, older), null);
+  assert.equal(inputsToShow(false, null, older), null);
+  // Tokens: this file's settings first, then what an earlier version kept, then defaults.
+  assert.equal(inputsToShow(true, mine, older), mine);
+  assert.equal(inputsToShow(true, null, older), older);
+  assert.equal(inputsToShow(true, null, null), null);
+  assert.deepEqual(readSavedInputs(JSON.stringify(mine)), mine);
+  assert.equal(readSavedInputs(""), null);
+  assert.equal(readSavedInputs("{not json"), null);
 }
 
 console.log("All logic tests passed.");

@@ -9,11 +9,11 @@ This plugin creates the color, size, and typography variables of a design system
 | Collection | What it holds | Modes |
 |---|---|---|
 | Primitives | Raw values: 13-step color palettes, sizes, font families and weights, opacities | One (Default) |
-| Theme | Roles such as `color/brand/500`, linked to Primitives | One per theme (Theme A, Theme B, …) |
+| Theme | Roles such as `color/brand/500`, linked to Primitives | One per theme (Main theme, Custom theme, …) |
 | Appearance | What designs use, such as `color/bg/brand/bold`, linked to Theme tokens | Light, Dark, and any extra appearances |
 | ColorScheme | The same colors with Android (Jetpack Compose) names, such as `primary` | Same as Appearance |
 
-The plugin also draws color tables on a page called "Color tokens", and exports the tokens for developers (JSON, or Kotlin for Android).
+The plugin also draws color tables and ColorScheme color maps on a page called "Color tokens", and exports the tokens for developers (JSON, or Kotlin for Android).
 
 All the rules live in `spec/`. The plugin follows them exactly.
 
@@ -27,7 +27,7 @@ tokens-plugin/
 ├── manifest.json        ← tells Figma the plugin's name and files
 ├── ui.html              ← the plugin window (the form and the report)
 ├── code.js              ← the built plugin that Figma runs (made by "npm run build")
-├── ui-assets/           ← icons used in the window, exported from Figma
+├── ui-assets/           ← icons used in the window, and the font embedded in it (fonts/, with its license)
 ├── spec/                ← the rules
 │   ├── foundations-spec.md   ← the full written specification
 │   ├── tokens.json           ← the same rules in machine-readable form (wins if the two disagree)
@@ -39,6 +39,9 @@ tokens-plugin/
 │   ├── foundations.ts   ← turns the form's inputs into the full plan of variables and checks
 │   ├── validate.ts      ← checks HEX values
 │   ├── tables.ts        ← describes the color tables
+│   ├── color-maps.ts    ← describes the ColorScheme color maps
+│   ├── saved-inputs.ts  ← decides which settings the form opens with
+│   ├── previews.ts      ← works out the real colors of each appearance card in the window
 │   ├── export.ts        ← builds the developer exports (JSON and Kotlin)
 │   ├── figma.ts         ← the Figma side: talks to the window and writes the variables
 │   ├── modes-figma.ts   ← finds, renames, and adds modes in the file
@@ -96,20 +99,24 @@ After a rebuild, close and run the plugin again to load the new `code.js`.
 
 ## 6. Use the plugin
 
-**Themes.** Each theme has a brand color, status colors (success, danger, warning, info), optional added colors, and a font family with its weights. Each color row shows the palette the plugin will make, as you type. A note appears under a color when its palette looks almost the same as another one, or when it will look quite different from the color picked.
+**Themes.** Each theme has a brand color, a neutral color (only its hue is used, to tint the grays), status colors (success, danger, warning, info), optional added colors, and a font family with its weights. Each color row shows the palette the plugin will make, as you type. A note appears under a color when its palette looks almost the same as another one, or when it will look quite different from the color picked.
 
-**Appearances.** Light is always there. Dark can be removed. You can add appearances based on Light or Dark, each with its own canvas color.
+**Names.** The first theme is called Main theme. A theme or appearance you add without typing a name is called Custom theme or Custom appearance, then Custom theme 2, Custom appearance 2, and so on.
+
+**Appearances.** Light is always there. Dark can be removed. You can add appearances based on Light or Dark. Each one has its own canvas color and text fill (how strong the bolder text and icons are). Each card is painted in its real colors, taken from the first theme, and shows a preview of its text.
 
 **Buttons:**
 
 | Button | What it does |
 |---|---|
 | Check only | Builds everything and runs every check. Writes nothing. |
-| Create variables | Runs the checks. If there is no error, creates or updates the variables and redraws the color tables. |
-| Update tables | Redraws the color tables from the variables in the file, including changes made by hand. |
+| Generate tokens | Runs the checks. If there is no error, creates or updates the variables and redraws the color tables and color maps. |
+| Update tables | Redraws the color tables and color maps from the variables in the file, including changes made by hand. |
 | Export | Exports Appearance or ColorScheme tokens as JSON, or ColorScheme tokens as Kotlin. Reads only. |
 
 The report under the form lists every error and warning. If there is an error, nothing is written.
+
+**Your settings** are saved in the file when you press Generate tokens, so each file keeps its own. If the file has no tokens (a new file, or you deleted them all), the form opens with the default settings. Changes you did not generate are not kept when you close the plugin.
 
 **Running it again** in a file that already has the variables updates them in place. Nothing is deleted. Variables and modes that the plugin no longer makes are listed as `orphan_variable` and `orphan_mode`, and left alone. Values you changed by hand on the plugin's variables are set back to the plan.
 
