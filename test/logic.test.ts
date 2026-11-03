@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { hexToOklch, oklchToHex, contrast, inGamut, maxChroma } from "../src/color.ts";
 import { CHROMA_MULT, buildPalette, STEPS, CONTRAST_PAIRS, pairBackgroundHex, buildHuePalette, closestStep, yellowFactor,
-  CHROMA_CEILING, REFERENCE_C400, YELLOW_BOOST, SHIFT_NOTICE_DISTANCE, placeAnchor, TARGET_L, RESPACE_FROM_500_TO_400,
+  SATURATION_FACTORS, DEFAULT_SATURATION, CHROMA_CEILING, REFERENCE_C400, YELLOW_BOOST, SHIFT_NOTICE_DISTANCE, placeAnchor, TARGET_L, RESPACE_FROM_500_TO_400,
   buildNeutralPalette, NEUTRAL_CHROMA, NEUTRAL_FADE, GRAY_HEX, neutralOf } from "../src/palette.ts";
 import { validateHex } from "../src/validate.ts";
 import { assignPaletteNames, hslHue, hueDistance, paletteRenames } from "../src/naming.ts";
@@ -1125,6 +1125,42 @@ assert.ok(spec.validation.checks.warning.includes("close_to_brand"));
   assert.equal(notice.length, 1);
   assert.equal(notice[0].severity, "warning");
   assert.match(notice[0].message, /the danger color/);
+}
+
+// 29. Saturation (sections 5.1 and 5.5): a level per theme, for status and custom palettes only.
+assert.deepEqual(SATURATION_FACTORS, Object.fromEntries(Object.entries(spec.primitives.hueOnlyPalette.saturationFactors).map(([k, v]) => [Number(k), v])));
+assert.equal(spec.inputs.saturation.default, DEFAULT_SATURATION);
+assert.equal(SATURATION_FACTORS[DEFAULT_SATURATION], 1);
+{
+  const status = { success: { hex: "#48A13F" }, danger: { hex: "#E74B3C" }, warning: { hex: "#CE6924" }, info: { hex: "#4785E6" } };
+  const theme = (level?: number, extra = {}) => ({ ...themeA, ...status, brand: { hex: "#2F6FED" }, neutral: { hex: "#4785E6" }, saturation: level, ...extra });
+  const named = (t: ThemeInput) => namePalettes(spec, { numberOfThemes: 1, themes: [t] });
+  const stepsOf = (n: ReturnType<typeof namePalettes>, role: string) => n.build().find((p) => p.name === n.paletteOf(0, role))!.steps;
+  const hexes = (steps: Record<number, { hex: string }>) => STEPS.map((s) => steps[s].hex);
+  // Level 5 is the usual palette, and a missing level is level 5.
+  assert.deepEqual(hexes(buildHuePalette("x", "#E74B3C", [GRAY_HEX], 5).steps), hexes(buildHuePalette("x", "#E74B3C").steps));
+  assert.deepEqual(hexes(stepsOf(named(theme(undefined)), "danger")), hexes(stepsOf(named(theme(5)), "danger")));
+  // Lower levels are softer and higher levels stronger, with the ceilings scaled too.
+  const c400 = (level: number) => buildHuePalette("x", "#E74B3C", [GRAY_HEX], level).steps[400].lch.C;
+  assert.ok(c400(1) < c400(5) && c400(5) < c400(10));
+  assert.ok(Math.abs(c400(1) - REFERENCE_C400 * 0.28) < 1e-9);
+  assert.ok(buildHuePalette("x", "#E74B3C", [GRAY_HEX], 10).steps[400].lch.C > CHROMA_CEILING[400]);
+  // Brand and neutral palettes never change.
+  for (const level of [1, 10]) {
+    assert.deepEqual(hexes(stepsOf(named(theme(level)), "brand")), hexes(stepsOf(named(theme(5)), "brand")));
+    assert.deepEqual(named(theme(level)).neutralStepsOf(0), named(theme(5)).neutralStepsOf(0));
+  }
+  // A status color with the brand's hue shares its palette at level 5, and gets its own at any other level.
+  const same = { danger: { hex: "#2F6FED" } };
+  assert.equal(named(theme(5, same)).paletteOf(0, "danger"), named(theme(5, same)).paletteOf(0, "brand"));
+  assert.notEqual(named(theme(8, same)).paletteOf(0, "danger"), named(theme(8, same)).paletteOf(0, "brand"));
+  // Two themes with the same hue at different levels do not share; at the same level they do.
+  const two = (a: number, b: number) => namePalettes(spec, { numberOfThemes: 2, themes: [theme(a), { ...theme(b), brand: { hex: "#2A9D8F" } }] });
+  assert.equal(two(3, 3).paletteOf(0, "danger"), two(3, 3).paletteOf(1, "danger"));
+  assert.notEqual(two(3, 8).paletteOf(0, "danger"), two(3, 8).paletteOf(1, "danger"));
+  // Every level generates, with the minimums met. Other values stop generation.
+  for (const level of spec.inputs.saturation.allowed) assert.deepEqual(checksOf({ numberOfThemes: 1, themes: [theme(level)] }), [], `level ${level}`);
+  for (const level of [0, 11, 2.5]) assert.deepEqual(checksOf({ numberOfThemes: 1, themes: [theme(level)] }), ["missing_input"], `level ${level}`);
 }
 
 console.log("All logic tests passed.");

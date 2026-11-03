@@ -3,17 +3,19 @@
 // Pure functions, no Figma API, so it can be tested with test/logic.test.ts.
 
 import { hexToRgb255 } from "./color.ts";
+import { DEFAULT_SATURATION } from "./palette.ts";
 
 // One color the user picked. source identifies it across runs (theme key + role), label is for messages.
 // exact is true for a brand color: its HEX must stay in its palette, so it never joins another color's palette.
-export type NamedColorInput = { source: string; hex: string; label: string; exact?: boolean };
+// saturation is the slider level of a status or custom color (5 when left out).
+export type NamedColorInput = { source: string; hex: string; label: string; exact?: boolean; saturation?: number };
 
 // What a color ends up using. palette is "Gray" for a color with no hue.
 export type ColorAssignment = { source: string; hex: string; palette: string };
 
 // A generated palette: its name, the color that shapes it, and every color that uses it.
 // exact: the palette is shaped by a brand color and keeps its HEX (section 5.2); otherwise only the hue is used (5.3).
-export type NamedPalette = { name: string; hex: string; hue: number; source: string; label: string; sources: string[]; exact: boolean };
+export type NamedPalette = { name: string; hex: string; hue: number; source: string; label: string; sources: string[]; exact: boolean; saturation: number };
 
 // A notice about two palettes that will look almost the same (similar_palette).
 // difference is the largest step difference between them; message is for the report;
@@ -75,11 +77,13 @@ export function assignPaletteNames(naming: any, achromaticPalette: string, color
       continue;
     }
     // 2. Same hue (within 1°) as a palette already named: share it. The closest one wins.
-    // A brand color only shares a palette made by a brand color with the same HEX.
+    // A brand color only shares a palette made by a brand color with the same HEX. Colors at different saturation
+    // levels look different, so they do not share, and a brand palette is shared only at the usual level.
+    const level = c.saturation ?? DEFAULT_SATURATION;
     const same = c.exact
       ? palettes.find((p) => p.exact && p.hex === hex)
       : palettes
-        .filter((p) => hueDistance(p.hue, hue) <= shareWithin)
+        .filter((p) => hueDistance(p.hue, hue) <= shareWithin && (p.exact ? level === DEFAULT_SATURATION : p.saturation === level))
         .sort((a, b) => hueDistance(a.hue, hue) - hueDistance(b.hue, hue))[0];
     if (same) {
       same.sources.push(c.source);
@@ -102,7 +106,7 @@ export function assignPaletteNames(naming: any, achromaticPalette: string, color
     }
     const name = names[index];
     taken.add(name);
-    palettes.push({ name, hex, hue, source: c.source, label: c.label, sources: [c.source], exact: !!c.exact });
+    palettes.push({ name, hex, hue, source: c.source, label: c.label, sources: [c.source], exact: !!c.exact, saturation: level });
     assignments.push({ source: c.source, hex, palette: name });
   }
   return { assignments, palettes, problems };

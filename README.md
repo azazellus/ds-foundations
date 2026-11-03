@@ -42,7 +42,7 @@ A theme is one look for your product, with its own colors and fonts. Each theme 
 - any other colors you want to add
 - a font family with its weights
 
-Each color row shows the palette the plugin will make, as you type. A note appears under a color when its palette looks almost the same as another one, when its hue is close to the brand color, or when it will look quite different from the color you picked. The brand color never gets a closeness note, because it has priority.
+The Saturation slider makes the status colors and any added colors softer or stronger, from level 1 to 10. It does not change the brand or neutral colors. Each color row shows the palette the plugin will make, as you type. A note appears under a color when its palette looks almost the same as another one, when its hue is close to the brand color, or when it will look quite different from the color you picked. The brand color never gets a closeness note, because it has priority.
 
 ### 2. Set up your color modes
 

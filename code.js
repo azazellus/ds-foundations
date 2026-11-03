@@ -22,7 +22,7 @@
 
   // spec/tokens.json
   var tokens_default = {
-    version: "1.22.0",
+    version: "1.23.0",
     description: "Source of truth for the design foundations specification (foundations-spec.md). Palette HEX values are user inputs and palette names come from primitives.paletteNaming; this file defines the rules, inputs, Theme mappings, alpha tokens, Appearance mappings, and ColorScheme mappings.",
     collections: {
       Primitives: { modes: ["Default"] },
@@ -150,8 +150,9 @@
         steps: { "300": 0.14, "400": 0.18 }
       },
       hueOnlyPalette: {
-        description: "Status and custom palettes take only the hue of the supplied HEX (section 5.3). They have no anchor step. Each step uses its target L (targetL) and the chroma referenceChroma400 \xD7 chromaMultiplier[step] \xD7 the yellow factor, then chromaCeiling, minChroma, the gamut clamp and the contrast adjustment.",
+        description: "Status and custom palettes take only the hue of the supplied HEX (section 5.3). They have no anchor step. Each step uses its target L (targetL) and the chroma referenceChroma400 \xD7 chromaMultiplier[step] \xD7 the yellow factor \xD7 the saturation factor, then chromaCeiling \xD7 the saturation factor, minChroma, the gamut clamp and the contrast adjustment.",
         referenceChroma400: 0.16,
+        saturationFactors: { "1": 0.28, "2": 0.46, "3": 0.64, "4": 0.82, "5": 1, "6": 1.16, "7": 1.32, "8": 1.48, "9": 1.64, "10": 1.8 },
         yellowBoost: {
           description: "Yellow hues can show much more chroma at light steps than other hues. The yellow factor is 1 + (factor - 1) \xD7 w, where w is 1 for an OKLCH hue from fullFrom to fullTo, falls linearly to 0 at zeroBelow and zeroAbove, and is 0 outside them.",
           factor: 1.6,
@@ -257,7 +258,7 @@
         achromatic: { rule: "A HEX whose R, G and B are equal (white, black, pure grays) has no hue.", palette: "Gray", result: "The role uses the fixed neutral palette (neutralPalette). No palette is generated for it." },
         order: "Colors are named theme by theme, in theme order. Within a theme: brand, then success, danger, warning, info (the status roles in use), then the custom roles in their order.",
         shareWithinDegrees: 1,
-        shareRule: "A status or custom color whose hue is within shareWithinDegrees of a palette already named (on the hue circle) uses that palette, in any theme. The palette is generated from the first color that made it. A brand color keeps its exact HEX (section 5.2), so it only shares a palette made by a brand color with the same HEX; otherwise it makes its own palette.",
+        shareRule: "A status or custom color whose hue is within shareWithinDegrees of a palette already named (on the hue circle) uses that palette, in any theme. The palette is generated from the first color that made it. Colors share only at the same saturation level, and a palette made by a brand color is shared only at level 5. A brand color keeps its exact HEX (section 5.2), so it only shares a palette made by a brand color with the same HEX; otherwise it makes its own palette.",
         freeNameRule: "Otherwise the color makes a new palette named by its hue's range. When that name is already taken, it takes the nearest free name on the circle (counted in names). When the two nearest free names are equally far, the one whose center is closer to 240\xB0 (the colder side) is used. When all names are taken, generation stops as missing_input.",
         similarMaxStepDifference: 0.03,
         similarRule: "After the palettes are generated, each palette is compared with every palette made before it in the naming order. When no step differs from the same step of an earlier palette by more than similarMaxStepDifference (OKLab distance, the measure of hueOnlyPalette.shiftNotice), it is reported as similar_palette (warning) against the closest such palette: the two palettes look almost the same. Hues are not compared, because HSL hues are uneven around the circle. The plugin form shows the same notice next to the color. A brand has priority over the other colors, so a palette made by a brand color is never reported.",
@@ -306,6 +307,14 @@
         type: "hex",
         name: "brand",
         paletteName: "primitives.paletteNaming"
+      },
+      saturation: {
+        scope: "theme",
+        requirement: "optional",
+        type: "level",
+        allowed: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        default: 5,
+        rule: "Sets the chroma of the theme's status and custom palettes (primitives.hueOnlyPalette.saturationFactors). Brand and neutral palettes do not change."
       },
       neutralColor: {
         scope: "theme",
@@ -1092,6 +1101,8 @@
   var MIN_CHROMA = 0.01;
   var CHROMA_CEILING = { 300: 0.14, 400: 0.18 };
   var REFERENCE_C400 = 0.16;
+  var SATURATION_FACTORS = { 1: 0.28, 2: 0.46, 3: 0.64, 4: 0.82, 5: 1, 6: 1.16, 7: 1.32, 8: 1.48, 9: 1.64, 10: 1.8 };
+  var DEFAULT_SATURATION = 5;
   var YELLOW_BOOST = { factor: 1.6, zeroBelow: 65, fullFrom: 85, fullTo: 105, zeroAbove: 125 };
   var SHIFT_NOTICE_DISTANCE = 0.06;
   var MAX_ADJUSTMENTS = 50;
@@ -1160,9 +1171,9 @@
   function measure(p, pair) {
     return minContrast(p.steps[pair.text].hex, pairBackgrounds(p, pair));
   }
-  function curveChroma(C400, s) {
+  function curveChroma(C400, s, ceilingFactor = 1) {
     var _a;
-    return Math.max(Math.min(C400 * CHROMA_MULT[s], (_a = CHROMA_CEILING[s]) != null ? _a : Infinity), MIN_CHROMA);
+    return Math.max(Math.min(C400 * CHROMA_MULT[s], ((_a = CHROMA_CEILING[s]) != null ? _a : Infinity) * ceilingFactor), MIN_CHROMA);
   }
   function commit(p, s, cand) {
     const clamped = clampChroma(cand);
@@ -1176,7 +1187,7 @@
     p.steps[s] = { lch: clamped, hex: oklchToHex(clamped) };
   }
   function fixPair(p, pair, threshold, allowChroma) {
-    var _a;
+    var _a, _b;
     const s = pair.text;
     if (s === p.anchor) return false;
     const cur = p.steps[s].lch;
@@ -1197,7 +1208,7 @@
       }
     }
     if (allowChroma) {
-      const maxC = Math.min(maxChroma(cur.L, cur.H), (_a = CHROMA_CEILING[s]) != null ? _a : Infinity);
+      const maxC = Math.min(maxChroma(cur.L, cur.H), ((_a = CHROMA_CEILING[s]) != null ? _a : Infinity) * ((_b = p.ceilingFactor) != null ? _b : 1));
       const order = [];
       for (let C2 = r3(cur.C); C2 >= MIN_CHROMA - 1e-9; C2 = r3(C2 - SEARCH_STEP)) order.push(C2);
       for (let C2 = r3(cur.C + SEARCH_STEP); C2 <= maxC; C2 = r3(C2 + SEARCH_STEP)) order.push(C2);
@@ -1317,12 +1328,14 @@
     const w = Math.max(0, Math.min(1, (H - y.zeroBelow) / (y.fullFrom - y.zeroBelow), (y.zeroAbove - H) / (y.zeroAbove - y.fullTo)));
     return 1 + (y.factor - 1) * w;
   }
-  function buildHuePalette(name, hex, neutrals = [GRAY_HEX]) {
+  function buildHuePalette(name, hex, neutrals = [GRAY_HEX], saturation = DEFAULT_SATURATION) {
+    var _a;
     const H = r1(hexToOklch(hex).H);
-    const C400 = REFERENCE_C400 * yellowFactor(H);
-    const p = { name, anchor: -1, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
+    const factor = (_a = SATURATION_FACTORS[saturation]) != null ? _a : 1;
+    const C400 = REFERENCE_C400 * yellowFactor(H) * factor;
+    const p = { name, anchor: -1, ceilingFactor: factor, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
     for (const s of STEPS) {
-      commit(p, s, { L: TARGET_L[s], C: curveChroma(C400, s), H });
+      commit(p, s, { L: TARGET_L[s], C: curveChroma(C400, s, factor), H });
     }
     calibrate(p);
     return p;
@@ -1391,6 +1404,7 @@
     return Math.floor(hue / width + 0.5) % count;
   }
   function assignPaletteNames(naming, achromaticPalette, colors) {
+    var _a;
     const names = naming.names;
     const width = naming.rangeWidth;
     const shareWithin = naming.shareWithinDegrees;
@@ -1405,7 +1419,8 @@
         assignments.push({ source: c.source, hex, palette: achromaticPalette });
         continue;
       }
-      const same = c.exact ? palettes.find((p) => p.exact && p.hex === hex) : palettes.filter((p) => hueDistance(p.hue, hue) <= shareWithin).sort((a, b) => hueDistance(a.hue, hue) - hueDistance(b.hue, hue))[0];
+      const level = (_a = c.saturation) != null ? _a : DEFAULT_SATURATION;
+      const same = c.exact ? palettes.find((p) => p.exact && p.hex === hex) : palettes.filter((p) => hueDistance(p.hue, hue) <= shareWithin && (p.exact ? level === DEFAULT_SATURATION : p.saturation === level)).sort((a, b) => hueDistance(a.hue, hue) - hueDistance(b.hue, hue))[0];
       if (same) {
         same.sources.push(c.source);
         assignments.push({ source: c.source, hex, palette: same.name });
@@ -1423,7 +1438,7 @@
       }
       const name = names[index];
       taken.add(name);
-      palettes.push({ name, hex, hue, source: c.source, label: c.label, sources: [c.source], exact: !!c.exact });
+      palettes.push({ name, hex, hue, source: c.source, label: c.label, sources: [c.source], exact: !!c.exact, saturation: level });
       assignments.push({ source: c.source, hex, palette: name });
     }
     return { assignments, palettes, problems };
@@ -1559,8 +1574,9 @@
           hex,
           source: `${((_i = inputs.themeKeys) == null ? void 0 : _i[i]) || modes[i]}|${role}`,
           label: `the ${role} color of ${modes[i]}`,
-          exact: role === "brand"
+          exact: role === "brand",
           // only the brand keeps its HEX (section 5.2)
+          saturation: role === "brand" ? void 0 : t == null ? void 0 : t.saturation
         });
       }
     }
@@ -1625,7 +1641,7 @@
       const c = colors.find((x) => x.theme === theme && x.role === role);
       return c ? (_a2 = result.assignments.find((a) => a.source === c.source)) == null ? void 0 : _a2.palette : void 0;
     };
-    const built = result.palettes.map((p) => p.exact ? buildPalette(p.name, p.hex, neutralsFor(p)) : buildHuePalette(p.name, p.hex, neutralsFor(p)));
+    const built = result.palettes.map((p) => p.exact ? buildPalette(p.name, p.hex, neutralsFor(p)) : buildHuePalette(p.name, p.hex, neutralsFor(p), p.saturation));
     const byName = (name) => built.find((p) => p.name === name);
     const build = () => built;
     const similar = similarPalettes(
@@ -1691,6 +1707,13 @@
         );
       } else if (themeModes.indexOf(name) !== i) {
         add("missing_input", "Theme", `theme ${i + 1} name`, "Global", "unique theme name", name, `"${name}" is used by more than one theme.`);
+      }
+    });
+    themeModes.forEach((name, i) => {
+      var _a2;
+      const level = (_a2 = inputs.themes[i]) == null ? void 0 : _a2.saturation;
+      if (level !== void 0 && !spec.inputs.saturation.allowed.includes(level)) {
+        add("missing_input", "Theme", "saturation", name, spec.inputs.saturation.allowed.join(", "), String(level), `Saturation must be a whole level from 1 to 10.`);
       }
     });
     const checkHue = (h, label, mode) => {

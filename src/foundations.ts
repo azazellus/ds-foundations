@@ -28,6 +28,7 @@ export type ThemeInput = {
   warning?: HueInput;
   info?: HueInput;
   custom?: Record<string, HueInput>; // one color per custom role (Inputs.customRoles)
+  saturation?: number; // the slider for the status and custom colors of this theme: 1 to 10, 5 when omitted (section 5.1)
   fontFamily: string;
   // Selected styles of the font family, with the font's own names ("Semi Bold"). When empty, the
   // available styles that match a weight slot are used (section 5.1).
@@ -246,6 +247,7 @@ export function orderedColors(spec: Spec, inputs: Inputs): (NamedColorInput & { 
       out.push({
         theme: i, role, hex, source: `${inputs.themeKeys?.[i] || modes[i]}|${role}`, label: `the ${role} color of ${modes[i]}`,
         exact: role === "brand", // only the brand keeps its HEX (section 5.2)
+        saturation: role === "brand" ? undefined : t?.saturation,
       });
     }
   }
@@ -308,7 +310,7 @@ export function namePalettes(spec: Spec, inputs: Inputs) {
   };
   // Every palette: brand palettes keep their HEX, the others use only the hue (sections 5.2, 5.3).
   const built: Palette[] = result.palettes.map((p) =>
-    (p.exact ? buildPalette(p.name, p.hex, neutralsFor(p)) : buildHuePalette(p.name, p.hex, neutralsFor(p))));
+    (p.exact ? buildPalette(p.name, p.hex, neutralsFor(p)) : buildHuePalette(p.name, p.hex, neutralsFor(p), p.saturation)));
   const byName = (name: string): Palette => built.find((p) => p.name === name)!;
   const build = (): Palette[] => built;
   // Palettes that look almost the same as an earlier one (section 1.1.8 rule 4), with the theme index
@@ -372,6 +374,14 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
         `"${name}" is not a valid theme name.`);
     } else if (themeModes.indexOf(name) !== i) {
       add("missing_input", "Theme", `theme ${i + 1} name`, "Global", "unique theme name", name, `"${name}" is used by more than one theme.`);
+    }
+  });
+
+  // The saturation slider of each theme, when given, is a whole level from 1 to 10.
+  themeModes.forEach((name, i) => {
+    const level = inputs.themes[i]?.saturation;
+    if (level !== undefined && !spec.inputs.saturation.allowed.includes(level)) {
+      add("missing_input", "Theme", "saturation", name, spec.inputs.saturation.allowed.join(", "), String(level), `Saturation must be a whole level from 1 to 10.`);
     }
   });
 

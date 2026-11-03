@@ -191,7 +191,7 @@ There are 60 names, one every 6°. Each name covers its center ±3°: from 3° b
 Rules, applied to the colors one at a time in a fixed order: theme by theme, and within a theme brand, then the status roles in use (success, danger, warning, info), then the custom roles.
 
 1. **No hue.** A HEX whose R, G, and B are equal (white, black, pure grays) uses the fixed Color/Gray palette. No palette is generated for it.
-2. **Same hue.** A status or custom color whose hue is within 1° of a palette already named uses that palette, in any theme. For example, two shades of the same green share one palette. The palette is generated from the first color that made it. A brand color keeps its exact HEX (section 5.2), so it only shares a palette made by a brand color with the same HEX; otherwise it makes its own palette (rules 3 and 4).
+2. **Same hue.** A status or custom color whose hue is within 1° of a palette already named uses that palette, in any theme. For example, two shades of the same green share one palette. Colors share only at the same saturation level (section 5.1), and a palette made by a brand color is shared only at level 5. The palette is generated from the first color that made it. A brand color keeps its exact HEX (section 5.2), so it only shares a palette made by a brand color with the same HEX; otherwise it makes its own palette (rules 3 and 4).
 3. **New palette.** Otherwise the color makes a new palette, named after its hue's range. If that name is already taken, it takes the nearest free name in the list. If the two nearest free names are equally far, the one closer to 240° (the colder side) wins. If all 60 names are taken, generation stops as `missing_input`.
 4. **Similar palettes.** After the palettes are generated, each one is compared with the palettes made before it. When no step differs from the same step of an earlier palette by more than 0.03 (OKLab distance, as in section 5.3 step 5), it is reported as `similar_palette` (warning), because the two palettes look almost the same. The finished palettes are compared, not the hues: HSL hues are uneven around the circle, so two colors far apart in HSL can still make almost the same palette (for example `#FF0026` and `#BD4242` as status or custom colors, 8.9° apart). The plugin form shows the same notice next to the color before anything is generated. A brand color has priority over the other colors, so a palette made by a brand color is never reported.
 5. **Renamed palettes.** The plugin remembers which color (theme and role) made each palette. When a later run gives that color's palette a new name, and no palette of the new run uses the old name, the plugin renames the old palette's variables in place: `Color/Old/{step}` becomes `Color/New/{step}`. Layers and aliases that use them are kept. If a variable with the new name already exists, the old palette is not renamed and is reported as `orphan_variable`. Nothing is deleted.
@@ -864,6 +864,7 @@ The plugin asks for each input below. Every palette input is a HEX value. The pl
 | Neutral color | Per theme | Optional | HEX (only its hue is used) | #808080 (plain gray: Color/Gray) |
 | Status roles | Global | Optional | Any of: success, danger, warning, info | All four |
 | Status colors (success, danger, warning, info) | Per theme | Mandatory for each status role in use | HEX, each | None |
+| Saturation | Per theme | Optional | A level from 1 to 10, for the theme's status and custom palettes. Brand and neutral palettes do not change | 5 |
 | Font families | Per theme | Mandatory | String | None |
 | Font weights | Per theme | Optional | Any of the non-italic styles of the theme's font family, with the font's own names | The styles that match a weight slot (section 2.2) |
 | Custom roles | Global | Optional | Zero or more role names, lowercase letters | None added |
@@ -1038,8 +1039,14 @@ This procedure applies to every palette and uses one order everywhere:
 
 1. **Reference chroma.** `C_400` is fixed at 0.16 for every status and custom palette. The supplied color's chroma is not used.
 2. **Yellow boost.** Yellow hues can show much more chroma at light steps than other hues. Multiply `C_400` by `1 + 0.6 × w`, where `w` depends on the palette's OKLCH hue: 1 from 85° to 105°, falling linearly to 0 at 65° and at 125°, and 0 outside. For example, a hue of 95° uses 0.256 and a hue of 75° uses 0.208.
-3. **Generate chroma.** For each step, `C_tone = C_400 × m_tone`, with the multipliers above.
-4. Then apply the chroma ceiling, the minimum chroma, and the gamut clamp, as for brand palettes (steps 4 to 6 above).
+3. **Saturation.** Multiply `C_400` by the factor of the theme's saturation level (section 5.1). The chroma ceilings below are multiplied by the same factor.
+
+| Level | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Factor | 0.28 | 0.46 | 0.64 | 0.82 | 1 | 1.16 | 1.32 | 1.48 | 1.64 | 1.8 |
+
+4. **Generate chroma.** For each step, `C_tone = C_400 × m_tone`, with the multipliers above.
+5. Then apply the chroma ceiling, the minimum chroma, and the gamut clamp, as for brand palettes (steps 4 to 6 above).
 
 The values are in `tokens.json`, under `primitives.hueOnlyPalette` and `primitives.chromaCeiling`.
 

@@ -106,10 +106,23 @@
   .section h2 { margin: 0; padding: 4px 0; font: 700 16px/20px var(--sans); }
   .rows { display: flex; flex-direction: column; gap: 4px; }
   .colors .rows { align-self: stretch; }
+  .section.colors.main { gap: 16px; }
 
   /* Colors header: the title over the label and HEX columns, then the palette step numbers. */
   .colors-head { align-self: stretch; display: flex; align-items: baseline; gap: 8px; }
   .colors-head h2 { width: 248px; flex-shrink: 0; }
+
+  /* Saturation slider, in the label and HEX columns: a native range input (invisible) under a thumb that shows the level. */
+  .colors-head.with-slider { align-items: center; }
+  .saturation { width: 248px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; }
+  .saturation .title { font-size: 12px; line-height: 20px; font-weight: 700; white-space: nowrap; }
+  .slider { position: relative; flex: 1 1 0; min-width: 0; height: 18px; }
+  .slider::before { content: ""; position: absolute; left: 0; right: 0; top: 8px; height: 2px; border-radius: 8px; background: #e8e9f2; }
+  .slider input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; -webkit-appearance: none; appearance: none; }
+  .slider input::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 18px; }
+  .slider .thumb { position: absolute; top: 2px; left: calc((100% - 12px) * var(--position)); width: 12px; height: 14px; display: flex; align-items: center; justify-content: center;
+    border-radius: 20px; background: var(--action); color: #fff; font-size: 8px; line-height: 10px; font-weight: 600; pointer-events: none; }
+  .slider input:focus-visible + .thumb { outline: 2px solid var(--action); outline-offset: 1px; }
   /* Same width as the palette strips below, one number per tile. */
   .step-labels { flex: 1 1 0; min-width: 0; display: flex; text-align: center; font-size: 12px; line-height: 16px; color: var(--step-label); }
   .step-labels span { flex: 1 0 0; }
@@ -586,8 +599,17 @@
     });
     panel.append(panel.head);
     panel.insertAdjacentHTML("beforeend", `${SEPARATOR}
-      <div class="section colors">
-        <div class="colors-head"><h2>Colors</h2><div class="step-labels">${STEPS.map((s) => `<span>${s}</span>`).join("")}</div></div>
+      <div class="section colors main">
+        <div class="colors-head"><h2>Main colors</h2><div class="step-labels">${STEPS.map((s) => `<span>${s}</span>`).join("")}</div></div>
+        <div class="rows"></div>
+      </div>
+      ${SEPARATOR}
+      <div class="section colors other">
+        <h2>Other colors</h2>
+        <div class="colors-head with-slider">
+          <div class="saturation"><span class="title">Saturation</span><div class="slider"><input type="range" min="1" max="10" step="1" aria-label="Saturation"><span class="thumb"></span></div></div>
+          <div class="step-labels">${STEPS.map((s) => `<span>${s}</span>`).join("")}</div>
+        </div>
         <div class="rows"></div>
         <button type="button" class="pill add-color">${icon("add", 20)}Add color</button>
       </div>
@@ -597,8 +619,10 @@
           <div class="picker font"><span class="text"></span>${icon("arrow", 16)}<select aria-label="Font family"></select></div></div>
         <div class="col weight-col"><h2>Font weights</h2><div class="chips"></div></div>
       </div>`);
-    const rows = panel.querySelector(".colors .rows");
+    const mainRows = panel.querySelector(".colors.main .rows");
+    const otherRows = panel.querySelector(".colors.other .rows");
     panel.colors = {};
+    setupSaturation(panel, saved?.saturation ?? 5);
 
     // Brand and status rows. The status checkboxes are shared: ticking one in any theme ticks it in all.
     const ticked = statusRoles();
@@ -612,7 +636,7 @@
       const fields = colorFields(saved?.colors?.[role] ?? (role === "brand" ? EMPTY_COLOR : role === "neutral" ? NEUTRAL_DEFAULT : STATUS_DEFAULTS[role]));
       row.append(fields, paletteStrip());
       panel.colors[role] = fields;
-      rows.append(row);
+      (STATUS.includes(role) ? otherRows : mainRows).append(row);
     }
     for (const cb of panel.querySelectorAll(".status-cb")) cb.onchange = () => setStatusRole(cb.value, cb.checked);
     panel.querySelector(".add-color").onclick = () => addCustomColor(undefined, undefined, panel);
@@ -627,6 +651,20 @@
     applyStatusRoles();
     refreshAddTheme();
     return panel;
+  }
+
+  // The saturation slider: one level per theme, for its status and custom colors. The thumb follows the input.
+  function setupSaturation(panel, level) {
+    const input = panel.querySelector(".slider input");
+    const thumb = panel.querySelector(".slider .thumb");
+    const show = () => {
+      thumb.textContent = input.value;
+      thumb.style.setProperty("--position", (input.value - 1) / 9);
+    };
+    input.value = level;
+    input.addEventListener("input", show);
+    panel.saturation = () => Number(input.value);
+    show();
   }
 
   // The font dropdown lists the installed families; the weight chips list that family's styles.
@@ -698,7 +736,7 @@
     row.querySelector("button").onclick = () => removeCustomColor(id);
     const fields = colorFields(value ?? EMPTY_COLOR);
     row.append(fields, paletteStrip());
-    panel.querySelector(".colors .rows").append(row);
+    panel.querySelector(".colors.other .rows").append(row);
   }
   const roleOf = (id) => themesBox.querySelector(`[data-custom="${id}"] .role-field`)?.value.trim() ?? "";
   // Copies the role name typed in one theme to the same color row in every other theme.
@@ -901,7 +939,7 @@
     const roles = statusRoles();
     const customRoles = customIds.map(roleOf);
     const themes = panels.map((p) => {
-      const t = { brand: p.colors.brand.get(), neutral: p.colors.neutral.get(), fontFamily: p.fontFamily(), fontWeights: p.fontWeights() };
+      const t = { brand: p.colors.brand.get(), neutral: p.colors.neutral.get(), saturation: p.saturation(), fontFamily: p.fontFamily(), fontWeights: p.fontWeights() };
       for (const r of roles) t[r] = p.colors[r].get();
       t.custom = {};
       customIds.forEach((id, i) => { t.custom[customRoles[i]] = p.querySelector(`[data-custom="${id}"] .fields`).get(); });
@@ -945,6 +983,7 @@
         key: inputs.themeKeys?.[i],
         name: inputs.themeNames?.[i],
         colors,
+        saturation: t.saturation,
         fontFamily: t.fontFamily,
         fontWeights: t.fontWeights,
       });

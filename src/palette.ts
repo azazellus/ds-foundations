@@ -25,6 +25,9 @@ export const CHROMA_CEILING: Record<number, number> = { 300: 0.14, 400: 0.18 };
 
 // Section 5.5, status and custom palettes (tokens.json hueOnlyPalette).
 export const REFERENCE_C400 = 0.16;
+// The saturation slider, level -> how much of the usual chroma and ceilings the palette gets. Level 5 is the usual look.
+export const SATURATION_FACTORS: Record<number, number> = { 1: 0.28, 2: 0.46, 3: 0.64, 4: 0.82, 5: 1, 6: 1.16, 7: 1.32, 8: 1.48, 9: 1.64, 10: 1.8 };
+export const DEFAULT_SATURATION = 5;
 export const YELLOW_BOOST = { factor: 1.6, zeroBelow: 65, fullFrom: 85, fullTo: 105, zeroAbove: 125 };
 export const SHIFT_NOTICE_DISTANCE = 0.06;
 const MAX_ADJUSTMENTS = 50;
@@ -76,6 +79,8 @@ export type Palette = {
   anchor: number; // -1 for status and custom palettes, which have no anchor (section 5.3)
   // Steps re-spaced around a brand that moved one step (section 5.2 step 3). They do not chase targets.
   respaced?: number[];
+  // How much the saturation slider scales the chroma ceilings (section 5.5). Brand palettes do not have it.
+  ceilingFactor?: number;
   // The neutral palettes the "neutral" pairings are measured against: one per theme that uses this palette.
   neutrals: Neutral[];
   steps: Record<number, { lch: Lch; hex: string }>;
@@ -141,8 +146,8 @@ function measure(p: Palette, pair: ContrastPair): number {
 }
 
 // Section 5.5: a step's chroma on the curve, under its ceiling and above the minimum. The gamut clamp comes after.
-function curveChroma(C400: number, s: number): number {
-  return Math.max(Math.min(C400 * CHROMA_MULT[s], CHROMA_CEILING[s] ?? Infinity), MIN_CHROMA);
+function curveChroma(C400: number, s: number, ceilingFactor = 1): number {
+  return Math.max(Math.min(C400 * CHROMA_MULT[s], (CHROMA_CEILING[s] ?? Infinity) * ceilingFactor), MIN_CHROMA);
 }
 
 function commit(p: Palette, s: number, cand: Lch): void {
@@ -187,7 +192,7 @@ function fixPair(p: Palette, pair: ContrastPair, threshold: number, allowChroma:
   // Chroma search (step 3): descending to MIN_CHROMA, then ascending to the gamut maximum.
   if (allowChroma) {
     // Never above the step's ceiling (section 5.4 step 3).
-    const maxC = Math.min(maxChroma(cur.L, cur.H), CHROMA_CEILING[s] ?? Infinity);
+    const maxC = Math.min(maxChroma(cur.L, cur.H), (CHROMA_CEILING[s] ?? Infinity) * (p.ceilingFactor ?? 1));
     const order: number[] = [];
     for (let C = r3(cur.C); C >= MIN_CHROMA - 1e-9; C = r3(C - SEARCH_STEP)) order.push(C);
     for (let C = r3(cur.C + SEARCH_STEP); C <= maxC; C = r3(C + SEARCH_STEP)) order.push(C);
@@ -333,13 +338,14 @@ export function yellowFactor(H: number): number {
 }
 
 // Section 5.3. Builds a status or custom palette from the hue of a HEX only: target L for every step,
-// a fixed chroma curve (with the yellow boost), the ceilings, then the contrast adjustment. No anchor.
-export function buildHuePalette(name: string, hex: string, neutrals: Neutral[] = [GRAY_HEX]): Palette {
+// a fixed chroma curve (with the yellow boost and the saturation level), the ceilings, then the contrast adjustment. No anchor.
+export function buildHuePalette(name: string, hex: string, neutrals: Neutral[] = [GRAY_HEX], saturation = DEFAULT_SATURATION): Palette {
   const H = r1(hexToOklch(hex).H);
-  const C400 = REFERENCE_C400 * yellowFactor(H);
-  const p: Palette = { name, anchor: -1, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
+  const factor = SATURATION_FACTORS[saturation] ?? 1;
+  const C400 = REFERENCE_C400 * yellowFactor(H) * factor;
+  const p: Palette = { name, anchor: -1, ceilingFactor: factor, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
   for (const s of STEPS) {
-    commit(p, s, { L: TARGET_L[s], C: curveChroma(C400, s), H });
+    commit(p, s, { L: TARGET_L[s], C: curveChroma(C400, s, factor), H });
   }
   calibrate(p);
   return p;
