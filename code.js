@@ -22,7 +22,7 @@
 
   // spec/tokens.json
   var tokens_default = {
-    version: "1.21.0",
+    version: "1.22.0",
     description: "Source of truth for the design foundations specification (foundations-spec.md). Palette HEX values are user inputs and palette names come from primitives.paletteNaming; this file defines the rules, inputs, Theme mappings, alpha tokens, Appearance mappings, and ColorScheme mappings.",
     collections: {
       Primitives: { modes: ["Default"] },
@@ -139,10 +139,14 @@
         description: "Where the brand color sits in its palette (section 5.2 steps 1 and 3). The brand HEX is always kept exactly.",
         closest: "The brand sits at the step whose targetL is closest to the brand's OKLCH L. Ties go to the darker step.",
         move: "When the brand fails the contrastPairs minimum with a Gray background at that step, it moves one step away from that background, to a step with no pairing: dark text on a light background (500, 700) moves one step lighter (500 to 400, 700 to 600); light text on a dark background (300, 150) moves one step darker (300 to 400, 150 to 200).",
-        respace: "After a move, the brand is darker or lighter than its new step's targetL. Only its two neighbours on each side change; every other step keeps its targetL. Toward that shift, the first neighbour keeps the usual targetL gap from the brand, and the second goes halfway between it and the next step. On the other side, the two neighbours are spaced evenly between the brand and the next step. The re-spaced steps still meet every contrast minimum, but do not chase targets."
+        respace: "After a move, the brand is darker or lighter than its new step's targetL. Usually only its two neighbours on each side change; every other step keeps its targetL. Each re-spaced step takes its chroma from chromaMultiplier at its new L, with no chromaCeiling, so a gamut clamp at its targetL is not carried over. Toward that shift, the first neighbour keeps the usual targetL gap from the brand, and the second goes halfway between it and the next step. On the other side, the two neighbours are spaced evenly between the brand and the next step. A brand that moved from 500 to 400 uses respaceFrom500To400 on the other side instead. The re-spaced steps still meet every contrast minimum, but do not chase targets and report no contrast_target warning.",
+        respaceFrom500To400: {
+          description: "For a brand that moved from 500 to 400: each listed step sits at this fraction of the way from the brand's L to the targetL of step 100, which stays fixed.",
+          fractions: { "300": 0.325, "200": 0.619, "150": 0.845 }
+        }
       },
       chromaCeiling: {
-        description: "The highest OKLCH chroma a generated step may have, for every hue and every palette. Steps not listed have no ceiling. The brand anchor (the brand HEX itself) is exempt. The contrast adjustment (section 5.4) never raises chroma above it.",
+        description: "The highest OKLCH chroma a generated step may have, for every hue and every palette. Steps not listed have no ceiling. The brand anchor (the brand HEX itself) and the steps re-spaced around a moved anchor (brandAnchor.respace) are exempt. The contrast adjustment (section 5.4) never raises chroma above it.",
         steps: { "300": 0.14, "400": 0.18 }
       },
       hueOnlyPalette: {
@@ -256,7 +260,9 @@
         shareRule: "A status or custom color whose hue is within shareWithinDegrees of a palette already named (on the hue circle) uses that palette, in any theme. The palette is generated from the first color that made it. A brand color keeps its exact HEX (section 5.2), so it only shares a palette made by a brand color with the same HEX; otherwise it makes its own palette.",
         freeNameRule: "Otherwise the color makes a new palette named by its hue's range. When that name is already taken, it takes the nearest free name on the circle (counted in names). When the two nearest free names are equally far, the one whose center is closer to 240\xB0 (the colder side) is used. When all names are taken, generation stops as missing_input.",
         similarMaxStepDifference: 0.03,
-        similarRule: "After the palettes are generated, each palette is compared with every palette made before it in the naming order. When no step differs from the same step of an earlier palette by more than similarMaxStepDifference (OKLab distance, the measure of hueOnlyPalette.shiftNotice), it is reported as similar_palette (warning) against the closest such palette: the two palettes look almost the same. Hues are not compared, because HSL hues are uneven around the circle. The plugin form shows the same notice next to the color.",
+        similarRule: "After the palettes are generated, each palette is compared with every palette made before it in the naming order. When no step differs from the same step of an earlier palette by more than similarMaxStepDifference (OKLab distance, the measure of hueOnlyPalette.shiftNotice), it is reported as similar_palette (warning) against the closest such palette: the two palettes look almost the same. Hues are not compared, because HSL hues are uneven around the circle. The plugin form shows the same notice next to the color. A brand has priority over the other colors, so a palette made by a brand color is never reported.",
+        closeToBrandDegrees: 13,
+        closeToBrandRule: "A status or custom color whose OKLCH hue is within closeToBrandDegrees of the brand of its own theme is reported as close_to_brand (warning), also when the two share a palette. The notice is about the other color, never the brand, and the plugin form shows it next to that color. A color with no hue (R, G, and B equal) is left out. A color with this notice gets no similar_palette notice against that brand.",
         rename: "The plugin remembers which color (theme and role) made each palette. When a later run gives that color's palette a new name, and the old name is not used by any palette of the new run, the plugin renames the old palette's variables in place (Color/Old/{step} becomes Color/New/{step}), so layers and aliases that use them are kept. If a variable with the new name already exists, the old palette is not renamed and is reported as orphan_variable. Nothing is deleted."
       },
       contrastPairsRule: "backgroundPalette neutral is the neutral palette of the theme that uses the palette being checked: Color/Gray, or that theme's tinted neutral (neutralTint). A palette used by several themes must meet each pairing against the neutral of every one of them. self is the palette itself. The brand HEX never changes: when the brand fails a self pairing at its own step, the background step of that pairing gets lighter instead (section 5.4 step 2).",
@@ -719,7 +725,7 @@
         "color/bg/brand/soft": { Light: "color/brand/150", Dark: "color/brand/800" },
         "color/bg/brand/softer": { Light: "color/brand/100", Dark: "color/brand/850" },
         "color/bg/brand/softest": { Light: "color/brand/50", Dark: "color/brand/900" },
-        "color/bg/danger/bold": { Light: "color/danger/500", Dark: "color/danger/400" },
+        "color/bg/danger/bold": { Light: "color/danger/500", Dark: "color/danger/300" },
         "color/bg/danger/soft": { Light: "color/danger/150", Dark: "color/danger/800" },
         "color/bg/danger/softer": { Light: "color/danger/100", Dark: "color/danger/850" },
         "color/bg/danger/softest": { Light: "color/danger/50", Dark: "color/danger/900" },
@@ -955,7 +961,7 @@
           "contrast_minimum",
           "status_pairing"
         ],
-        warning: ["contrast_target", "gamut_clamp", "orphan_variable", "orphan_mode", "similar_palette", "hue_only_shift"]
+        warning: ["contrast_target", "gamut_clamp", "orphan_variable", "orphan_mode", "similar_palette", "close_to_brand", "hue_only_shift"]
       },
       maxAdjustmentsPerPalette: 50
     }
@@ -1089,6 +1095,7 @@
   var YELLOW_BOOST = { factor: 1.6, zeroBelow: 65, fullFrom: 85, fullTo: 105, zeroAbove: 125 };
   var SHIFT_NOTICE_DISTANCE = 0.06;
   var MAX_ADJUSTMENTS = 50;
+  var RESPACE_FROM_500_TO_400 = { 300: 0.325, 200: 0.619, 150: 0.845 };
   var L_SEARCH_LIMIT = 0.15;
   var SEARCH_STEP = 1e-3;
   var GRAY_HEX = {
@@ -1120,6 +1127,7 @@
   }
   var r3 = (x) => Math.round(x * 1e3) / 1e3;
   var r1 = (x) => Math.round(x * 10) / 10;
+  var r2 = (x) => Math.round(x * 100) / 100;
   function chooseAnchor(L0) {
     let best = STEPS[0];
     let bestD = Infinity;
@@ -1152,7 +1160,10 @@
   function measure(p, pair) {
     return minContrast(p.steps[pair.text].hex, pairBackgrounds(p, pair));
   }
-  var r2 = (x) => Math.round(x * 100) / 100;
+  function curveChroma(C400, s) {
+    var _a;
+    return Math.max(Math.min(C400 * CHROMA_MULT[s], (_a = CHROMA_CEILING[s]) != null ? _a : Infinity), MIN_CHROMA);
+  }
   function commit(p, s, cand) {
     const clamped = clampChroma(cand);
     if (clamped.C < cand.C - 1e-9) {
@@ -1247,9 +1258,8 @@
     if (p.errors.length > 0) return;
     for (const pair of CONTRAST_PAIRS) {
       const ratio = measure(p, pair);
-      if (ratio >= pair.target) continue;
-      const respaced = ((_a = p.respaced) != null ? _a : []).includes(pair.text);
-      if (!respaced && p.adjustments < MAX_ADJUSTMENTS && fixPair(p, pair, pair.target, false)) {
+      if (ratio >= pair.target || ((_a = p.respaced) == null ? void 0 : _a.includes(pair.text))) continue;
+      if (p.adjustments < MAX_ADJUSTMENTS && fixPair(p, pair, pair.target, false)) {
         p.adjustments++;
       } else {
         p.warnings.push({
@@ -1263,50 +1273,44 @@
     }
   }
   function buildPalette(name, hex, neutrals = [GRAY_HEX]) {
-    var _a;
     const src = hexToOklch(hex);
-    const placed = placeAnchor(hex, neutrals);
-    const anchor = placed.anchor;
+    const { closest, anchor } = placeAnchor(hex, neutrals);
     const C400 = src.C / CHROMA_MULT[anchor];
     const H = r1(src.H);
+    const respacedL = anchor === closest ? {} : respacedLightness(closest, anchor, src.L);
     const p = { name, anchor, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
+    if (anchor !== closest) p.respaced = Object.keys(respacedL).map(Number);
     for (const s of STEPS) {
       if (s === anchor) {
         p.steps[s] = { lch: { L: src.L, C: src.C, H }, hex: hex.toUpperCase() };
-        continue;
+      } else if (s in respacedL) {
+        commit(p, s, { L: respacedL[s], C: Math.max(C400 * CHROMA_MULT[s], MIN_CHROMA), H });
+      } else {
+        commit(p, s, { L: TARGET_L[s], C: curveChroma(C400, s), H });
       }
-      commit(p, s, { L: TARGET_L[s], C: Math.max(Math.min(C400 * CHROMA_MULT[s], (_a = CHROMA_CEILING[s]) != null ? _a : Infinity), MIN_CHROMA), H });
     }
-    if (anchor !== placed.closest) respaceAroundAnchor(p, anchor, src.L);
     calibrate(p);
     return p;
   }
-  function respaceAroundAnchor(p, anchor, brandL) {
+  function respacedLightness(closest, anchor, brandL) {
     const T = TARGET_L;
-    const ai = STEPS.indexOf(anchor);
-    const toward = brandL < T[anchor] ? -1 : 1;
-    const at = (k) => STEPS[ai + k * toward];
-    const away = (k) => STEPS[ai - k * toward];
-    const setL = (s, L) => commit(p, s, __spreadProps(__spreadValues({}, p.steps[s].lch), { L: r3(L) }));
-    const moved = [];
-    const n1 = at(1), n2 = at(2), f1 = at(3);
-    if (n1 !== void 0) {
-      const n1L = brandL + (T[n1] - T[anchor]);
-      setL(n1, n1L);
-      moved.push(n1);
-      if (n2 !== void 0 && f1 !== void 0) {
-        setL(n2, (n1L + T[f1]) / 2);
-        moved.push(n2);
+    const i = STEPS.indexOf(anchor);
+    const shift = brandL < T[anchor] ? -1 : 1;
+    const toward = (k) => STEPS[i + k * shift];
+    const away = (k) => STEPS[i - k * shift];
+    const L = {};
+    L[toward(1)] = brandL + (T[toward(1)] - T[anchor]);
+    L[toward(2)] = (L[toward(1)] + T[toward(3)]) / 2;
+    if (closest === 500 && anchor === 400) {
+      for (const s of Object.keys(RESPACE_FROM_500_TO_400).map(Number)) {
+        L[s] = brandL + (T[100] - brandL) * RESPACE_FROM_500_TO_400[s];
       }
+    } else {
+      const gap = (T[away(3)] - brandL) / 3;
+      L[away(1)] = brandL + gap;
+      L[away(2)] = brandL + 2 * gap;
     }
-    const m1 = away(1), m2 = away(2), f2 = away(3);
-    if (m1 !== void 0 && m2 !== void 0 && f2 !== void 0) {
-      const gap = (T[f2] - brandL) / 3;
-      setL(m1, brandL + gap);
-      setL(m2, brandL + 2 * gap);
-      moved.push(m1, m2);
-    }
-    p.respaced = moved;
+    return Object.fromEntries(Object.entries(L).map(([s, value]) => [s, r3(value)]));
   }
   function yellowFactor(H) {
     const y = YELLOW_BOOST;
@@ -1314,13 +1318,11 @@
     return 1 + (y.factor - 1) * w;
   }
   function buildHuePalette(name, hex, neutrals = [GRAY_HEX]) {
-    var _a;
     const H = r1(hexToOklch(hex).H);
     const C400 = REFERENCE_C400 * yellowFactor(H);
     const p = { name, anchor: -1, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
     for (const s of STEPS) {
-      const C2 = Math.max(Math.min(C400 * CHROMA_MULT[s], (_a = CHROMA_CEILING[s]) != null ? _a : Infinity), MIN_CHROMA);
-      commit(p, s, { L: TARGET_L[s], C: C2, H });
+      commit(p, s, { L: TARGET_L[s], C: curveChroma(C400, s), H });
     }
     calibrate(p);
     return p;
@@ -1429,6 +1431,7 @@
   function similarPalettes(palettes, difference, maxDifference) {
     const out = [];
     palettes.forEach((p, i) => {
+      if (p.exact) return;
       const near = palettes.slice(0, i).map((q) => ({ q, d: difference(p.name, q.name) })).filter((x) => x.d <= maxDifference).sort((a, b) => a.d - b.d)[0];
       if (!near) return;
       out.push({
@@ -1563,6 +1566,26 @@
     }
     return out;
   }
+  function colorsCloseToBrand(colors, maxDegrees) {
+    const hasHue = (hex) => hslHue(hex) !== null;
+    const out = [];
+    for (const c of colors) {
+      const brand = colors.find((x) => x.theme === c.theme && x.exact);
+      if (c.exact || !brand || !hasHue(c.hex) || !hasHue(brand.hex)) continue;
+      const degrees = hueDistance(hexToOklch(c.hex).H, hexToOklch(brand.hex).H);
+      if (degrees > maxDegrees) continue;
+      out.push({
+        theme: c.theme,
+        role: c.role,
+        hex: c.hex,
+        label: c.label,
+        degrees,
+        message: `The hue of ${c.label} (${c.hex}) is close to the brand color (${brand.hex}), so the two may be hard to tell apart.`,
+        note: "Its hue is close to the brand color, so the two may be hard to tell apart."
+      });
+    }
+    return out;
+  }
   function namePalettes(spec, inputs) {
     var _a, _b, _c;
     const colors = orderedColors(spec, inputs);
@@ -1613,7 +1636,9 @@
       const c = colors.find((x) => x.source === s.source);
       return __spreadProps(__spreadValues({}, s), { theme: c.theme, role: c.role });
     });
-    return __spreadProps(__spreadValues({}, result), { similar, paletteOf, build, colors, neutralNaming, neutralBuilt, neutralNameOf, neutralStepsOf });
+    const closeToBrand = colorsCloseToBrand(colors, spec.primitives.paletteNaming.closeToBrandDegrees);
+    const similarOthers = similar.filter((s) => !(s.otherPalette === paletteOf(s.theme, "brand") && closeToBrand.some((c) => c.theme === s.theme && c.role === s.role)));
+    return __spreadProps(__spreadValues({}, result), { similar: similarOthers, closeToBrand, paletteOf, build, colors, neutralNaming, neutralBuilt, neutralNameOf, neutralStepsOf });
   }
   function hueOnlyShifts(naming, built) {
     const out = [];
@@ -1852,6 +1877,17 @@
         `a step more than ${spec.primitives.paletteNaming.similarMaxStepDifference} from Color/${s.otherPalette}`,
         `largest step difference ${s.difference.toFixed(3)}`,
         s.message
+      );
+    }
+    for (const c of naming.closeToBrand) {
+      add(
+        "close_to_brand",
+        "Primitives",
+        `Color/${naming.paletteOf(c.theme, c.role)}`,
+        themeModes[c.theme],
+        `more than ${spec.primitives.paletteNaming.closeToBrandDegrees}\xB0 from the brand's hue`,
+        `${c.degrees.toFixed(1)}\xB0`,
+        c.message
       );
     }
     if (hasErrors()) return stop();
@@ -3359,7 +3395,7 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
     try {
       const naming = namePalettes(tokens_default, inputs);
       const built = naming.build();
-      const notes = naming.similar.map((s) => ({ theme: s.theme, role: s.role, note: s.note }));
+      const notes = [...naming.closeToBrand, ...naming.similar].map((s) => ({ theme: s.theme, role: s.role, note: s.note }));
       for (const h of hueOnlyShifts(naming, built)) {
         notes.push({ theme: h.theme, role: h.role, note: `Only the hue of this color is used. Its palette will be closer to ${h.stepHex} (step ${h.step}).` });
       }

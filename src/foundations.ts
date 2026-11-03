@@ -1,12 +1,12 @@
 // Turns the user's inputs plus spec/tokens.json into a full variable plan and a validation report.
 // Pure functions, no Figma API. Implements foundations-spec.md sections 2, 3, 5.1, 5.6 and 6.1.
 
-import { contrast } from "./color.ts";
+import { contrast, hexToOklch } from "./color.ts";
 import { buildHuePalette, buildNeutralPalette, buildPalette, closestStep, GRAY_HEX, neutralOf, paletteDifference, SHIFT_NOTICE_DISTANCE } from "./palette.ts";
 import type { Neutral } from "./palette.ts";
 import type { Palette } from "./palette.ts";
 import { validateHex } from "./validate.ts";
-import { assignPaletteNames, similarPalettes } from "./naming.ts";
+import { assignPaletteNames, hslHue, hueDistance, similarPalettes } from "./naming.ts";
 import type { NamedColorInput, NamedPalette, SimilarNotice } from "./naming.ts";
 
 // The parsed contents of spec/tokens.json. Kept loose on purpose: the file is the source of truth.
@@ -252,6 +252,25 @@ export function orderedColors(spec: Spec, inputs: Inputs): (NamedColorInput & { 
   return out;
 }
 
+// Section 1.1.8 rule 6: the status and custom colors whose OKLCH hue is close to the brand of their own theme.
+// The brand has priority, so the notice is always about the other color. A color with no hue is left out.
+function colorsCloseToBrand(colors: ReturnType<typeof orderedColors>, maxDegrees: number) {
+  const hasHue = (hex: string): boolean => hslHue(hex) !== null;
+  const out: { theme: number; role: string; hex: string; label: string; degrees: number; message: string; note: string }[] = [];
+  for (const c of colors) {
+    const brand = colors.find((x) => x.theme === c.theme && x.exact);
+    if (c.exact || !brand || !hasHue(c.hex) || !hasHue(brand.hex)) continue;
+    const degrees = hueDistance(hexToOklch(c.hex).H, hexToOklch(brand.hex).H);
+    if (degrees > maxDegrees) continue;
+    out.push({
+      theme: c.theme, role: c.role, hex: c.hex, label: c.label, degrees,
+      message: `The hue of ${c.label} (${c.hex}) is close to the brand color (${brand.hex}), so the two may be hard to tell apart.`,
+      note: "Its hue is close to the brand color, so the two may be hard to tell apart.",
+    });
+  }
+  return out;
+}
+
 // Names the palettes of these inputs. Used by buildPlan, and by the plugin form to warn about
 // similar palettes while the user is still picking colors.
 export function namePalettes(spec: Spec, inputs: Inputs) {
@@ -299,7 +318,11 @@ export function namePalettes(spec: Spec, inputs: Inputs) {
     const c = colors.find((x) => x.source === s.source)!;
     return { ...s, theme: c.theme, role: c.role };
   });
-  return { ...result, similar, paletteOf, build, colors, neutralNaming, neutralBuilt, neutralNameOf, neutralStepsOf };
+  // One notice per color: being close to the brand already covers looking like the brand's palette.
+  const closeToBrand = colorsCloseToBrand(colors, spec.primitives.paletteNaming.closeToBrandDegrees);
+  const similarOthers = similar.filter((s) => !(s.otherPalette === paletteOf(s.theme, "brand")
+    && closeToBrand.some((c) => c.theme === s.theme && c.role === s.role)));
+  return { ...result, similar: similarOthers, closeToBrand, paletteOf, build, colors, neutralNaming, neutralBuilt, neutralNameOf, neutralStepsOf };
 }
 
 // Status and custom colors whose palette has no step close to the HEX picked (section 5.3 step 5).
@@ -512,6 +535,10 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
     add("similar_palette", "Primitives", `Color/${s.palette}`, themeModes[s.theme],
       `a step more than ${spec.primitives.paletteNaming.similarMaxStepDifference} from Color/${s.otherPalette}`,
       `largest step difference ${s.difference.toFixed(3)}`, s.message);
+  }
+  for (const c of naming.closeToBrand) {
+    add("close_to_brand", "Primitives", `Color/${naming.paletteOf(c.theme, c.role)}`, themeModes[c.theme],
+      `more than ${spec.primitives.paletteNaming.closeToBrandDegrees}° from the brand's hue`, `${c.degrees.toFixed(1)}°`, c.message);
   }
   if (hasErrors()) return stop();
 

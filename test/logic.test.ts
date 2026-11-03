@@ -1,8 +1,8 @@
 // Logic tests. Run with: node --experimental-strip-types test/logic.test.ts
 import assert from "node:assert/strict";
-import { hexToOklch, oklchToHex, contrast, inGamut } from "../src/color.ts";
+import { hexToOklch, oklchToHex, contrast, inGamut, maxChroma } from "../src/color.ts";
 import { CHROMA_MULT, buildPalette, STEPS, CONTRAST_PAIRS, pairBackgroundHex, buildHuePalette, closestStep, yellowFactor,
-  CHROMA_CEILING, REFERENCE_C400, YELLOW_BOOST, SHIFT_NOTICE_DISTANCE, placeAnchor, TARGET_L,
+  CHROMA_CEILING, REFERENCE_C400, YELLOW_BOOST, SHIFT_NOTICE_DISTANCE, placeAnchor, TARGET_L, RESPACE_FROM_500_TO_400,
   buildNeutralPalette, NEUTRAL_CHROMA, NEUTRAL_FADE, GRAY_HEX, neutralOf } from "../src/palette.ts";
 import { validateHex } from "../src/validate.ts";
 import { assignPaletteNames, hslHue, hueDistance, paletteRenames } from "../src/naming.ts";
@@ -562,7 +562,8 @@ const formNotice = namePalettes(spec, { numberOfThemes: 1, themes: [{ ...themeA,
 assert.deepEqual(formNotice.map((x) => [x.theme, x.role]), [[0, "warning"]]);
 // A brand keeps its HEX: #B03C3C as brand (at its closest step, 500) still looks like the #FF0026 status palette...
 const brandRed = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, brand: { hex: "#B03C3C" }, danger: { hex: "#FF0026" } }] });
-assert.equal(similarOn(brandRed, paletteOfRole(brandRed, "danger")).length, 1);
+assert.equal(brandRed.report.filter((r) => r.check === "close_to_brand").length, 1); // one notice per color: closeness covers it
+assert.equal(similarOn(brandRed, paletteOfRole(brandRed, "danger")).length, 0);
 // ...but the neon #FF0026 as brand does not look like the #BD4242 status palette.
 const neonBrand = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, brand: { hex: "#FF0026" }, danger: { hex: "#BD4242" } }] });
 assert.equal(similarOn(neonBrand, paletteOfRole(neonBrand, "danger")).length, 0);
@@ -600,7 +601,6 @@ for (const s of STEPS) {
   if (cap && s !== vivid.anchor) assert.ok(vivid.steps[s].lch.C <= cap + 1e-9, `brand step ${s} above its ceiling`);
 }
 // A vivid brand that anchors at 500: its generated 400 is held at the 0.18 ceiling.
-// (#D62828 used to be the example; it now moves to 400 and keeps its own chroma, see test 17.)
 const red500 = buildPalette("Red", "#C62828");
 assert.equal(red500.anchor, 500);
 assert.ok(hexToOklch(red500.steps[400].hex).C <= 0.18 + 0.005);
@@ -771,7 +771,7 @@ for (const hex of ["#127681", "#2E7D32", "#D62828"]) {
   assert.equal(p.steps[400].hex, hex, `${hex} stays exact`);
   assert.deepEqual(p.errors, [], `${hex} meets every minimum`);
   assert.ok(contrast(p.steps[500].hex, "#EAEAEA") >= 4.5);
-  assert.deepEqual([...p.respaced!].sort((a, b) => a - b), [200, 300, 500, 600]);
+  assert.deepEqual([...p.respaced!].sort((a, b) => a - b), [150, 200, 300, 500, 600]);
   // Step 500 keeps the usual gap below the brand; 50, 100, 150 and 800 to 950 keep their targets.
   const L = hexToOklch(hex).L;
   assert.ok(Math.abs(p.steps[500].lch.L - (L - (TARGET_L[400] - TARGET_L[500]))) < 0.002 || p.steps[500].lch.L < L - 0.11);
@@ -784,6 +784,33 @@ for (const hex of ["#5B3CC4", "#78449F", "#E53935", "#1D4ED8", "#B03C3C"]) {
   const a = placeAnchor(hex);
   assert.equal(a.anchor, a.closest, hex);
   assert.equal(buildPalette("x", hex).respaced, undefined);
+}
+// Re-spaced steps take their chroma at their new L: a gamut clamp at the target L is not carried over.
+for (const hex of ["#CC3333", "#D92B2B", "#C2410C", "#2F6FED", "#0066FF"]) {
+  const p = buildPalette("x", hex);
+  const src = hexToOklch(hex);
+  const step = p.steps[200].lch;
+  const expected = Math.min(src.C * CHROMA_MULT[200] / CHROMA_MULT[p.anchor], maxChroma(step.L, step.H));
+  assert.ok(Math.abs(step.C - expected) < 0.002, `${hex} step 200 chroma ${step.C} expected ${expected}`);
+  // The report has one clamp for the step at most: the one at its final L.
+  assert.ok(p.warnings.filter((w) => w.check === "gamut_clamp" && w.step === 200).length <= 1, `${hex} clamp warnings`);
+}
+assert.deepEqual(RESPACE_FROM_500_TO_400, Object.fromEntries(Object.entries(spec.primitives.brandAnchor.respaceFrom500To400.fractions).map(([k, v]) => [Number(k), v])));
+// A brand moved from 500 to 400: 150, 200 and 300 sit at their fractions, with no jump between 150 and 200.
+assert.equal(buildPalette("x", "#CC3333").steps[150].hex, "#FFC4BD");
+assert.equal(buildPalette("x", "#CC3333").steps[200].hex, "#FF9A90");
+// A dark brand that moved to 600 keeps its even spacing: step 150 is not re-spaced.
+assert.equal(buildPalette("x", "#770000").anchor, 600);
+assert.ok(!buildPalette("x", "#770000").respaced!.includes(150));
+// Re-spaced steps have no ceiling: a saturated brand's 300 follows the curve.
+assert.equal(buildPalette("x", "#CC3333").steps[300].hex, "#F26E65");
+assert.ok(buildPalette("x", "#E30426").steps[300].lch.C > CHROMA_CEILING[300]);
+// Re-spaced steps report only their minimums: no target warning, and no error while the minimum holds.
+{
+  const p = buildPalette("x", "#CC3333");
+  assert.ok(p.respaced!.includes(150) && p.respaced!.includes(300));
+  assert.equal(p.warnings.filter((w) => w.check === "contrast_target" && p.respaced!.includes(w.step!)).length, 0);
+  assert.ok(contrast(p.steps[150].hex, GRAY_HEX[700]) >= 7 && contrast(p.steps[300].hex, GRAY_HEX[700]) >= 4.5);
 }
 // The constant rules match tokens.json: the moved anchor table in section 5.2.
 assert.ok(spec.primitives.brandAnchor.move.includes("500 to 400") && spec.primitives.brandAnchor.move.includes("150 to 200"));
@@ -1058,6 +1085,46 @@ assert.deepEqual(themeModeNames(spec, 3, ["", "", "Custom theme"]), ["Main theme
   assert.deepEqual(readSavedInputs(JSON.stringify(mine)), mine);
   assert.equal(readSavedInputs(""), null);
   assert.equal(readSavedInputs("{not json"), null);
+}
+
+// 27. Danger in Dark (section 3.3): step 300, like the other status colors, so a danger color that shares the
+// brand's palette keeps readable text on error.
+assert.equal(spec.appearance.tokens["color/bg/danger/bold"].Dark, "color/danger/300");
+assert.ok(specMd.includes("| color/bg/danger/bold | color/danger/500 | color/danger/300 |"));
+for (const [brand, danger] of [["#886666", "#D62828"], ["#CC3333", "#D62828"], ["#CC3322", "#E74B3C"], ["#0066FF", "#0066FF"]]) {
+  const shared = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, brand: { hex: brand }, danger: { hex: danger } }] });
+  assert.deepEqual(shared.report.filter((r) => r.severity === "error"), [], `${brand} with danger ${danger}`);
+}
+
+// 28. Close to the brand (section 1.1.8 rule 6): the notice is under the other color, never the brand.
+assert.equal(spec.primitives.paletteNaming.closeToBrandDegrees, 13);
+assert.ok(spec.validation.checks.warning.includes("close_to_brand"));
+{
+  const status = { success: { hex: "#48A13F" }, danger: { hex: "#E74B3C" }, warning: { hex: "#CE6924" }, info: { hex: "#4785E6" } };
+  const close = (brand: string, extra = {}) => namePalettes(spec, { numberOfThemes: 1, themes: [{ ...themeA, ...status, brand: { hex: brand }, ...extra }] }).closeToBrand.map((c) => c.role);
+  assert.deepEqual(close("#CC3333"), ["danger"]); // 3.3° apart, and today's palette comparison stays silent
+  assert.deepEqual(close("#E74B3C"), ["danger"]); // the same color: they share a palette
+  assert.deepEqual(close("#E8590C", { warning: { hex: "#4785E6" } }), ["danger"]); // 12.5° apart
+  assert.deepEqual(close("#2F6FED", { info: { hex: "#48A13F" } }), []);
+  assert.deepEqual(close("#808080"), []); // a brand with no hue
+  assert.deepEqual(close("#CC3333", { danger: { hex: "#808080" } }), []); // a color with no hue
+  // Custom colors count, and only the brand of the same theme is compared.
+  const custom = namePalettes(spec, { numberOfThemes: 1, customRoles: ["promo"], themes: [{ ...themeA, ...status, brand: { hex: "#2F6FED" }, info: { hex: "#48A13F" }, custom: { promo: { hex: "#3070F0" } } }] });
+  assert.deepEqual(custom.closeToBrand.map((c) => c.role), ["promo"]);
+  const twoThemes = namePalettes(spec, { numberOfThemes: 2, themes: [
+    { ...themeA, ...status, brand: { hex: "#2F6FED" }, info: { hex: "#48A13F" }, danger: { hex: "#FF0026" } },
+    { ...themeA, ...status, brand: { hex: "#B03C3C" }, danger: { hex: "#48A13F" } },
+  ] });
+  assert.deepEqual(twoThemes.closeToBrand, []);
+  // A brand never gets a notice, even when it looks like a color of an earlier theme.
+  assert.deepEqual([...twoThemes.similar, ...twoThemes.closeToBrand].filter((n) => n.role === "brand"), []);
+  // It is a warning in the report, and generation goes on.
+  const plan = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, ...status, brand: { hex: "#CC3333" } }] });
+  const notice = plan.report.filter((r) => r.check === "close_to_brand");
+  assert.ok(plan.ok);
+  assert.equal(notice.length, 1);
+  assert.equal(notice[0].severity, "warning");
+  assert.match(notice[0].message, /the danger color/);
 }
 
 console.log("All logic tests passed.");

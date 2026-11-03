@@ -112,9 +112,11 @@ export function assignPaletteNames(naming: any, achromaticPalette: string, color
 // maxDifference (section 1.1.8 rule 4). The hue is not used here: HSL hues are uneven around the circle,
 // so the finished palettes are compared. difference(a, b) measures two palettes, given by name.
 // Each palette is compared with the ones before it, and the notice names the closest one.
+// A brand has priority over the other colors, so a palette made by a brand never gets this notice.
 export function similarPalettes(palettes: NamedPalette[], difference: (a: string, b: string) => number, maxDifference: number): SimilarNotice[] {
   const out: SimilarNotice[] = [];
   palettes.forEach((p, i) => {
+    if (p.exact) return;
     const near = palettes
       .slice(0, i)
       .map((q) => ({ q, d: difference(p.name, q.name) }))

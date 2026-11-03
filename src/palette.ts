@@ -18,7 +18,7 @@ export const CHROMA_MULT: Record<number, number> = {
   500: 0.93, 600: 0.76, 700: 0.56, 800: 0.38, 850: 0.32, 900: 0.28, 950: 0.27,
 };
 
-export const MIN_CHROMA = 0.01;
+const MIN_CHROMA = 0.01;
 
 // Section 5.5: the highest chroma a generated step may have, for every hue (tokens.json chromaCeiling).
 export const CHROMA_CEILING: Record<number, number> = { 300: 0.14, 400: 0.18 };
@@ -27,11 +27,15 @@ export const CHROMA_CEILING: Record<number, number> = { 300: 0.14, 400: 0.18 };
 export const REFERENCE_C400 = 0.16;
 export const YELLOW_BOOST = { factor: 1.6, zeroBelow: 65, fullFrom: 85, fullTo: 105, zeroAbove: 125 };
 export const SHIFT_NOTICE_DISTANCE = 0.06;
-export const MAX_ADJUSTMENTS = 50;
+const MAX_ADJUSTMENTS = 50;
+
+// Section 5.2 step 3: a brand that moved from 500 to 400 is darker than a normal 400. These steps sit at these
+// fractions of the way from the brand to step 100 (tokens.json primitives.brandAnchor.respaceFrom500To400).
+export const RESPACE_FROM_500_TO_400: Record<number, number> = { 300: 0.325, 200: 0.619, 150: 0.845 };
 
 // Section 5.4 step 2
-export const L_SEARCH_LIMIT = 0.15;
-export const SEARCH_STEP = 0.001;
+const L_SEARCH_LIMIT = 0.15;
+const SEARCH_STEP = 0.001;
 
 // Section 1.1.6. Gray is fixed and never generated.
 export const GRAY_HEX: Record<number, string> = {
@@ -82,9 +86,10 @@ export type Palette = {
 
 const r3 = (x: number): number => Math.round(x * 1000) / 1000;
 const r1 = (x: number): number => Math.round(x * 10) / 10;
+const r2 = (x: number): number => Math.round(x * 100) / 100;
 
 // Section 5.2 step 1. Closest target L wins. Ties go to the darker step (higher step number).
-export function chooseAnchor(L0: number): number {
+function chooseAnchor(L0: number): number {
   let best = STEPS[0];
   let bestD = Infinity;
   for (const s of STEPS) {
@@ -115,7 +120,7 @@ export function placeAnchor(hex: string, neutrals: Neutral[] = [GRAY_HEX]): { cl
 
 // The background colors of a pairing: the step of every neutral the palette is used with, or a step of
 // the palette itself.
-export function pairBackgrounds(p: Palette, pair: ContrastPair): string[] {
+function pairBackgrounds(p: Palette, pair: ContrastPair): string[] {
   return pair.bgPalette === "self" ? [p.steps[pair.bg].hex] : p.neutrals.map((n) => n[pair.bg]);
 }
 
@@ -135,7 +140,10 @@ function measure(p: Palette, pair: ContrastPair): number {
   return minContrast(p.steps[pair.text].hex, pairBackgrounds(p, pair));
 }
 
-const r2 = (x: number): number => Math.round(x * 100) / 100;
+// Section 5.5: a step's chroma on the curve, under its ceiling and above the minimum. The gamut clamp comes after.
+function curveChroma(C400: number, s: number): number {
+  return Math.max(Math.min(C400 * CHROMA_MULT[s], CHROMA_CEILING[s] ?? Infinity), MIN_CHROMA);
+}
 
 function commit(p: Palette, s: number, cand: Lch): void {
   const clamped = clampChroma(cand);
@@ -243,13 +251,12 @@ function calibrate(p: Palette): void {
   }
   if (p.errors.length > 0) return;
 
-  // Targets: lightness only, never the anchor (section 5.4 step 5). Every unmet target is a warning,
-  // also when the adjustment cap leaves no room to try.
+  // Targets: lightness only, never the anchor (section 5.4 step 5). Re-spaced steps stay where the brand rule put
+  // them and report only their minimums. Any other unmet target is a warning, also when the cap leaves no room to try.
   for (const pair of CONTRAST_PAIRS) {
     const ratio = measure(p, pair);
-    if (ratio >= pair.target) continue;
-    const respaced = (p.respaced ?? []).includes(pair.text); // stays where the brand rule put it
-    if (!respaced && p.adjustments < MAX_ADJUSTMENTS && fixPair(p, pair, pair.target, false)) {
+    if (ratio >= pair.target || p.respaced?.includes(pair.text)) continue;
+    if (p.adjustments < MAX_ADJUSTMENTS && fixPair(p, pair, pair.target, false)) {
       p.adjustments++;
     } else {
       p.warnings.push({
@@ -267,55 +274,55 @@ function calibrate(p: Palette): void {
 // neutrals: the neutral palette of every theme that uses this palette (Color/Gray when not given).
 export function buildPalette(name: string, hex: string, neutrals: Neutral[] = [GRAY_HEX]): Palette {
   const src = hexToOklch(hex);
-  const placed = placeAnchor(hex, neutrals);
-  const anchor = placed.anchor;
+  const { closest, anchor } = placeAnchor(hex, neutrals);
   const C400 = src.C / CHROMA_MULT[anchor];
   const H = r1(src.H);
+  const respacedL = anchor === closest ? {} : respacedLightness(closest, anchor, src.L);
 
   const p: Palette = { name, anchor, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
+  if (anchor !== closest) p.respaced = Object.keys(respacedL).map(Number);
   for (const s of STEPS) {
     // The anchor is the brand color itself, with its exact HEX: converting it would round it by a digit.
     if (s === anchor) {
       p.steps[s] = { lch: { L: src.L, C: src.C, H }, hex: hex.toUpperCase() };
-      continue;
+    } else if (s in respacedL) {
+      // A re-spaced step follows the curve at its new L, with no ceiling (section 5.2 step 3).
+      commit(p, s, { L: respacedL[s], C: Math.max(C400 * CHROMA_MULT[s], MIN_CHROMA), H });
+    } else {
+      commit(p, s, { L: TARGET_L[s], C: curveChroma(C400, s), H });
     }
-    // The other steps stay under the ceiling.
-    commit(p, s, { L: TARGET_L[s], C: Math.max(Math.min(C400 * CHROMA_MULT[s], CHROMA_CEILING[s] ?? Infinity), MIN_CHROMA), H });
   }
-  if (anchor !== placed.closest) respaceAroundAnchor(p, anchor, src.L);
 
   calibrate(p);
   return p;
 }
 
-// Section 5.2 step 3, for a brand that moved one step: it sits darker (or lighter) than its step's target,
-// so only its two neighbours on each side are re-spaced; every other step keeps its target L.
-// - Toward the shift: the first neighbour keeps the usual gap below (or above) the brand, and the second
-//   goes halfway between it and the next step, which stays fixed.
+// Section 5.2 step 3, for a brand that moved one step: it sits darker (or lighter) than its step's target, so
+// the steps around it get a new L, returned here as step -> L. Every other step keeps its target L.
+// - Toward the shift: the first neighbour keeps the usual gap from the brand, and the second goes halfway
+//   between it and the next step, which stays fixed.
 // - On the other side: the two neighbours are spaced evenly between the brand and the next step, which stays fixed.
-function respaceAroundAnchor(p: Palette, anchor: number, brandL: number): void {
+//   A brand that moved from 500 to 400 uses fixed fractions for 300, 200 and 150 instead, so the light steps have no jump.
+function respacedLightness(closest: number, anchor: number, brandL: number): Record<number, number> {
   const T = TARGET_L;
-  const ai = STEPS.indexOf(anchor);
-  const toward = brandL < T[anchor] ? -1 : 1; // index direction: -1 = toward the darker steps
-  const at = (k: number): number | undefined => STEPS[ai + k * toward];
-  const away = (k: number): number | undefined => STEPS[ai - k * toward];
-  const setL = (s: number, L: number): void => commit(p, s, { ...p.steps[s].lch, L: r3(L) });
-  const moved: number[] = [];
-  const n1 = at(1), n2 = at(2), f1 = at(3);
-  if (n1 !== undefined) {
-    const n1L = brandL + (T[n1] - T[anchor]);
-    setL(n1, n1L);
-    moved.push(n1);
-    if (n2 !== undefined && f1 !== undefined) { setL(n2, (n1L + T[f1]) / 2); moved.push(n2); }
+  const i = STEPS.indexOf(anchor);
+  const shift = brandL < T[anchor] ? -1 : 1; // index direction in STEPS: -1 = toward the darker steps
+  const toward = (k: number): number => STEPS[i + k * shift];
+  const away = (k: number): number => STEPS[i - k * shift];
+
+  const L: Record<number, number> = {};
+  L[toward(1)] = brandL + (T[toward(1)] - T[anchor]);
+  L[toward(2)] = (L[toward(1)] + T[toward(3)]) / 2;
+  if (closest === 500 && anchor === 400) {
+    for (const s of Object.keys(RESPACE_FROM_500_TO_400).map(Number)) {
+      L[s] = brandL + (T[100] - brandL) * RESPACE_FROM_500_TO_400[s];
+    }
+  } else {
+    const gap = (T[away(3)] - brandL) / 3;
+    L[away(1)] = brandL + gap;
+    L[away(2)] = brandL + 2 * gap;
   }
-  const m1 = away(1), m2 = away(2), f2 = away(3);
-  if (m1 !== undefined && m2 !== undefined && f2 !== undefined) {
-    const gap = (T[f2] - brandL) / 3;
-    setL(m1, brandL + gap);
-    setL(m2, brandL + 2 * gap);
-    moved.push(m1, m2);
-  }
-  p.respaced = moved;
+  return Object.fromEntries(Object.entries(L).map(([s, value]) => [s, r3(value)]));
 }
 
 // Section 5.5: the yellow factor for an OKLCH hue. 1 outside the yellows, up to YELLOW_BOOST.factor.
@@ -332,8 +339,7 @@ export function buildHuePalette(name: string, hex: string, neutrals: Neutral[] =
   const C400 = REFERENCE_C400 * yellowFactor(H);
   const p: Palette = { name, anchor: -1, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
   for (const s of STEPS) {
-    const C = Math.max(Math.min(C400 * CHROMA_MULT[s], CHROMA_CEILING[s] ?? Infinity), MIN_CHROMA);
-    commit(p, s, { L: TARGET_L[s], C, H });
+    commit(p, s, { L: TARGET_L[s], C: curveChroma(C400, s), H });
   }
   calibrate(p);
   return p;

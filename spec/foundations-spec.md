@@ -193,8 +193,9 @@ Rules, applied to the colors one at a time in a fixed order: theme by theme, and
 1. **No hue.** A HEX whose R, G, and B are equal (white, black, pure grays) uses the fixed Color/Gray palette. No palette is generated for it.
 2. **Same hue.** A status or custom color whose hue is within 1° of a palette already named uses that palette, in any theme. For example, two shades of the same green share one palette. The palette is generated from the first color that made it. A brand color keeps its exact HEX (section 5.2), so it only shares a palette made by a brand color with the same HEX; otherwise it makes its own palette (rules 3 and 4).
 3. **New palette.** Otherwise the color makes a new palette, named after its hue's range. If that name is already taken, it takes the nearest free name in the list. If the two nearest free names are equally far, the one closer to 240° (the colder side) wins. If all 60 names are taken, generation stops as `missing_input`.
-4. **Similar palettes.** After the palettes are generated, each one is compared with the palettes made before it. When no step differs from the same step of an earlier palette by more than 0.03 (OKLab distance, as in section 5.3 step 5), it is reported as `similar_palette` (warning), because the two palettes look almost the same. The finished palettes are compared, not the hues: HSL hues are uneven around the circle, so two colors far apart in HSL can still make almost the same palette (for example `#FF0026` and `#BD4242` as status or custom colors, 8.9° apart). The plugin form shows the same notice next to the color before anything is generated.
+4. **Similar palettes.** After the palettes are generated, each one is compared with the palettes made before it. When no step differs from the same step of an earlier palette by more than 0.03 (OKLab distance, as in section 5.3 step 5), it is reported as `similar_palette` (warning), because the two palettes look almost the same. The finished palettes are compared, not the hues: HSL hues are uneven around the circle, so two colors far apart in HSL can still make almost the same palette (for example `#FF0026` and `#BD4242` as status or custom colors, 8.9° apart). The plugin form shows the same notice next to the color before anything is generated. A brand color has priority over the other colors, so a palette made by a brand color is never reported.
 5. **Renamed palettes.** The plugin remembers which color (theme and role) made each palette. When a later run gives that color's palette a new name, and no palette of the new run uses the old name, the plugin renames the old palette's variables in place: `Color/Old/{step}` becomes `Color/New/{step}`. Layers and aliases that use them are kept. If a variable with the new name already exists, the old palette is not renamed and is reported as `orphan_variable`. Nothing is deleted.
+6. **Close to the brand.** A status or custom color whose OKLCH hue is within 13° of the brand color of its own theme is reported as `close_to_brand` (warning), also when the two share a palette. The notice is about the other color, never the brand color, and the plugin form shows it next to that color before anything is generated. A color with no hue (rule 1) is left out. A color with this notice gets no `similar_palette` notice against that brand color.
 
 #### 1.1.9 Tinted neutral palettes
 
@@ -592,7 +593,7 @@ Their `softest`, `softer`, and `soft` backgrounds follow the dark canvas like th
 | color/bg/brand/soft | color/brand/150 | color/brand/800 |
 | color/bg/brand/softer | color/brand/100 | color/brand/850 |
 | color/bg/brand/softest | color/brand/50 | color/brand/900 |
-| color/bg/danger/bold | color/danger/500 | color/danger/400 |
+| color/bg/danger/bold | color/danger/500 | color/danger/300 |
 | color/bg/danger/soft | color/danger/150 | color/danger/800 |
 | color/bg/danger/softer | color/danger/100 | color/danger/850 |
 | color/bg/danger/softest | color/danger/50 | color/danger/900 |
@@ -952,11 +953,13 @@ Values for each text fill step:
 
    Status and custom palettes start from the target L values instead (section 5.3).
 
-   **After a moved anchor**, the brand color is darker or lighter than its new step's target, so the steps around it are re-spaced. Only its two neighbours on each side change; every other step keeps its target L.
+   **After a moved anchor**, the brand color is darker or lighter than its new step's target, so the steps around it are re-spaced. Usually only its two neighbours on each side change; every other step keeps its target L.
    - Toward that shift, the first neighbour keeps the usual target gap from the brand color, and the second goes halfway between it and the next step, which stays fixed.
    - On the other side, the two neighbours are spaced evenly between the brand color and the next step, which stays fixed.
+   - A brand color that moved from 500 to 400 follows a different rule on the lighter side. Steps 300, 200, and 150 sit at fixed fractions of the way from the brand color's L to the target L of step 100, which stays fixed: 0.325, 0.619, and 0.845. This keeps the lightest steps free of a jump in lightness.
+   - Each re-spaced step takes its chroma from the curve in section 5.5 at its new L, with no chroma ceiling, so a gamut clamp at its target L is not carried over.
 
-   Example: `#127681` anchored at 400 (L 0.519). Step 500 keeps the usual gap of 0.119 (L 0.400), step 600 goes halfway to step 700, and steps 300 and 200 are spaced evenly between the brand color and step 150. The re-spaced steps still meet every contrast minimum, but do not chase targets (section 5.4 step 5). The rule is in `tokens.json`, under `primitives.brandAnchor`.
+   Example: `#127681` anchored at 400 (L 0.519). Step 500 keeps the usual gap of 0.119 (L 0.400), step 600 goes halfway to step 700, and steps 300, 200, and 150 sit at their fractions of the way to step 100. The re-spaced steps still meet every contrast minimum, but do not chase targets (section 5.4 step 5). The rule is in `tokens.json`, under `primitives.brandAnchor`.
 
 4. **Name the palette.** Use the name from section 1.1.8. Example: a brand color of `#78449F` (HSL hue 274°) is named `Purple` and becomes `Color/Purple/500` at its anchor.
 
@@ -995,7 +998,7 @@ This procedure applies to every palette and uses one order everywhere:
    - Accept the first candidate whose contrast meets the threshold.
    - The anchor is never changed.
 4. **Re-validate.** One adjustment is one accepted candidate in step 2 or 3. After each adjustment, recalculate the pairing it changed. If the palette needs more than 50 adjustments, stop and report a failure. Only foreground steps are adjusted, apart from the brand color's own step 100 (step 2), and no foreground step is used as a background (section 1.1.5). Step 500 is the foreground in two pairings, and both of its backgrounds (neutral step 100 and the palette's own step 100) are lighter than it. Darkening step 500 for one pairing therefore never lowers the contrast of the other.
-5. **Aim for targets.** After all minimums pass, apply the lightness search of step 2 with each target in place of its minimum. Targets never use the chroma search of step 3, never move the anchor, and never move the steps re-spaced around a moved anchor (section 5.2 step 3), because they are optimization goals. Never move a value below a minimum to reach a target. A target that cannot be reached is reported as a warning (`contrast_target`).
+5. **Aim for targets.** After all minimums pass, apply the lightness search of step 2 with each target in place of its minimum. Targets never use the chroma search of step 3, never move the anchor, and never move the steps re-spaced around a moved anchor (section 5.2 step 3), because they are optimization goals. Never move a value below a minimum to reach a target. A target that cannot be reached is reported as a warning (`contrast_target`). Steps re-spaced around a moved anchor report only their minimums.
 
 ### 5.5 Chroma and hue
 
@@ -1021,7 +1024,7 @@ This procedure applies to every palette and uses one order everywhere:
 | 900 | 0.28 |
 | 950 | 0.27 |
 
-4. **Chroma ceiling.** No generated step goes above the ceiling below, for any hue. The anchor keeps the brand color's exact chroma.
+4. **Chroma ceiling.** No generated step goes above the ceiling below, for any hue. The anchor keeps the brand color's exact chroma, and the steps re-spaced around a moved anchor have no ceiling (section 5.2 step 3).
 
 | Step | Highest chroma |
 |---:|---:|
@@ -1126,6 +1129,7 @@ The plugin produces five outputs. The first three come from Check only and Gener
    | `orphan_variable` | warning |
    | `orphan_mode` | warning |
    | `similar_palette` | warning |
+   | `close_to_brand` | warning |
    | `hue_only_shift` | warning |
 
 3. **Figma-ready variable definitions**, grouped by collection and mode.

@@ -139,14 +139,15 @@ figma.ui.onmessage = async (msg: {
 };
 
 // While the user picks colors, the form asks which ones would make a palette that looks almost the
-// same as another one (similar_palette), and which status or custom colors get a palette that looks
-// quite different from the color picked (hue_only_shift), so it can show a notice next to them.
+// same as another one (similar_palette), which status or custom colors have a hue close to the brand
+// (close_to_brand), and which get a palette that looks quite different from the color picked
+// (hue_only_shift), so it can show a notice next to them.
 // It also gets every color's palette, shown next to the color as a strip of 13 steps. Writes nothing.
 function previewNames(inputs: Inputs): void {
   try {
     const naming = namePalettes(spec, inputs);
     const built = naming.build();
-    const notes = naming.similar.map((s) => ({ theme: s.theme, role: s.role, note: s.note }));
+    const notes = [...naming.closeToBrand, ...naming.similar].map((s) => ({ theme: s.theme, role: s.role, note: s.note }));
     for (const h of hueOnlyShifts(naming, built)) {
       notes.push({ theme: h.theme, role: h.role, note: `Only the hue of this color is used. Its palette will be closer to ${h.stepHex} (step ${h.step}).` });
     }
