@@ -1,55 +1,95 @@
 <!-- Plugin window: the input form (foundations-spec.md section 5.1) and the validation report (section 6.1).
      Layout follows the "Plugin UI" design (Figma file vVJzXGPhbz2Zb5KXwuJfse, node 39:2602): a 960 × 880 window,
-     with each color's palette shown next to it. The window is light; each appearance card shows its real colors. -->
+     with each color's palette shown next to it. The window is light or dark, by the switch in the bottom bar;
+     each appearance card always shows its real colors. -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root {
+  /* Colors from the Appearance variables in the design, one set for each mode of the window.
+     A .panel.light or .panel.dark is an appearance card: it keeps its own mode, whatever the window's mode is.
+     The borders and shadows are in each set because they take their color where they are defined. */
+  :root, .panel.light {
+    color-scheme: light;
     --text: #2f2f38;
     --muted: #676872;
     --step-label: #676872;
     --placeholder: rgba(0, 0, 0, 0.32);
     --window: #ffffff;
     --panel: #ffffff;
-    --add-bg: #f3f4ff; /* the "Add …" placeholder sections */
+    --overlay: #ffffff;   /* the bottom button bar */
+    --add-bg: #f3f4ff;    /* the "Add …" placeholder sections */
     --field: #ffffff;
+    --action-bg: #ffffff; /* buttons */
+    --on-action: #ffffff; /* text on the main button and the slider thumb */
+    --track: #e8e9f2;     /* the slider's line */
     --border: rgba(0, 0, 0, 0.24);
     --field-line: rgba(0, 0, 0, 0.24);
     --brand-line: rgba(85, 58, 223, 0.36); /* buttons and "Add …" sections */
-    --accent: #553adf;  /* selected weight chips */
-    --action: #553adf;  /* buttons, ticked checkboxes, "Generate tokens" */
+    --accent: #553adf;    /* brand text and icons, selected weight chips */
+    --action: #553adf;    /* main button, ticked checkboxes, slider thumb */
     --accent-soft: #f3f4ff;
     --selected-line: #7b79f4;
     --empty-swatch: #d9d9d9;
+    --scroll-thumb: rgba(0, 0, 0, 0.32);
     --error: #d1293d;
     --warning: #b86200;
     --success: #14804a;
-    /* Fonts. IBM Plex Sans is embedded at the very end of this file, so it shows on every computer.
-       Plugin windows cannot download fonts, so JetBrains Mono falls back to what is installed. */
-    --sans: "IBM Plex Sans", system-ui, sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
-    /* Effects from the design. Borders are drawn inside, as in Figma, so they never change a size. */
+    --bar-shadow: rgba(255, 255, 255, 0.48); /* around the bottom button bar */
+    --add-shadow: inset 0 4px 16px rgba(0, 0, 0, 0.12), inset 0 -8px 12px rgba(255, 255, 255, 0.48); /* "Add …" sections */
+    --extrude: inset 0 -2px 12px rgba(0, 0, 0, 0.08);        /* panels and the bottom bar */
+    --shadow-secondary: inset 0 4px 4px rgba(255, 255, 255, 0.48), inset 0 -4px 4px rgba(0, 0, 0, 0.04); /* buttons and dropdowns */
     --line: inset 0 0 0 0.5px var(--border);
     --field-border: inset 0 0 0 0.5px var(--field-line);
     --brand-border: inset 0 0 0 0.5px var(--brand-line);
-    --extrude: inset 0 -2px 12px rgba(0, 0, 0, 0.08);        /* white panels */
-    --incave: inset 0 4px 8px rgba(0, 0, 0, 0.04);           /* "Add …" sections and HEX fields */
-    --shadow-secondary: inset 0 -4px 4px rgba(0, 0, 0, 0.04); /* white buttons and dropdowns */
-    --add-shadow: inset 0 4px 16px rgba(0, 6, 77, 0.1), inset 0 -8px 12px rgba(255, 255, 255, 0.5); /* "Add …" sections */
-    --shadow-primary: inset 0 -4px 6px rgba(7, 0, 72, 0.24);   /* the main button */
     /* Colors of an appearance card. These show until the plugin sends the real ones (showPreviews). */
     --icon: #2f2f38; --text-bold: #676872; --brand-bolder: #2a1e75; --brand-bold: #553adf;
     --soft-neutral: #f3f4fa; --soft-brand: #f3f4ff;
   }
-  /* A card of a Dark-based appearance starts dark. The two border shadows are repeated here because they
-     take their color when they are defined, so they would otherwise keep the light one. */
-  .panel.dark {
-    --text: #d9dae4; --muted: #afb0bb; --placeholder: rgba(255, 255, 255, 0.4);
-    --panel: #0c0d11; --field: #2f2f38;
-    --border: rgba(255, 255, 255, 0.16); --field-line: rgba(255, 255, 255, 0.16);
-    --line: inset 0 0 0 0.5px var(--border); --field-border: inset 0 0 0 0.5px var(--field-line);
+  :root.ui-dark, .panel.dark {
+    color-scheme: dark;
+    --text: #d9dae4;
+    --muted: #afb0bb;
+    --step-label: #afb0bb;
+    --placeholder: rgba(255, 255, 255, 0.4);
+    --window: #1c1c23;
+    --panel: #1c1c23;
+    --overlay: #131419;
+    --add-bg: #16123e;
+    --field: #2f2f38;
+    --action-bg: #2f2f38;
+    --on-action: #131419;
+    --track: #23232b;
+    --border: rgba(255, 255, 255, 0.16);
+    --field-line: rgba(255, 255, 255, 0.16);
+    --brand-line: rgba(85, 58, 223, 0.36);
+    --accent: #a3a7ff;
+    --action: #a3a7ff;
+    --accent-soft: #16123e;
+    --selected-line: #7b79f4;
+    --empty-swatch: #d9d9d9;
+    --scroll-thumb: rgba(255, 255, 255, 0.32);
+    --error: #ff8d99;
+    --warning: #c7af32;
+    --success: #4dca91;
+    --bar-shadow: rgba(0, 0, 0, 0.48);
+    --add-shadow: inset 0 4px 16px rgba(255, 255, 255, 0), inset 0 -8px 12px rgba(255, 255, 255, 0.06);
+    --extrude: inset 0 -2px 12px rgba(255, 255, 255, 0.08);
+    --shadow-secondary: inset 0 4px 4px rgba(255, 255, 255, 0.06), inset 0 -4px 4px rgba(0, 0, 0, 0.04);
+    --line: inset 0 0 0 0.5px var(--border);
+    --field-border: inset 0 0 0 0.5px var(--field-line);
+    --brand-border: inset 0 0 0 0.5px var(--brand-line);
     --icon: #d9dae4; --text-bold: #afb0bb; --brand-bolder: #d6daff; --brand-bold: #a3a7ff;
-    --soft-neutral: #131419; --soft-brand: #100d32;
+    --soft-neutral: #1c1c23; --soft-brand: #16123e;
+  }
+  /* Fonts and the effects that are the same in both modes. */
+  :root {
+    /* IBM Plex Sans is embedded at the very end of this file, so it shows on every computer.
+       Plugin windows cannot download fonts, so JetBrains Mono falls back to what is installed. */
+    --sans: "IBM Plex Sans", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    /* Effects from the design. Borders are drawn inside, as in Figma, so they never change a size. */
+    --incave: inset 0 4px 8px rgba(0, 0, 0, 0.04);           /* HEX fields */
+    --shadow-primary: inset 0 -4px 6px rgba(7, 0, 72, 0.24);   /* the main button */
   }
   * { box-sizing: border-box; }
   /* The window itself never scrolls (and never bounces), so the bottom button bar stays put.
@@ -63,7 +103,7 @@
   .scroll::-webkit-scrollbar { display: none; }
   .scrollbar { position: fixed; top: 2px; right: 0; bottom: 2px; width: 12px; z-index: 20; pointer-events: none; }
   .scrollbar .thumb {
-    position: absolute; right: 3px; width: 6px; border-radius: 3px; background: rgba(0, 0, 0, 0.32);
+    position: absolute; right: 3px; width: 6px; border-radius: 3px; background: var(--scroll-thumb);
     opacity: 0; transition: opacity 0.3s; pointer-events: auto;
   }
   .scrollbar.active .thumb, .scrollbar .thumb:hover { opacity: 1; }
@@ -89,12 +129,13 @@
   .icon { display: block; position: relative; flex-shrink: 0; }
   .icon img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* An icon in the color of its card: the design's icon is the shape, --icon fills it. */
+  .icon.tinted.brand { background: var(--accent); }
   .icon.tinted { background: var(--icon); -webkit-mask: var(--shape) center / contain no-repeat; mask: var(--shape) center / contain no-repeat; }
   .i24 { width: 24px; height: 24px; } .i20 { width: 20px; height: 20px; } .i16 { width: 16px; height: 16px; }
 
   /* Separator line (design asset, stretched to the panel width). */
   .sep { position: relative; align-self: stretch; height: 0; }
-  .sep img { position: absolute; top: -0.5px; left: -0.29%; width: 100.58%; height: 1px; display: block; }
+  .sep::before { content: ""; position: absolute; left: 0; right: 0; top: -0.25px; height: 0.5px; background: var(--border); }
 
   /* "Add …" placeholder sections: light purple, recessed, with a white button in the middle. */
   .add-section { align-self: stretch; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
@@ -117,11 +158,11 @@
   .saturation { width: 248px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; }
   .saturation .title { font-size: 12px; line-height: 20px; font-weight: 700; white-space: nowrap; }
   .slider { position: relative; flex: 1 1 0; min-width: 0; height: 18px; }
-  .slider::before { content: ""; position: absolute; left: 0; right: 0; top: 8px; height: 2px; border-radius: 8px; background: #e8e9f2; }
+  .slider::before { content: ""; position: absolute; left: 0; right: 0; top: 8px; height: 2px; border-radius: 8px; background: var(--track); }
   .slider input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; -webkit-appearance: none; appearance: none; }
   .slider input::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 18px; }
   .slider .thumb { position: absolute; top: 2px; left: calc((100% - 12px) * var(--position)); width: 12px; height: 14px; display: flex; align-items: center; justify-content: center;
-    border-radius: 20px; background: var(--action); color: #fff; font-size: 8px; line-height: 10px; font-weight: 600; pointer-events: none; }
+    border-radius: 20px; background: var(--action); color: var(--on-action); font-size: 8px; line-height: 10px; font-weight: 600; pointer-events: none; }
   .slider input:focus-visible + .thumb { outline: 2px solid var(--action); outline-offset: 1px; }
   /* Same width as the palette strips below, one number per tile. */
   .step-labels { flex: 1 1 0; min-width: 0; display: flex; text-align: center; font-size: 12px; line-height: 16px; color: var(--step-label); }
@@ -159,7 +200,7 @@
   /* A weight is a toggle chip. Off: white with the style name. On: light purple, bold, with a "×" to turn it off.
      The hidden checkbox keeps it accessible; the script mirrors it as the class "on". */
   .chip { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 12px; border-radius: 512px;
-    background: #ffffff; box-shadow: var(--line), var(--shadow-secondary); color: var(--text); font-weight: 400; cursor: pointer; white-space: nowrap; }
+    background: var(--panel); box-shadow: var(--line), var(--shadow-secondary); color: var(--text); font-weight: 400; cursor: pointer; white-space: nowrap; }
   .chip input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
   .chip .x { display: none; width: 16px; height: 16px; }
   .chip.on { padding-right: 8px; background: var(--accent-soft); box-shadow: inset 0 0 0 0.5px var(--selected-line), var(--shadow-secondary); color: var(--accent); font-weight: 600; }
@@ -169,7 +210,7 @@
   /* Checkboxes: 16px, blue with the design's check icon when ticked. */
   input.cb {
     appearance: none; -webkit-appearance: none; margin: 0; flex-shrink: 0;
-    width: 16px; height: 16px; border: 0; border-radius: 4px; background: #ffffff; cursor: pointer;
+    width: 16px; height: 16px; border: 0; border-radius: 4px; background: var(--field); cursor: pointer;
     box-shadow: var(--line), var(--incave);
   }
   input.cb:checked { background: var(--action) var(--check-icon) center / 16px 16px no-repeat; box-shadow: none; }
@@ -216,22 +257,23 @@
   .panel.export > .pill { align-self: flex-end; }
 
   /* Pill buttons: white with a thin line and a soft inner shadow; the main one is purple. */
-  .pill { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 2px 12px 2px 8px; border-radius: 512px; background: #ffffff; box-shadow: var(--brand-border), var(--shadow-secondary); color: var(--action); font-weight: 600; white-space: nowrap; }
+  .pill { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 2px 12px 2px 8px; border-radius: 512px; background: var(--action-bg); box-shadow: var(--brand-border), var(--shadow-secondary); color: var(--action); font-weight: 600; white-space: nowrap; }
   .pill.small { height: 24px; padding-top: 0; padding-bottom: 0; }
   .pill.text-only { padding: 2px 12px; }
-  .pill.primary { background: var(--action); box-shadow: var(--shadow-primary); color: #ffffff; }
+  .pill.primary { background: var(--action); box-shadow: var(--shadow-primary); color: var(--on-action); }
   .pill:disabled { opacity: 0.5; cursor: default; }
   .icon-btn { border-radius: 6px; }
   .icon-btn:focus-visible, .pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* Bottom button bar: flush with the window's bottom edge, rounded at the top. */
-  .bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; filter: drop-shadow(0 -16px 32px #ffffff); }
+  .bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; filter: drop-shadow(0 -16px 16px var(--bar-shadow)); }
   .bottom-buttons {
     display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 24px;
-    background: #ffffff; border-radius: 48px 48px 0 0;
+    background: var(--overlay); border-radius: 48px 48px 0 0;
     box-shadow: inset 0.5px 0.5px 0 0 var(--border), inset -0.5px 0 0 0 var(--border), var(--extrude);
   }
   .bottom-buttons .group { display: flex; gap: 8px; }
   .bottom-buttons .pill { height: 48px; padding: 0 24px; font-size: 16px; }
+  .bottom-buttons .pill.icon-only { width: 48px; padding: 0; }
   .row-of-pills { display: flex; gap: 8px; justify-content: center; }
 
   /* Report. */
@@ -240,7 +282,7 @@
   #status.error { color: var(--error); } #status.ok { color: var(--success); }
   #summary { color: var(--text); }
   .report table { width: 100%; border-collapse: collapse; font-size: 11px; line-height: 15px; }
-  .report th, .report td { text-align: left; padding: 4px; border-bottom: 1px solid #e1e1e1; vertical-align: top; word-break: break-word; }
+  .report th, .report td { text-align: left; padding: 4px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; }
   .report td.error { color: var(--error); font-weight: 600; } .report td.warning { color: var(--warning); font-weight: 600; }
   .tabs { display: flex; flex-wrap: wrap; gap: 4px; }
   .tabs .pill { height: 24px; font-size: 12px; color: var(--text); font-weight: 400; padding: 0 10px; }
@@ -366,6 +408,7 @@
 
 <div class="bottom-bar">
   <div class="bottom-buttons">
+    <button type="button" class="pill icon-only" id="uiMode" aria-label="Dark mode"><span class="icon i24" data-icon="contrast"></span></button>
     <div class="group">
       <button type="button" class="pill text-only" id="check">Check only</button>
       <button type="button" class="pill text-only" id="tables" title="Redraw the color tables from the variables as they are now in this file">Update tables</button>
@@ -377,6 +420,9 @@
 <script>
   // ---------- Icons from the design (exported unchanged from Figma; see ui-assets/) ----------
   const ICONS = {
+    contrast: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M8.1 21.2125C6.88333 20.6875 5.825 19.975 4.925 19.075C4.025 18.175 3.3125 17.1167 2.7875 15.9C2.2625 14.6833 2 13.3833 2 12C2 10.6167 2.2625 9.31667 2.7875 8.1C3.3125 6.88333 4.025 5.825 4.925 4.925C5.825 4.025 6.88333 3.3125 8.1 2.7875C9.31667 2.2625 10.6167 2 12 2C13.3833 2 14.6833 2.2625 15.9 2.7875C17.1167 3.3125 18.175 4.025 19.075 4.925C19.975 5.825 20.6875 6.88333 21.2125 8.1C21.7375 9.31667 22 10.6167 22 12C22 13.3833 21.7375 14.6833 21.2125 15.9C20.6875 17.1167 19.975 18.175 19.075 19.075C18.175 19.975 17.1167 20.6875 15.9 21.2125C14.6833 21.7375 13.3833 22 12 22C10.6167 22 9.31667 21.7375 8.1 21.2125ZM13 19.925C14.9833 19.675 16.6458 18.8042 17.9875 17.3125C19.3292 15.8208 20 14.05 20 12C20 9.95 19.3292 8.17917 17.9875 6.6875C16.6458 5.19583 14.9833 4.325 13 4.075V19.925Z" fill="#A3A7FF"/>
+</svg>`,
     edit: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g id="edit">
 <path id="vector" d="M5 19H6.425L16.2 9.225L14.775 7.8L5 17.575V19ZM4 21C3.71667 21 3.47917 20.9042 3.2875 20.7125C3.09583 20.5208 3 20.2833 3 20V17.575C3 17.3083 3.05 17.0542 3.15 16.8125C3.25 16.5708 3.39167 16.3583 3.575 16.175L16.2 3.575C16.4 3.39167 16.6208 3.25 16.8625 3.15C17.1042 3.05 17.3583 3 17.625 3C17.8917 3 18.15 3.05 18.4 3.15C18.65 3.25 18.8667 3.4 19.05 3.6L20.425 5C20.625 5.18333 20.7708 5.4 20.8625 5.65C20.9542 5.9 21 6.15 21 6.4C21 6.66667 20.9542 6.92083 20.8625 7.1625C20.7708 7.40417 20.625 7.625 20.425 7.825L7.825 20.425C7.64167 20.6083 7.42917 20.75 7.1875 20.85C6.94583 20.95 6.69167 21 6.425 21H4ZM15.475 8.525L14.775 7.8L16.2 9.225L15.475 8.525Z" fill="#2F2F38"/>
@@ -402,11 +448,6 @@
 <path id="vector" d="M7.75 9.84167C7.67222 9.81389 7.6 9.76667 7.53333 9.7L4.46667 6.63333C4.34444 6.51111 4.28333 6.35556 4.28333 6.16667C4.28333 5.97778 4.34444 5.82222 4.46667 5.7C4.58889 5.57778 4.74444 5.51667 4.93333 5.51667C5.12222 5.51667 5.27778 5.57778 5.4 5.7L8 8.3L10.6 5.7C10.7222 5.57778 10.8778 5.51667 11.0667 5.51667C11.2556 5.51667 11.4111 5.57778 11.5333 5.7C11.6556 5.82222 11.7167 5.97778 11.7167 6.16667C11.7167 6.35556 11.6556 6.51111 11.5333 6.63333L8.46667 9.7C8.4 9.76667 8.32778 9.81389 8.25 9.84167C8.17222 9.86944 8.08889 9.88333 8 9.88333C7.91111 9.88333 7.82778 9.86944 7.75 9.84167Z" fill="#2F2F38"/>
 </g>
 </svg>`,
-    separator: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="175" height="1" viewBox="0 0 175 1" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="Separator">
-<path id="Vector 1" d="M0.5 0.5H174.5" stroke-linecap="round" stroke="#E1E1E1"/>
-</g>
-</svg>`,
     openInNew: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g id="open_in_new">
 <path id="vector" d="M4.16667 17.5C3.70833 17.5 3.31597 17.3368 2.98958 17.0104C2.66319 16.684 2.5 16.2917 2.5 15.8333V4.16667C2.5 3.70833 2.66319 3.31597 2.98958 2.98958C3.31597 2.66319 3.70833 2.5 4.16667 2.5H9.16667C9.40278 2.5 9.60069 2.57986 9.76042 2.73958C9.92014 2.89931 10 3.09722 10 3.33333C10 3.56944 9.92014 3.76736 9.76042 3.92708C9.60069 4.08681 9.40278 4.16667 9.16667 4.16667H4.16667V15.8333H15.8333V10.8333C15.8333 10.5972 15.9132 10.3993 16.0729 10.2396C16.2326 10.0799 16.4306 10 16.6667 10C16.9028 10 17.1007 10.0799 17.2604 10.2396C17.4201 10.3993 17.5 10.5972 17.5 10.8333V15.8333C17.5 16.2917 17.3368 16.684 17.0104 17.0104C16.684 17.3368 16.2917 17.5 15.8333 17.5H4.16667ZM15.8333 5.33333L8.66667 12.5C8.51389 12.6528 8.31944 12.7292 8.08333 12.7292C7.84722 12.7292 7.65278 12.6528 7.5 12.5C7.34722 12.3472 7.27083 12.1528 7.27083 11.9167C7.27083 11.6806 7.34722 11.4861 7.5 11.3333L14.6667 4.16667H12.5C12.2639 4.16667 12.066 4.08681 11.9062 3.92708C11.7465 3.76736 11.6667 3.56944 11.6667 3.33333C11.6667 3.09722 11.7465 2.89931 11.9062 2.73958C12.066 2.57986 12.2639 2.5 12.5 2.5H16.6667C16.9028 2.5 17.1007 2.57986 17.2604 2.73958C17.4201 2.89931 17.5 3.09722 17.5 3.33333V7.5C17.5 7.73611 17.4201 7.93403 17.2604 8.09375C17.1007 8.25347 16.9028 8.33333 16.6667 8.33333C16.4306 8.33333 16.2326 8.25347 16.0729 8.09375C15.9132 7.93403 15.8333 7.73611 15.8333 7.5V5.33333Z" fill="#553ADF"/>
@@ -419,12 +460,35 @@
 </svg>`,
   };
   const iconUrl = (name) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(ICONS[name]);
-  const icon = (name, size) => `<span class="icon i${size}"><img alt="" src="${iconUrl(name)}"></span>`;
+  // An icon in the color of its mode: brand icons in --accent, the others in --icon.
+  const iconTone = (name) => (/#553ADF|#A3A7FF/.test(ICONS[name]) ? " brand" : "");
+  const icon = (name, size) => `<span class="icon i${size} tinted${iconTone(name)}" style="--shape: url('${iconUrl(name)}')"></span>`;
   // An icon in the color of its card (--icon).
   const cardIcon = (name, size) => `<span class="icon i${size} tinted" style="--shape: url('${iconUrl(name)}')"></span>`;
-  const SEPARATOR = `<div class="sep"><img alt="" src="${iconUrl("separator")}"></div>`;
-  document.documentElement.style.setProperty("--check-icon", `url("${iconUrl("check")}")`);
-  for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = `<img alt="" src="${iconUrl(el.dataset.icon)}">`;
+  const SEPARATOR = `<div class="sep"></div>`;
+  for (const el of document.querySelectorAll("[data-icon]")) {
+    el.className += ` tinted${iconTone(el.dataset.icon)}`;
+    el.style.setProperty("--shape", `url('${iconUrl(el.dataset.icon)}')`);
+  }
+
+  // ---------- Light and dark window ----------
+  // The switch in the bottom bar. The plugin remembers the choice for this person (figma.clientStorage).
+  // The check mark is a picture, so it gets the color of the mode here: white, or the design's color/icon/inverse.
+  const checkIconFor = (dark) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(dark ? ICONS.check.replaceAll('fill="white"', 'fill="#0C0D11"') : ICONS.check);
+  function setUiMode(mode) {
+    const dark = mode === "dark";
+    document.documentElement.classList.toggle("ui-dark", dark);
+    document.documentElement.style.setProperty("--check-icon", `url("${checkIconFor(dark)}")`);
+    const button = document.getElementById("uiMode");
+    button.setAttribute("aria-pressed", String(dark));
+    button.title = dark ? "Switch to light mode" : "Switch to dark mode";
+  }
+  setUiMode("light");
+  document.getElementById("uiMode").onclick = () => {
+    const mode = document.documentElement.classList.contains("ui-dark") ? "light" : "dark";
+    setUiMode(mode);
+    parent.postMessage({ pluginMessage: { type: "ui-mode", mode } }, "*");
+  };
 
   // ---------- Overlay scrollbar ----------
   // A thin scrollbar drawn over the content, so scrolling never changes the layout width.
@@ -883,10 +947,10 @@
     panel.canvas = stepPicker("Canvas color", () => {
       const picked = panel.canvas.get().base;
       if (picked !== base) { base = picked; panel.textFill.setOptions(fillOptions(base)); }
-      panel.classList.toggle("dark", base === "Dark");
+      panel.classList.toggle("dark", base === "Dark"); panel.classList.toggle("light", base !== "Dark");
     });
     panel.canvas.setOptions(kind === "Light" ? light : kind === "Dark" ? dark : [...light, ...dark], saved ? `${saved.base}:${saved.canvasStep}` : undefined);
-    panel.classList.toggle("dark", base === "Dark");
+    panel.classList.toggle("dark", base === "Dark"); panel.classList.toggle("light", base !== "Dark");
     const rows = document.createElement("div");
     rows.className = "card-rows";
     rows.append(cardRow("Canvas color", panel.canvas), cardRow("Text fill", panel.textFill));
@@ -1144,6 +1208,7 @@
   onmessage = (event) => {
     const msg = event.data.pluginMessage;
     if (!msg) return;
+    if (msg.type === "ui-mode") setUiMode(msg.mode);
     if (msg.type === "saved-inputs") {
       FONTS = msg.fonts || {};
       GRAY = msg.ui?.gray || {};

@@ -3313,7 +3313,11 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
   // src/figma.ts
   var FILE_INPUTS = "form-inputs";
   var OLDER_STORAGE_KEY = "last-inputs";
+  var UI_MODE_KEY = "ui-mode";
   figma.showUI(__html__, { width: 960, height: 880 });
+  figma.clientStorage.getAsync(UI_MODE_KEY).then((mode) => {
+    if (mode) figma.ui.postMessage({ type: "ui-mode", mode });
+  });
   var fontStyles = null;
   async function loadFontStyles() {
     var _a, _b;
@@ -3357,6 +3361,7 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
   })();
   figma.ui.onmessage = async (msg) => {
     var _a;
+    if (msg.type === "ui-mode") return figma.clientStorage.setAsync(UI_MODE_KEY, msg.mode);
     if (msg.type === "tables") return updateTablesOnly();
     if (msg.type === "export") return exportTokens(msg.options);
     if (msg.type === "names") return previewNames(msg.inputs);

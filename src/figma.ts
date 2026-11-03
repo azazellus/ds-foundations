@@ -26,7 +26,13 @@ const FILE_INPUTS = "form-inputs";
 // Earlier versions kept one copy per user, in every file. It is only read now, for files they generated.
 const OLDER_STORAGE_KEY = "last-inputs";
 
+// Light or dark window: this person's choice, in every file.
+const UI_MODE_KEY = "ui-mode";
+
 figma.showUI(__html__, { width: 960, height: 880 });
+figma.clientStorage.getAsync(UI_MODE_KEY).then((mode) => {
+  if (mode) figma.ui.postMessage({ type: "ui-mode", mode });
+});
 
 // The font families installed in Figma, with their non-italic styles (for the font and weight lists).
 let fontStyles: Record<string, string[]> | null = null;
@@ -73,8 +79,9 @@ async function settingsForThisFile(): Promise<Inputs | null> {
 })();
 
 figma.ui.onmessage = async (msg: {
-  type: string; inputs: Inputs; write: boolean; options: ExportChoice;
+  type: string; inputs: Inputs; write: boolean; options: ExportChoice; mode: string;
 }) => {
+  if (msg.type === "ui-mode") return figma.clientStorage.setAsync(UI_MODE_KEY, msg.mode);
   if (msg.type === "tables") return updateTablesOnly();
   if (msg.type === "export") return exportTokens(msg.options);
   if (msg.type === "names") return previewNames(msg.inputs);
