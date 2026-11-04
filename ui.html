@@ -1,6 +1,7 @@
 <!-- Plugin window: the input form (foundations-spec.md section 5.1) and the validation report (section 6.1).
      Layout follows the "Plugin UI" design (Figma file vVJzXGPhbz2Zb5KXwuJfse, node 39:2602): a 960 × 880 window that can be resized,
-     with each color's palette shown next to it. The window is light or dark, by the switch in the bottom bar;
+     with each color's palette shown next to it. A bar at the top holds three tabs: Edit, Generate and Export.
+     A file with no tokens opens on the landing page. The window is light or dark, by the switch in the top bar;
      each appearance card always shows its real colors. -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,15 +16,20 @@
     --step-label: #676872;
     --placeholder: rgba(0, 0, 0, 0.32);
     --window: #ffffff;
-    --panel: #ffffff;
-    --overlay: #ffffff;   /* the bottom button bar */
+    --panel: #ffffff;     /* theme, color mode and export panels */
+    --base: #ffffff;      /* the Report card and the font weight chips */
+    --overlay: #ffffff;   /* the top bar */
+    --tab-on: #ffffff;    /* the selected tab */
+    --icon-inverse: #ffffff; /* icons on the main button */
     --add-bg: #f3f4ff;    /* the "Add …" placeholder sections */
     --field: #ffffff;
     --action-bg: #ffffff; /* buttons */
     --on-action: #ffffff; /* text on the main button and the slider thumb */
-    --track: #e8e9f2;     /* the slider's line */
-    --border: rgba(0, 0, 0, 0.24);
-    --field-line: rgba(0, 0, 0, 0.24);
+    --track: #d9dae4;     /* the slider's line */
+    --tab-track: #f3f4fa; /* behind the three tabs */
+    --glow: #e5e8ff;      /* the center of the soft light behind the logo on the landing page */
+    --border: rgba(0, 0, 0, 0.16);
+    --field-line: rgba(0, 0, 0, 0.16);
     --brand-line: rgba(85, 58, 223, 0.36); /* buttons and "Add …" sections */
     --accent: #553adf;    /* brand text and icons, selected weight chips */
     --action: #553adf;    /* main button, ticked checkboxes, slider thumb */
@@ -31,12 +37,12 @@
     --selected-line: #7b79f4;
     --empty-swatch: #d9d9d9;
     --scroll-thumb: rgba(0, 0, 0, 0.32);
-    --error: #d1293d;
-    --warning: #b86200;
-    --success: #14804a;
-    --bar-shadow: rgba(255, 255, 255, 0.48); /* around the bottom button bar */
+    --error: #ad3b4e;
+    --warning: #776600;
+    --success: #00754c;
+    --bar-shadow: rgba(0, 0, 0, 0.12); /* around the top bar */
     --add-shadow: inset 0 4px 16px rgba(0, 0, 0, 0.12), inset 0 -8px 12px rgba(255, 255, 255, 0.48); /* "Add …" sections */
-    --extrude: inset 0 -2px 12px rgba(0, 0, 0, 0.08);        /* panels and the bottom bar */
+    --extrude: inset 0 -2px 12px rgba(0, 0, 0, 0.08);        /* panels and the top bar */
     --shadow-secondary: inset 0 4px 4px rgba(255, 255, 255, 0.48), inset 0 -4px 4px rgba(0, 0, 0, 0.04); /* buttons and dropdowns */
     --line: inset 0 0 0 0.5px var(--border);
     --field-border: inset 0 0 0 0.5px var(--field-line);
@@ -52,15 +58,20 @@
     --step-label: #afb0bb;
     --placeholder: rgba(255, 255, 255, 0.4);
     --window: #1c1c23;
-    --panel: #1c1c23;
-    --overlay: #131419;
+    --panel: #23232b;
+    --base: #1c1c23;
+    --overlay: #23232b;
+    --tab-on: #23232b;
+    --icon-inverse: #0c0d11;
     --add-bg: #16123e;
     --field: #2f2f38;
     --action-bg: #2f2f38;
     --on-action: #131419;
-    --track: #23232b;
-    --border: rgba(255, 255, 255, 0.16);
-    --field-line: rgba(255, 255, 255, 0.16);
+    --track: #2f2f38;
+    --tab-track: #1c1c23;
+    --glow: #1c184d;
+    --border: rgba(255, 255, 255, 0.12);
+    --field-line: rgba(255, 255, 255, 0.12);
     --brand-line: rgba(85, 58, 223, 0.36);
     --accent: #a3a7ff;
     --action: #a3a7ff;
@@ -71,7 +82,7 @@
     --error: #ff8d99;
     --warning: #c7af32;
     --success: #4dca91;
-    --bar-shadow: rgba(0, 0, 0, 0.48);
+    --bar-shadow: rgba(255, 255, 255, 0);
     --add-shadow: inset 0 4px 16px rgba(255, 255, 255, 0), inset 0 -8px 12px rgba(255, 255, 255, 0.06);
     --extrude: inset 0 -2px 12px rgba(255, 255, 255, 0.08);
     --shadow-secondary: inset 0 4px 4px rgba(255, 255, 255, 0.06), inset 0 -4px 4px rgba(0, 0, 0, 0.04);
@@ -92,16 +103,16 @@
     --shadow-primary: inset 0 -4px 6px rgba(7, 0, 72, 0.24);   /* the main button */
   }
   * { box-sizing: border-box; }
-  /* The window itself never scrolls (and never bounces), so the bottom button bar stays put.
-     Only the content area (.scroll) scrolls. Its bottom padding leaves room for the button bar. */
+  /* The window itself never scrolls (and never bounces), so the top bar stays put.
+     Only the content area (.scroll) scrolls. Its top padding leaves room for the top bar (88px). */
   html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
   body { margin: 0; background: var(--window); color: var(--text); font: 14px/20px var(--sans); }
-  .scroll { height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 16px 16px 120px; }
+  .scroll { height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 112px 16px 24px; }
   /* The native scrollbar is hidden so it takes no width from the layout. A thin scrollbar is drawn
      over the content instead (.scrollbar, moved by the script "Overlay scrollbar"). */
   .scroll { scrollbar-width: none; }
   .scroll::-webkit-scrollbar { display: none; }
-  .scrollbar { position: fixed; top: 2px; right: 0; bottom: 2px; width: 12px; z-index: 20; pointer-events: none; }
+  .scrollbar { position: fixed; top: 90px; right: 0; bottom: 2px; width: 12px; z-index: 20; pointer-events: none; }
   .scrollbar .thumb {
     position: absolute; right: 3px; width: 6px; border-radius: 3px; background: var(--scroll-thumb);
     opacity: 0; transition: opacity 0.3s; pointer-events: auto;
@@ -110,16 +121,20 @@
   button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
   .hidden { display: none !important; }
 
-  /* Sections: "Themes", "Color modes", "Export tokens" and "Report". */
-  .card { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 24px; }
+  /* Until the plugin sends the settings, nothing shows: the window then opens on the right page. */
+  html:not(.ready) .nav, html:not(.ready) .scroll { visibility: hidden; }
+
+  /* Sections: "Themes", "Color modes" and the export panels. */
+  .card { display: flex; flex-direction: column; align-items: center; gap: 24px; margin-bottom: 48px; }
+  .card:last-child { margin-bottom: 0; }
   .section-title { align-self: stretch; display: flex; flex-direction: column; gap: 8px; padding: 12px 24px; }
   .section-title h1 { margin: 0; font-size: 28px; line-height: 40px; font-weight: 700; }
   .section-title p { margin: 0; width: 440px; max-width: 100%; }
-  .stack { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
+  .stack { align-self: stretch; display: flex; flex-direction: column; gap: 12px; }
 
   /* White panels: one per theme, appearance, or export. */
   .panel { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 24px; color: var(--text); background: var(--panel); border-radius: 24px; box-shadow: var(--line), var(--extrude); }
-  .panel.theme { gap: 16px; scroll-margin-top: 16px; }
+  .panel.theme { gap: 16px; scroll-margin-top: 104px; } /* stays clear of the top bar when scrolled to */
   .panel-title { align-self: stretch; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .panel-title .name, .panel-title input { font-size: 20px; line-height: 32px; font-weight: 700; }
   .panel-title input { flex: 1; min-width: 0; padding: 0 8px; border: 0; border-radius: 8px; background: var(--field); box-shadow: var(--field-border); color: var(--text); font-family: inherit; }
@@ -140,7 +155,7 @@
   /* "Add …" placeholder sections: light purple, recessed, with a white button in the middle. */
   .add-section { align-self: stretch; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
     background: var(--add-bg); border-radius: 24px; box-shadow: var(--brand-border), var(--add-shadow); }
-  .add-section.theme { height: 80px; }   /* "Add theme" */
+  .add-section.theme { height: 112px; }   /* "Add theme" */
 
   .section { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; align-self: stretch; }
   .section.colors { gap: 12px; }
@@ -200,7 +215,7 @@
   /* A weight is a toggle chip. Off: white with the style name. On: light purple, bold, with a "×" to turn it off.
      The hidden checkbox keeps it accessible; the script mirrors it as the class "on". */
   .chip { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 12px; border-radius: 512px;
-    background: var(--panel); box-shadow: var(--line), var(--shadow-secondary); color: var(--text); font-weight: 400; cursor: pointer; white-space: nowrap; }
+    background: var(--base); box-shadow: var(--line), var(--shadow-secondary); color: var(--text); font-weight: 400; cursor: pointer; white-space: nowrap; }
   .chip input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
   .chip .x { display: none; width: 16px; height: 16px; }
   .chip.on { padding-right: 8px; background: var(--accent-soft); box-shadow: inset 0 0 0 0.5px var(--selected-line), var(--shadow-secondary); color: var(--accent); font-weight: 600; }
@@ -232,7 +247,7 @@
 
   /* Color modes: two columns that fill the width. "Add appearance" is the next cell.
      All rows have the same height, so that cell is always as tall as a card. */
-  .mode-grid { align-self: stretch; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 8px; }
+  .mode-grid { align-self: stretch; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 12px; }
   #appearances { display: contents; }
   .panel.appearance { min-width: 0; gap: 16px; }
   .card-rows { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
@@ -249,11 +264,13 @@
   .preview .soft .neutral { background: var(--soft-neutral); }
   .preview .soft .brand { background: var(--soft-brand); }
 
-  /* Export tokens: two panels side by side. The button sits at the bottom right. */
-  .export-grid { align-self: stretch; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  /* Export: two panels side by side. The button sits under the options, on the right. */
+  .export-grid { align-self: stretch; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+  #tabExport .card { margin-bottom: 12px; }
+  #tabExport .card:last-child { margin-bottom: 0; }
   .panel.export { gap: 16px; min-width: 0; }
   .panel.export .about { font-size: 12px; line-height: 16px; min-height: 48px; margin: 0; color: var(--muted); }
-  .panel.export .options { align-self: stretch; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .panel.export .options { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
   .panel.export > .pill { align-self: flex-end; }
 
   /* Pill buttons: white with a thin line and a soft inner shadow; the main one is purple. */
@@ -261,19 +278,65 @@
   .pill.small { height: 24px; padding-top: 0; padding-bottom: 0; }
   .pill.text-only { padding: 2px 12px; }
   .pill.primary { background: var(--action); box-shadow: var(--shadow-primary); color: var(--on-action); }
+  .pill.primary .icon.tinted, .pill.primary .icon.tinted.brand { background: var(--icon-inverse); }
   .pill:disabled { opacity: 0.5; cursor: default; }
+  .pill.icon-only { width: 40px; height: 40px; padding: 0; }
   .icon-btn { border-radius: 6px; }
   .icon-btn:focus-visible, .pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  /* Bottom button bar: flush with the window's bottom edge, rounded at the top. */
-  .bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; filter: drop-shadow(0 -16px 16px var(--bar-shadow)); }
-  .bottom-buttons {
-    display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 24px;
-    background: var(--overlay); border-radius: 48px 48px 0 0;
-    box-shadow: inset 0.5px 0.5px 0 0 var(--border), inset -0.5px 0 0 0 var(--border), var(--extrude);
+  /* Top bar: flush with the window's top edge, rounded at the bottom. The content scrolls under it. */
+  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10; filter: drop-shadow(0 -16px 16px var(--bar-shadow)); }
+  .nav-bar {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px; height: 88px; padding: 24px;
+    background: var(--overlay); border-radius: 0 0 48px 48px;
+    box-shadow: inset 0.5px -0.5px 0 0 var(--border), inset -0.5px 0 0 0 var(--border), var(--extrude);
   }
-  .bottom-buttons .group { display: flex; gap: 8px; }
-  .bottom-buttons .pill { height: 48px; padding: 0 24px; font-size: 16px; }
-  .bottom-buttons .pill.icon-only { width: 48px; padding: 0; }
+  .brand { display: flex; align-items: center; gap: 12px; padding: 0 16px; color: var(--accent); flex-shrink: 0; }
+  .brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  .brand-logo { display: block; width: 12px; height: 24px; }
+  .brand-name { font: 700 24px/24px var(--sans); letter-spacing: -1.2px; white-space: nowrap; }
+  .nav-buttons { display: flex; gap: 8px; flex-shrink: 0; }
+  /* The three tabs. The selected one is a white pill. */
+  .nav-tabs { display: flex; gap: 8px; padding: 4px; border-radius: 20px; background: var(--tab-track); box-shadow: var(--line), var(--incave); }
+  .nav-tabs button { height: 32px; padding: 0 20px; border-radius: 512px; font: 400 16px/20px var(--sans); color: var(--text); white-space: nowrap; }
+  .nav-tabs button.on { background: var(--tab-on); box-shadow: var(--line), var(--shadow-secondary); color: var(--accent); font-weight: 600; }
+  .nav-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* Landing page: shown when the file has no tokens, or when the name in the top bar is pressed.
+     It covers the window until "Let's start!" is pressed, and the tabs and the form stay as they were underneath. */
+  .landing { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; overflow-y: auto; padding: 24px 16px;
+    background: radial-gradient(31.83% 31.83% at 50% 40.26%, var(--glow), var(--window)); }
+  .landing-switch { position: absolute; top: 24px; right: 24px; }
+  /* margin: auto centers the content, and still lets it scroll in a window that is too short for it. */
+  .landing-content { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 48px; }
+  .landing-logo { display: block; width: 96px; height: 192px; color: var(--accent); }
+  .landing-text { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+  .landing-text h1 { margin: 0; font: 700 80px/80px var(--sans); letter-spacing: -4px; color: var(--accent); white-space: nowrap; }
+  .landing-start { height: 40px; padding: 0 20px !important; font-size: 16px; }
+  .landing-text p { margin: 0; width: 416px; max-width: 100%; font-size: 16px; line-height: 24px; text-align: center; }
+
+  /* Generate tab: the result of the check on the left, the buttons on the right. */
+  .action-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; min-height: 40px; padding: 0 24px; margin-bottom: 24px; }
+  .action-row .group { display: flex; gap: 8px; margin-left: auto; }
+  .action-row .pill { height: 40px; padding: 0 20px; font-size: 16px; }
+  .status-line { flex: 1 1 280px; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 16px; line-height: 20px; color: var(--muted); }
+  .status-line.ok { color: var(--success); }
+  .status-line.error { color: var(--error); }
+  .status-line .icon.tinted { background: currentColor; }
+
+  /* Report: a card that opens and closes. It turns red and fills the window when there are errors. */
+  .panel.report-card { gap: 16px; align-items: stretch; padding: 24px; background: var(--base); }
+  .report-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; }
+  .report-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+  .report-title { display: flex; align-items: center; gap: 8px; font-size: 20px; line-height: 32px; font-weight: 700; }
+  .report-count { font-size: 14px; line-height: 20px; font-weight: 400; color: var(--muted); }
+  .report-warning { display: none; }
+  .report-card.error { min-height: calc(100vh - 136px); }
+  .report-card.error .report-title { color: var(--error); }
+  .report-card.error .report-warning { display: block; background: var(--error); }
+  .report-head .when-open { display: none; }
+  .report-head[aria-expanded="true"] .when-open { display: block; }
+  .report-head[aria-expanded="true"] .when-closed { display: none; }
+  .report-body { display: flex; flex-direction: column; gap: 12px; }
   /* The handle that resizes the window, in its bottom right corner. */
   .resize-handle { position: fixed; right: 0; bottom: 0; z-index: 30; width: 20px; height: 20px; color: var(--muted); cursor: nwse-resize; touch-action: none; }
   .resize-handle svg { display: block; }
@@ -281,13 +344,11 @@
   @media (max-width: 919px) {
     .mode-grid, .export-grid { grid-template-columns: 1fr; }
   }
-  .row-of-pills { display: flex; gap: 8px; justify-content: center; }
 
-  /* Report. */
+  /* Report and export results. */
   .report .panel { align-self: stretch; align-items: stretch; }
-  #status { font-weight: 600; }
-  #status.error { color: var(--error); } #status.ok { color: var(--success); }
-  #summary { color: var(--text); }
+  .result-status { font-weight: 600; }
+  .result-status.error { color: var(--error); } .result-status.ok { color: var(--success); }
   .report table { width: 100%; border-collapse: collapse; font-size: 11px; line-height: 15px; }
   .report th, .report td { text-align: left; padding: 4px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; }
   .report td.error { color: var(--error); font-weight: 600; } .report td.warning { color: var(--warning); font-weight: 600; }
@@ -297,7 +358,25 @@
   textarea { width: 100%; height: 160px; padding: 8px; font: 11px/1.3 var(--mono); font-variant-ligatures: none; border: 0; border-radius: 8px; background: var(--field); box-shadow: var(--field-border), var(--incave); color: var(--text); }
 </style>
 
+<!-- Top bar: logo, tabs, settings (no feature behind it yet) and the light or dark switch. -->
+<header class="nav">
+  <div class="nav-bar">
+    <button type="button" class="brand" id="home" aria-label="Tokenseed: open the landing page"><span class="brand-logo" data-svg="logoSmall"></span><span class="brand-name">Tokenseed</span></button>
+    <div class="nav-tabs" role="tablist" aria-label="Pages">
+      <button type="button" role="tab" data-tab="edit" class="on" aria-selected="true">Edit</button>
+      <button type="button" role="tab" data-tab="generate" aria-selected="false">Generate</button>
+      <button type="button" role="tab" data-tab="export" aria-selected="false">Export</button>
+    </div>
+    <div class="nav-buttons">
+      <button type="button" class="pill icon-only" id="settings" aria-label="Settings"><span class="icon i24" data-icon="tune"></span></button>
+      <button type="button" class="pill icon-only ui-mode" aria-label="Dark mode"><span class="icon i24" data-icon="contrast"></span></button>
+    </div>
+  </div>
+</header>
+
 <main class="scroll" id="scroll">
+<!-- Edit tab: the themes and the color modes. -->
+<div id="tabEdit">
 <section class="card" aria-labelledby="themesTitle">
   <div class="section-title">
     <h1 id="themesTitle">Themes</h1>
@@ -323,10 +402,52 @@
     </div>
   </div>
 </section>
+</div>
 
-<!-- Developer exports (src/export.ts, spec section 6.1.2): Appearance tokens, and ColorScheme tokens for Android. -->
-<section class="card" aria-labelledby="exportTitle">
-  <div class="section-title"><h1 id="exportTitle">Export tokens</h1></div>
+<!-- Generate tab: the check runs when the tab opens, and writes nothing. The buttons are hidden while there are errors. -->
+<div id="tabGenerate" class="hidden">
+  <div class="action-row" id="actionRow">
+    <div class="status-line" id="statusLine" role="status"><span id="statusIcon"></span><span id="statusText"></span></div>
+    <div class="group">
+      <button type="button" class="pill text-only hidden" id="tables" title="Redraw the color tables from the variables as they are now in this file">Update tables</button>
+      <button type="button" class="pill text-only primary" id="create">Generate tokens</button>
+    </div>
+  </div>
+  <div class="panel report-card" id="reportCard">
+    <button type="button" class="report-head" id="reportToggle" aria-expanded="false" aria-controls="reportBody">
+      <span class="report-title">
+        <span class="icon i24 report-warning" data-icon="warning"></span>
+        <span>Report</span>
+        <span class="report-count" id="reportCount"></span>
+      </span>
+      <span class="icon i24 when-closed" data-icon="arrowDown"></span>
+      <span class="icon i24 when-open" data-icon="arrowUp"></span>
+    </button>
+    <div class="sep hidden" id="reportSep"></div>
+    <div class="report-body report hidden" id="reportBody">
+      <div class="result-status" id="reportStatus"></div>
+      <div id="summary"></div>
+      <div id="details" class="stack hidden">
+        <label class="check-row"><input type="checkbox" class="cb" id="showWarnings" checked> Show warnings</label>
+        <table>
+          <thead><tr><th>Severity</th><th>Check</th><th>Token</th><th>Mode</th><th>Expected</th><th>Actual</th><th>Message</th></tr></thead>
+          <tbody id="findings"></tbody>
+        </table>
+        <div class="tabs">
+          <button type="button" class="pill on" data-out="report">Report JSON</button>
+          <button type="button" class="pill" data-out="manifest">Manifest JSON</button>
+          <button type="button" class="pill" data-out="definitions">Variable definitions</button>
+          <button type="button" class="pill" id="copy">Copy</button>
+        </div>
+        <textarea id="output" readonly aria-label="JSON output"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Export tab: developer exports (src/export.ts, spec section 6.1.2): Appearance tokens, and ColorScheme tokens for Android. -->
+<div id="tabExport" class="hidden">
+<section class="card" aria-label="Export tokens">
   <div class="export-grid">
     <div class="panel export" data-collection="appearance">
       <div class="panel-title"><span class="name">Appearance</span></div>
@@ -348,7 +469,7 @@
               <option value="perTheme">One file per theme</option>
             </select></div></div>
       </div>
-      <button type="button" class="pill" id="export"><span class="icon i20" data-icon="openInNew"></span>Export JSON</button>
+      <button type="button" class="pill primary" id="export"><span class="icon i20" data-icon="openInNew"></span>Export JSON</button>
     </div>
     <div class="panel export" data-collection="colorScheme">
       <div class="panel-title"><span class="name">ColorScheme (Android)</span></div>
@@ -369,35 +490,18 @@
               <option value="perTheme">One file per theme</option>
             </select></div></div>
       </div>
-      <button type="button" class="pill" id="exportScheme"><span class="icon i20" data-icon="openInNew"></span><span id="exportSchemeLabel">Export Kotlin</span></button>
+      <button type="button" class="pill primary" id="exportScheme"><span class="icon i20" data-icon="openInNew"></span><span id="exportSchemeLabel">Export Kotlin</span></button>
     </div>
   </div>
 </section>
 
 
-<section class="card report hidden" id="result" aria-labelledby="reportTitle">
-  <div class="section-title"><h1 id="reportTitle">Report</h1></div>
+<!-- The export result, shown after an Export button: one pill per file, then the selected file. -->
+<section class="card report hidden" id="exportResult" aria-label="Export result">
   <div class="panel stack">
-    <div id="status" role="status"></div>
-    <div id="summary"></div>
-    <!-- Validation details; hidden after "Update tables", which runs no checks. -->
-    <div id="details" class="stack">
-      <label class="check-row"><input type="checkbox" class="cb" id="showWarnings" checked> Show warnings</label>
-      <table>
-        <thead><tr><th>Severity</th><th>Check</th><th>Token</th><th>Mode</th><th>Expected</th><th>Actual</th><th>Message</th></tr></thead>
-        <tbody id="findings"></tbody>
-      </table>
-      <div class="tabs">
-        <button type="button" class="pill on" data-out="report">Report JSON</button>
-        <button type="button" class="pill" data-out="manifest">Manifest JSON</button>
-        <button type="button" class="pill" data-out="definitions">Variable definitions</button>
-        <button type="button" class="pill" id="copy">Copy</button>
-      </div>
-      <textarea id="output" readonly aria-label="JSON output"></textarea>
-    </div>
-    <!-- Export result: shown after "Export JSON". -->
+    <div class="result-status" id="exportStatus" role="status"></div>
+    <div id="exportSummary"></div>
     <div id="exportDetails" class="stack hidden">
-      <!-- One pill per exported file; the selected file is shown below. -->
       <div class="tabs" id="exportFiles"></div>
       <div class="tabs">
         <button type="button" class="pill" id="download">Download this file</button>
@@ -408,6 +512,7 @@
     </div>
   </div>
 </section>
+</div>
 
 </main>
 
@@ -415,20 +520,97 @@
 
 <div class="scrollbar" id="scrollbar" aria-hidden="true"><div class="thumb"></div></div>
 
-<div class="bottom-bar">
-  <div class="bottom-buttons">
-    <button type="button" class="pill icon-only" id="uiMode" aria-label="Dark mode"><span class="icon i24" data-icon="contrast"></span></button>
-    <div class="group">
-      <button type="button" class="pill text-only" id="check">Check only</button>
-      <button type="button" class="pill text-only" id="tables" title="Redraw the color tables from the variables as they are now in this file">Update tables</button>
+<!-- Landing page: shown when the file has no tokens, or when the name in the top bar is pressed. -->
+<div class="landing hidden" id="landing">
+  <button type="button" class="pill icon-only ui-mode landing-switch" aria-label="Dark mode"><span class="icon i24" data-icon="contrast"></span></button>
+  <div class="landing-content">
+    <span class="landing-logo" data-svg="logoLarge"></span>
+    <div class="landing-text">
+      <h1>Tokenseed</h1>
+      <p>Create accessible and maintainable foundation tokens for your design systems. Tokenseed generates colors, sizes and typographies based on your preferences.</p>
     </div>
-    <button type="button" class="pill text-only primary" id="create">Generate tokens</button>
+    <button type="button" class="pill text-only primary landing-start" id="start">Let's start!</button>
   </div>
 </div>
 
 <script>
   // ---------- Icons from the design (exported unchanged from Figma; see ui-assets/) ----------
   const ICONS = {
+    logoSmall: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="12" height="24" viewBox="0 0 12 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Logo">
+<g id="Subtract" filter="url(#filter0_ii_0_72)">
+<path d="M5.46826 0.534668C5.76147 0.239883 6.23853 0.239883 6.53174 0.534668L11.5635 5.59424C11.843 5.8753 12 6.25547 12 6.65186V17.3785C12 17.7764 11.8419 18.1581 11.5605 18.4395L6.53027 23.4697C6.23739 23.7625 5.76261 23.7625 5.46973 23.4697L0.439453 18.4395C0.158149 18.1581 0 17.7764 0 17.3785V6.65186C0 6.25547 0.157021 5.8753 0.436523 5.59424L5.46826 0.534668ZM6.26587 7.76733C6.11926 7.61994 5.88074 7.61994 5.73413 7.76733L4.71826 8.7887C4.57854 8.92919 4.50005 9.11937 4.5 9.3175V14.6895C4.50003 14.8883 4.5791 15.0791 4.71973 15.2197L5.73486 16.2349C5.8813 16.3813 6.1187 16.3813 6.26514 16.2349L7.28027 15.2197C7.4209 15.0791 7.49997 14.8883 7.5 14.6895V9.3175C7.49995 9.11937 7.42146 8.92919 7.28174 8.7887L6.26587 7.76733Z" fill-rule="evenodd" clip-rule="evenodd" fill="#553ADF"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_ii_0_72" x="-0.375" y="-1.18642" width="12.75" height="26.3758" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dx="-0.375" dy="1.5"/>
+<feGaussianBlur stdDeviation="1.125"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.24 0"/>
+<feBlend mode="normal" in2="shape" result="effect1_innerShadow_0_72"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dx="0.375" dy="-1.5"/>
+<feGaussianBlur stdDeviation="1.125"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.124499 0 0 0 0 0.0488784 0 0 0 0 0.5389 0 0 0 0.4 0"/>
+<feBlend mode="normal" in2="effect1_innerShadow_0_72" result="effect2_innerShadow_0_72"/>
+</filter>
+</defs>
+</svg>`,
+    logoLarge: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="96" height="192" viewBox="0 0 96 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Logo">
+<g id="Subtract" filter="url(#filter0_ii_0_7)">
+<path d="M43.7461 4.27734C46.0918 1.91907 49.9082 1.91907 52.2539 4.27734L92.5078 44.7539C94.7438 47.0024 96 50.0438 96 53.2148V139.028C96 142.211 94.7348 145.265 92.4844 147.516L52.2422 187.758C49.8992 190.1 46.1008 190.1 43.7578 187.758L3.51562 147.516C1.26519 145.265 0 142.211 0 139.028V53.2148C0 50.0438 1.25617 47.0024 3.49219 44.7539L43.7461 4.27734ZM50.127 62.1387C48.9541 60.9595 47.0459 60.9595 45.873 62.1387L37.7461 70.3096C36.6283 71.4335 36.0004 72.9549 36 74.54V117.516C36.0002 119.107 36.6328 120.633 37.7578 121.758L45.8789 129.879C47.0504 131.05 48.9496 131.05 50.1211 129.879L58.2422 121.758C59.3672 120.633 59.9998 119.107 60 117.516V74.54C59.9996 72.9549 59.3717 71.4335 58.2539 70.3096L50.127 62.1387Z" fill-rule="evenodd" clip-rule="evenodd" fill="#553ADF"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_ii_0_7" x="-3" y="-9.49136" width="102" height="211.006" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dx="-3" dy="12"/>
+<feGaussianBlur stdDeviation="9"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.24 0"/>
+<feBlend mode="normal" in2="shape" result="effect1_innerShadow_0_7"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dx="3" dy="-12"/>
+<feGaussianBlur stdDeviation="9"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.124499 0 0 0 0 0.0488784 0 0 0 0 0.5389 0 0 0 0.4 0"/>
+<feBlend mode="normal" in2="effect1_innerShadow_0_7" result="effect2_innerShadow_0_7"/>
+</filter>
+</defs>
+</svg>`,
+    tune: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="discover_tune">
+<path id="vector" d="M14 9C13.7167 9 13.4792 8.90417 13.2875 8.7125C13.0958 8.52083 13 8.28333 13 8C13 7.71667 13.0958 7.47917 13.2875 7.2875C13.4792 7.09583 13.7167 7 14 7H16V4C16 3.71667 16.0958 3.47917 16.2875 3.2875C16.4792 3.09583 16.7167 3 17 3C17.2833 3 17.5208 3.09583 17.7125 3.2875C17.9042 3.47917 18 3.71667 18 4V7H20C20.2833 7 20.5208 7.09583 20.7125 7.2875C20.9042 7.47917 21 7.71667 21 8C21 8.28333 20.9042 8.52083 20.7125 8.7125C20.5208 8.90417 20.2833 9 20 9H14ZM16.2875 20.7125C16.0958 20.5208 16 20.2833 16 20V12C16 11.7167 16.0958 11.4792 16.2875 11.2875C16.4792 11.0958 16.7167 11 17 11C17.2833 11 17.5208 11.0958 17.7125 11.2875C17.9042 11.4792 18 11.7167 18 12V20C18 20.2833 17.9042 20.5208 17.7125 20.7125C17.5208 20.9042 17.2833 21 17 21C16.7167 21 16.4792 20.9042 16.2875 20.7125ZM6.2875 20.7125C6.09583 20.5208 6 20.2833 6 20V17H4C3.71667 17 3.47917 16.9042 3.2875 16.7125C3.09583 16.5208 3 16.2833 3 16C3 15.7167 3.09583 15.4792 3.2875 15.2875C3.47917 15.0958 3.71667 15 4 15H10C10.2833 15 10.5208 15.0958 10.7125 15.2875C10.9042 15.4792 11 15.7167 11 16C11 16.2833 10.9042 16.5208 10.7125 16.7125C10.5208 16.9042 10.2833 17 10 17H8V20C8 20.2833 7.90417 20.5208 7.7125 20.7125C7.52083 20.9042 7.28333 21 7 21C6.71667 21 6.47917 20.9042 6.2875 20.7125ZM6.2875 12.7125C6.09583 12.5208 6 12.2833 6 12V4C6 3.71667 6.09583 3.47917 6.2875 3.2875C6.47917 3.09583 6.71667 3 7 3C7.28333 3 7.52083 3.09583 7.7125 3.2875C7.90417 3.47917 8 3.71667 8 4V12C8 12.2833 7.90417 12.5208 7.7125 12.7125C7.52083 12.9042 7.28333 13 7 13C6.71667 13 6.47917 12.9042 6.2875 12.7125Z" fill="#553ADF"/>
+</g>
+</svg>`,
+    warning: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="warning">
+<path id="vector" d="M2.725 21C2.54167 21 2.375 20.9542 2.225 20.8625C2.075 20.7708 1.95833 20.65 1.875 20.5C1.79167 20.35 1.74583 20.1875 1.7375 20.0125C1.72917 19.8375 1.775 19.6667 1.875 19.5L11.125 3.5C11.225 3.33333 11.3542 3.20833 11.5125 3.125C11.6708 3.04167 11.8333 3 12 3C12.1667 3 12.3292 3.04167 12.4875 3.125C12.6458 3.20833 12.775 3.33333 12.875 3.5L22.125 19.5C22.225 19.6667 22.2708 19.8375 22.2625 20.0125C22.2542 20.1875 22.2083 20.35 22.125 20.5C22.0417 20.65 21.925 20.7708 21.775 20.8625C21.625 20.9542 21.4583 21 21.275 21H2.725ZM4.45 19H19.55L12 6L4.45 19ZM12.7125 17.7125C12.9042 17.5208 13 17.2833 13 17C13 16.7167 12.9042 16.4792 12.7125 16.2875C12.5208 16.0958 12.2833 16 12 16C11.7167 16 11.4792 16.0958 11.2875 16.2875C11.0958 16.4792 11 16.7167 11 17C11 17.2833 11.0958 17.5208 11.2875 17.7125C11.4792 17.9042 11.7167 18 12 18C12.2833 18 12.5208 17.9042 12.7125 17.7125ZM12.7125 14.7125C12.9042 14.5208 13 14.2833 13 14V11C13 10.7167 12.9042 10.4792 12.7125 10.2875C12.5208 10.0958 12.2833 10 12 10C11.7167 10 11.4792 10.0958 11.2875 10.2875C11.0958 10.4792 11 10.7167 11 11V14C11 14.2833 11.0958 14.5208 11.2875 14.7125C11.4792 14.9042 11.7167 15 12 15C12.2833 15 12.5208 14.9042 12.7125 14.7125Z" fill="#AD3B4E"/>
+</g>
+</svg>`,
+    arrowUp: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="keyboard_arrow_up">
+<path id="vector" d="M12 10.8L8.1 14.7C7.91667 14.8833 7.68333 14.975 7.4 14.975C7.11667 14.975 6.88333 14.8833 6.7 14.7C6.51667 14.5167 6.425 14.2833 6.425 14C6.425 13.7167 6.51667 13.4833 6.7 13.3L11.3 8.7C11.5 8.5 11.7333 8.4 12 8.4C12.2667 8.4 12.5 8.5 12.7 8.7L17.3 13.3C17.4833 13.4833 17.575 13.7167 17.575 14C17.575 14.2833 17.4833 14.5167 17.3 14.7C17.1167 14.8833 16.8833 14.975 16.6 14.975C16.3167 14.975 16.0833 14.8833 15.9 14.7L12 10.8Z" fill="#2F2F38"/>
+</g>
+</svg>`,
+    arrowDown: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="keyboard_arrow_down">
+<path id="vector" d="M11.625 14.9125C11.5083 14.8708 11.4 14.8 11.3 14.7L6.7 10.1C6.51667 9.91667 6.425 9.68333 6.425 9.4C6.425 9.11667 6.51667 8.88333 6.7 8.7C6.88333 8.51667 7.11667 8.425 7.4 8.425C7.68333 8.425 7.91667 8.51667 8.1 8.7L12 12.6L15.9 8.7C16.0833 8.51667 16.3167 8.425 16.6 8.425C16.8833 8.425 17.1167 8.51667 17.3 8.7C17.4833 8.88333 17.575 9.11667 17.575 9.4C17.575 9.68333 17.4833 9.91667 17.3 10.1L12.7 14.7C12.6 14.8 12.4917 14.8708 12.375 14.9125C12.2583 14.9542 12.1333 14.975 12 14.975C11.8667 14.975 11.7417 14.9542 11.625 14.9125Z" fill="#2F2F38"/>
+</g>
+</svg>`,
+    statusCheck: `<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="check">
+<path id="vector" d="M9.55 15.15L18.025 6.675C18.225 6.475 18.4583 6.375 18.725 6.375C18.9917 6.375 19.225 6.475 19.425 6.675C19.625 6.875 19.725 7.1125 19.725 7.3875C19.725 7.6625 19.625 7.9 19.425 8.1L10.25 17.3C10.05 17.5 9.81667 17.6 9.55 17.6C9.28333 17.6 9.05 17.5 8.85 17.3L4.55 13C4.35 12.8 4.25417 12.5625 4.2625 12.2875C4.27083 12.0125 4.375 11.775 4.575 11.575C4.775 11.375 5.0125 11.275 5.2875 11.275C5.5625 11.275 5.8 11.375 6 11.575L9.55 15.15Z" fill="#00754C"/>
+</g>
+</svg>`,
     contrast: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M8.1 21.2125C6.88333 20.6875 5.825 19.975 4.925 19.075C4.025 18.175 3.3125 17.1167 2.7875 15.9C2.2625 14.6833 2 13.3833 2 12C2 10.6167 2.2625 9.31667 2.7875 8.1C3.3125 6.88333 4.025 5.825 4.925 4.925C5.825 4.025 6.88333 3.3125 8.1 2.7875C9.31667 2.2625 10.6167 2 12 2C13.3833 2 14.6833 2.2625 15.9 2.7875C17.1167 3.3125 18.175 4.025 19.075 4.925C19.975 5.825 20.6875 6.88333 21.2125 8.1C21.7375 9.31667 22 10.6167 22 12C22 13.3833 21.7375 14.6833 21.2125 15.9C20.6875 17.1167 19.975 18.175 19.075 19.075C18.175 19.975 17.1167 20.6875 15.9 21.2125C14.6833 21.7375 13.3833 22 12 22C10.6167 22 9.31667 21.7375 8.1 21.2125ZM13 19.925C14.9833 19.675 16.6458 18.8042 17.9875 17.3125C19.3292 15.8208 20 14.05 20 12C20 9.95 19.3292 8.17917 17.9875 6.6875C16.6458 5.19583 14.9833 4.325 13 4.075V19.925Z" fill="#A3A7FF"/>
 </svg>`,
@@ -479,6 +661,10 @@
     el.className += ` tinted${iconTone(el.dataset.icon)}`;
     el.style.setProperty("--shape", `url('${iconUrl(el.dataset.icon)}')`);
   }
+  // The logos keep the design's soft inner shadow, so they are placed as they are, in the text color of the mode.
+  for (const el of document.querySelectorAll("[data-svg]")) {
+    el.innerHTML = ICONS[el.dataset.svg].replace(/fill="#553ADF"/gi, 'fill="currentColor"');
+  }
 
   // ---------- Resizing the window ----------
   // A plugin window cannot be resized by its edges, so this handle asks the plugin for a new size while it is dragged.
@@ -501,23 +687,26 @@
   resizeHandle.addEventListener("pointercancel", endResize);
 
   // ---------- Light and dark window ----------
-  // The switch in the bottom bar. The plugin remembers the choice for this person (figma.clientStorage).
+  // The switch in the top bar (and on the landing page). The plugin remembers the choice for this person (figma.clientStorage).
   // The check mark is a picture, so it gets the color of the mode here: white, or the design's color/icon/inverse.
   const checkIconFor = (dark) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(dark ? ICONS.check.replaceAll('fill="white"', 'fill="#0C0D11"') : ICONS.check);
   function setUiMode(mode) {
     const dark = mode === "dark";
     document.documentElement.classList.toggle("ui-dark", dark);
     document.documentElement.style.setProperty("--check-icon", `url("${checkIconFor(dark)}")`);
-    const button = document.getElementById("uiMode");
-    button.setAttribute("aria-pressed", String(dark));
-    button.title = dark ? "Switch to light mode" : "Switch to dark mode";
+    for (const button of document.querySelectorAll(".ui-mode")) {
+      button.setAttribute("aria-pressed", String(dark));
+      button.title = dark ? "Switch to light mode" : "Switch to dark mode";
+    }
   }
   setUiMode("light");
-  document.getElementById("uiMode").onclick = () => {
-    const mode = document.documentElement.classList.contains("ui-dark") ? "light" : "dark";
-    setUiMode(mode);
-    parent.postMessage({ pluginMessage: { type: "ui-mode", mode } }, "*");
-  };
+  for (const button of document.querySelectorAll(".ui-mode")) {
+    button.onclick = () => {
+      const mode = document.documentElement.classList.contains("ui-dark") ? "light" : "dark";
+      setUiMode(mode);
+      parent.postMessage({ pluginMessage: { type: "ui-mode", mode } }, "*");
+    };
+  }
 
   // ---------- Overlay scrollbar ----------
   // A thin scrollbar drawn over the content, so scrolling never changes the layout width.
@@ -642,16 +831,26 @@
     const hex = box.querySelector('input[type="text"]');
     const pick = box.querySelector('input[type="color"]');
     const swatch = box.querySelector(".swatch");
+    // What the field means: a code without its "#" (008566) already counts as #008566, so the swatch and palette
+    // update as soon as it is pasted. Anything else stays as typed, for the usual HEX check.
+    const code = () => {
+      const v = hex.value.trim().toUpperCase();
+      return /^[0-9A-F]{6}$/.test(v) ? "#" + v : v;
+    };
     const paint = () => {
-      const v = hex.value.trim();
+      const v = code();
       const ok = HEX_RE.test(v);
       swatch.style.background = ok ? v : "";
       swatch.classList.toggle("white", ok && v.toUpperCase() === "#FFFFFF");
       if (ok) pick.value = v;
     };
     hex.addEventListener("input", paint);
+    // The "#" itself appears in the field on Enter, or when the field is left.
+    const addMissingHash = () => { if (HEX_RE.test(code())) hex.value = code(); };
+    hex.addEventListener("keydown", (e) => { if (e.key === "Enter") addMissingHash(); });
+    hex.addEventListener("blur", addMissingHash);
     pick.addEventListener("input", () => { hex.value = pick.value.toUpperCase(); paint(); });
-    box.get = () => ({ hex: hex.value.trim().toUpperCase() });
+    box.get = () => ({ hex: code() });
     box.set = (h) => { hex.value = h?.hex || ""; paint(); };
     box.set(value);
     return box;
@@ -1097,31 +1296,79 @@
     refreshAddDark();
   }
 
-  // ---------- Buttons ----------
-  const statusEl = document.getElementById("status");
-  function showResult(text) {
-    statusEl.textContent = text;
-    statusEl.className = "";
-    document.getElementById("result").classList.remove("hidden");
-    document.getElementById("result").scrollIntoView({ behavior: "smooth", block: "start" });
+  // ---------- Tabs ----------
+  const TAB_PAGES = { edit: "tabEdit", generate: "tabGenerate", export: "tabExport" };
+  let currentTab = "edit";
+  const tabScroll = {}; // where each tab was scrolled to, so coming back finds the same place
+  function showTab(name) {
+    if (name === currentTab) return;
+    document.activeElement?.blur(); // finish a rename or a HEX that is being typed
+    tabScroll[currentTab] = scroller.scrollTop;
+    currentTab = name;
+    for (const [tab, id] of Object.entries(TAB_PAGES)) document.getElementById(id).classList.toggle("hidden", tab !== name);
+    for (const b of document.querySelectorAll(".nav-tabs button")) {
+      b.classList.toggle("on", b.dataset.tab === name);
+      b.setAttribute("aria-selected", String(b.dataset.tab === name));
+    }
+    scroller.scrollTop = tabScroll[name] || 0;
+    placeThumb();
+    if (name === "generate" && !busy) run(false); // the check writes nothing
   }
+  for (const b of document.querySelectorAll(".nav-tabs button")) b.onclick = () => showTab(b.dataset.tab);
+
+  // ---------- Landing page ----------
+  document.getElementById("start").onclick = () => document.getElementById("landing").classList.add("hidden");
+  // The name in the top bar opens it again, in any file. A rename or a HEX being typed is finished first.
+  document.getElementById("home").onclick = () => {
+    document.activeElement?.blur();
+    document.getElementById("landing").classList.remove("hidden");
+  };
+
+  // ---------- Generate tab ----------
+  let hasTokens = false;  // does the file already have tokens? Sent by the plugin, and true after a write.
+  let busy = false;       // a check, a write or a table update is running
+  let lastAction = "run"; // what a "failure" message from the plugin is about
+  const statusLine = document.getElementById("statusLine");
+  const statusIcons = { ok: "statusCheck", error: "warning" };
+  // The line next to the buttons. tone: "ok" (green check), "error" (red warning) or "" (plain, no icon).
+  function setStatus(text, tone = "") {
+    statusLine.className = `status-line ${tone}`;
+    document.getElementById("statusIcon").innerHTML = statusIcons[tone] ? cardIcon(statusIcons[tone], 24) : "";
+    document.getElementById("statusText").textContent = text;
+  }
+  function setBusy(value) {
+    busy = value;
+    document.getElementById("create").disabled = value;
+    document.getElementById("tables").disabled = value;
+  }
+  // A file with tokens is updated, and can redraw its tables. A file with none has nothing to redraw from.
+  function showTokenButtons() {
+    document.getElementById("create").textContent = hasTokens ? "Update tokens" : "Generate tokens";
+    document.getElementById("tables").classList.toggle("hidden", !hasTokens);
+  }
+  function openReport(open) {
+    document.getElementById("reportToggle").setAttribute("aria-expanded", String(open));
+    document.getElementById("reportBody").classList.toggle("hidden", !open);
+    document.getElementById("reportSep").classList.toggle("hidden", !open);
+    placeThumb();
+  }
+  document.getElementById("reportToggle").onclick = () => {
+    openReport(document.getElementById("reportToggle").getAttribute("aria-expanded") !== "true");
+  };
   function run(write) {
     document.activeElement?.blur(); // finish a rename that is being typed
-    showResult(write ? "Generating tokens..." : "Checking...");
-    document.getElementById("summary").innerHTML = "";
-    document.getElementById("details").classList.add("hidden"); // shown again with the result
-    document.getElementById("exportDetails").classList.add("hidden");
+    lastAction = "run";
+    setBusy(true);
+    setStatus(write ? "Generating tokens..." : "Checking...");
     parent.postMessage({ pluginMessage: { type: "run", inputs: readInputs(), write } }, "*");
   }
-  document.getElementById("check").onclick = () => run(false);
   document.getElementById("create").onclick = () => run(true);
 
   // Redraw the tables from the file's current variables. The form inputs are not used.
   document.getElementById("tables").onclick = () => {
-    showResult("Updating color tables...");
-    document.getElementById("summary").innerHTML = "";
-    document.getElementById("details").classList.add("hidden");
-    document.getElementById("exportDetails").classList.add("hidden");
+    lastAction = "tables";
+    setBusy(true);
+    setStatus("Updating color tables...");
     parent.postMessage({ pluginMessage: { type: "tables" } }, "*");
   };
 
@@ -1158,10 +1405,14 @@
   for (const id of ["naming", "split", "exportFormat", "schemeSplit"]) document.getElementById(id).onchange = showNaming;
   showNaming();
   function startExport(collection) {
-    showResult(collection === "colorScheme" ? "Exporting ColorScheme tokens..." : "Exporting appearance tokens...");
-    document.getElementById("summary").innerHTML = "";
-    document.getElementById("details").classList.add("hidden");
+    lastAction = "export";
+    const status = document.getElementById("exportStatus");
+    status.textContent = collection === "colorScheme" ? "Exporting ColorScheme tokens..." : "Exporting appearance tokens...";
+    status.className = "result-status";
+    document.getElementById("exportSummary").innerHTML = "";
     document.getElementById("exportDetails").classList.add("hidden");
+    document.getElementById("exportResult").classList.remove("hidden");
+    document.getElementById("exportResult").scrollIntoView({ behavior: "smooth", block: "nearest" });
     parent.postMessage({ pluginMessage: { type: "export", options: exportOptions(collection) } }, "*");
   }
   document.getElementById("export").onclick = () => startExport("appearance");
@@ -1253,22 +1504,34 @@
       CUSTOM_THEME_NAME = msg.ui?.customThemeName || CUSTOM_THEME_NAME;
       CUSTOM_APPEARANCE_NAME = msg.ui?.customAppearanceName || CUSTOM_APPEARANCE_NAME;
       fillInputs(msg.inputs);
+      hasTokens = !!msg.hasTokens;
+      showTokenButtons();
+      document.getElementById("landing").classList.toggle("hidden", hasTokens);
+      document.documentElement.classList.add("ready");
     }
     if (msg.type === "names-result") { showPalettes(msg.palettes || []); showSimilar(msg.similar || []); showPreviews(msg.previews || []); }
     if (msg.type === "failure") {
-      statusEl.textContent = "Figma error: " + msg.message;
-      statusEl.className = "error";
+      if (lastAction === "export") {
+        const status = document.getElementById("exportStatus");
+        status.textContent = "Figma error: " + msg.message;
+        status.className = "result-status error";
+      } else {
+        setBusy(false);
+        document.getElementById("actionRow").classList.remove("hidden");
+        setStatus("Figma error: " + msg.message, "error");
+      }
     }
     if (msg.type === "export-result") {
       const themes = Object.keys(msg.data.themes);
       const ok = themes.length > 0;
       const first = ok ? Object.values(msg.data.themes[themes[0]].appearances) : [];
       const tokens = first.length ? Object.keys(first[0]).length : 0;
-      statusEl.textContent = ok
+      const status = document.getElementById("exportStatus");
+      status.textContent = ok
         ? `Exported ${tokens} tokens for ${themes.length} theme(s) and ${first.length} appearance(s), in ${(msg.files || []).length} file(s).`
         : "Nothing to export.";
-      statusEl.className = msg.problems.length ? "error" : "ok";
-      document.getElementById("summary").innerHTML = msg.problems.length
+      status.className = `result-status ${msg.problems.length ? "error" : "ok"}`;
+      document.getElementById("exportSummary").innerHTML = msg.problems.length
         ? `<b>Problems:</b><br>${msg.problems.map(esc).join("<br>")}` : "";
       exported = msg.files || [];
       document.getElementById("exportFiles").innerHTML = exported
@@ -1279,27 +1542,47 @@
       document.getElementById("exportDetails").classList.toggle("hidden", !ok);
     }
     if (msg.type === "tables-result") {
-      statusEl.textContent = `Color tables updated on the page "${msg.page}" (${msg.tables} table(s)).`;
-      statusEl.className = "ok";
-      document.getElementById("summary").innerHTML = msg.missing.length
-        ? `No ${msg.missing.map(esc).join(", ")} collection in this file, so that table was skipped.` : "";
+      setBusy(false);
+      const skipped = msg.missing.length ? ` No ${msg.missing.join(", ")} collection in this file, so that table was skipped.` : "";
+      setStatus(`Color tables updated on the page "${msg.page}" (${msg.tables} table(s)).${skipped}`, "ok");
     }
     if (msg.type === "result") {
       last = msg;
+      setBusy(false);
       document.getElementById("details").classList.remove("hidden");
       const errors = msg.report.filter((r) => r.severity === "error").length;
       const warnings = msg.report.length - errors;
-      if (!msg.ok) {
-        statusEl.textContent = `Stopped: ${errors} error(s), ${warnings} warning(s). Nothing was written.`;
-        statusEl.className = "error";
-      } else if (msg.wrote) {
-        statusEl.textContent = `Done. ${warnings} warning(s).`;
-        statusEl.className = "ok";
-      } else {
-        statusEl.textContent = `Check passed. ${warnings} warning(s). Nothing was written yet.`;
-        statusEl.className = "ok";
-      }
       const s = msg.summary;
+      const reportStatus = document.getElementById("reportStatus");
+      // Errors: only the report shows, opened and red. The buttons come back once the check passes,
+      // and the report closes again.
+      const hadErrors = document.getElementById("reportCard").classList.contains("error");
+      if (hadErrors && msg.ok) openReport(false);
+      document.getElementById("reportCard").classList.toggle("error", !msg.ok);
+      document.getElementById("actionRow").classList.toggle("hidden", !msg.ok);
+      document.getElementById("reportCount").textContent =
+        [errors && `${errors} error(s)`, warnings && `${warnings} warning(s)`].filter(Boolean).join(", ");
+      if (!msg.ok) {
+        reportStatus.textContent = `Stopped: ${errors} error(s), ${warnings} warning(s). Nothing was written.`;
+        reportStatus.className = "result-status error";
+        openReport(true);
+      } else if (msg.wrote) {
+        hasTokens = true;
+        showTokenButtons();
+        const counts = `${s.created} created, ${s.updated} updated, ${s.unchanged} unchanged.`;
+        if (s.problems.length) {
+          setStatus(`Done, with ${s.problems.length} problem(s). ${counts} See the report.`, "error");
+          openReport(true);
+        } else {
+          setStatus(`Done. ${counts}`, "ok");
+        }
+        reportStatus.textContent = `Done. ${warnings} warning(s).`;
+        reportStatus.className = "result-status ok";
+      } else {
+        setStatus(hasTokens ? "All tokens are ready to be updated in your Figma file" : "All tokens are ready to be generated into your Figma file", "ok");
+        reportStatus.textContent = `Check passed. ${warnings} warning(s). Nothing was written yet.`;
+        reportStatus.className = "result-status ok";
+      }
       document.getElementById("summary").innerHTML = s
         ? `${s.created} created, ${s.updated} updated, ${s.unchanged} unchanged` +
           (s.renamed?.length ? `<br>${s.renamed.map(esc).join("<br>")}` : "") +

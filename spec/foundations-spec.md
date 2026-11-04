@@ -1005,7 +1005,7 @@ This procedure applies to every palette and uses one order everywhere:
 
 #### Chroma (brand palettes)
 
-1. **Reference chroma.** The brand color is the anchor color. Compute the chroma at the 400 step as `C_400 = C_anchor / m_anchor`, where `C_anchor` is the color's OKLCH chroma and `m_anchor` is the multiplier of the anchor step below.
+1. **Reference chroma.** The brand color is the anchor color. Compute the chroma at the 400 step as `C_400 = C_anchor / m_anchor`, where `C_anchor` is the color's OKLCH chroma and `m_anchor` is the multiplier of the anchor step below. When the anchor is step 800, 850, 900, or 950, `m_anchor` is its reference value in the second table below instead.
 2. **Generate chroma.** For each step, `C_tone = C_400 × m_tone`.
 3. **Multipliers:**
 
@@ -1020,10 +1020,21 @@ This procedure applies to every palette and uses one order everywhere:
 | 500 | 0.93 |
 | 600 | 0.76 |
 | 700 | 0.56 |
+| 800 | 0.323 |
+| 850 | 0.192 |
+| 900 | 0.154 |
+| 950 | 0.135 |
+
+Reference values for a brand anchored at a dark step:
+
+| Anchor step | Reference value |
+|---:|---:|
 | 800 | 0.38 |
 | 850 | 0.32 |
 | 900 | 0.28 |
 | 950 | 0.27 |
+
+Note: The dark multipliers are low, so dividing by them would make the steps lighter than a dark brand more saturated. The brand color at the anchor step keeps its exact HEX, so it can have more chroma than the steps next to it.
 
 4. **Chroma ceiling.** No generated step goes above the ceiling below, for any hue. The anchor keeps the brand color's exact chroma, and the steps re-spaced around a moved anchor have no ceiling (section 5.2 step 3).
 
@@ -1093,7 +1104,7 @@ Contrast is WCAG 2.x contrast on sRGB. Compute it from the rounded HEX values th
 
 ### 6.1 Outputs
 
-The plugin produces five outputs. The first three come from Check only and Generate tokens, and are shown in the plugin's report; when generation stops, only the validation report is produced (section 6.2). The color tables are drawn after the variables are written. The developer exports are made on request.
+The plugin produces five outputs. The first three come from the check that runs when the Generate tab opens and from Generate tokens, and are shown in the plugin's report; when generation stops, only the validation report is produced (section 6.2). The color tables are drawn after the variables are written. The developer exports are made on request.
 
 1. **Token manifest (JSON).** One entry per token:
    - `collection` (Primitives, Theme, Appearance, or ColorScheme)
@@ -1263,7 +1274,7 @@ Steps are sequential.
 
 1. Read `tokens.json`. Collect the inputs in section 5.1 and validate them. Name the palettes (section 1.1.8).
 2. Build every palette and every variable definition, and run all the checks in section 6.1 on them. Nothing has been written to the file yet.
-3. If any check is an error, stop: show only the validation report (section 6.2). Check only always stops here, and shows the report without writing.
+3. If any check is an error, stop: show only the validation report (section 6.2). The check that runs when the Generate tab opens always stops here, and shows the report without writing.
 4. Find or create each collection by name, and its modes (section 5.8). Rename palettes whose name changed (section 1.1.8, rule 5). Find existing variables by collection and name, then update them. Never create duplicates.
 5. Create or update Primitives, since they have no references.
 6. Create or update Theme tokens, with `VARIABLE_ALIAS` values pointing to Primitive IDs.
@@ -1278,7 +1289,7 @@ Variables in the file that are not in the manifest are reported as `orphan_varia
 
 #### Saved settings
 
-The plugin saves the form's settings inside the Figma file when Generate tokens writes the variables. Check only does not save them. Each file keeps its own settings.
+The plugin saves the form's settings inside the Figma file when Generate tokens writes the variables. The check that runs when the Generate tab opens does not save them. Each file keeps its own settings.
 
 When the plugin opens:
 

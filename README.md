@@ -32,7 +32,11 @@ You only import the plugin once. After that, run it from the same menu.
 
 ## Use the plugin
 
+In a file with no tokens, the plugin opens on a welcome page. Press **Let's start!** to continue. To see that page again in any file, press the Tokenseed name at the top left. The window has three tabs at the top: **Edit**, **Generate**, and **Export**.
+
 ### 1. Set up your themes
+
+This is in the Edit tab.
 
 A theme is one look for your product, with its own colors and fonts. Each theme has:
 
@@ -46,6 +50,8 @@ The Saturation slider makes the status colors and any added colors softer or str
 
 ### 2. Set up your color modes
 
+This is also in the Edit tab.
+
 A color mode, also called an appearance, is a version of the theme's colors. Light is always there, and Dark can be removed. You can also add your own, based on Light or Dark.
 
 Each one has its own canvas color and text fill, which sets how strong the bolder text and icons are. Each card shows its real colors, taken from the first theme, with a preview of its text.
@@ -54,19 +60,24 @@ If you add a theme or color mode without typing a name, it is called Custom them
 
 ### 3. Generate your tokens
 
+Open the Generate tab. It runs every check straight away and writes nothing to your file.
+
 | Button | What it does |
 |---|---|
-| Check only | Runs every check and writes nothing to your file. |
-| Generate tokens | Runs every check. If there is no error, it creates or updates the variables and redraws the color tables and color maps. |
-| Update tables | Redraws the color tables and color maps from the variables in the file, including changes made by hand. |
-| Export | Exports tokens for developers. It changes nothing in your file. |
+| Generate tokens | Runs every check. If there is no error, it creates the variables and draws the color tables and color maps. |
+| Update tokens | The same button, in a file that already has tokens. It updates the variables and redraws the color tables and color maps. |
+| Update tables | Redraws the color tables and color maps from the variables in the file, including changes made by hand. It appears when the file has tokens. |
 
-The report under the form lists every error and warning. If there is an error, nothing is written.
+The Report card lists every error and warning. Press it to open or close it. If there is an error, the report opens and the buttons are hidden until you fix it in the Edit tab. Nothing is written.
+
+### 4. Export for developers
+
+The Export tab exports tokens for developers. It changes nothing in your file.
 
 ## Good to know
 
 - **Resize the window.** Drag the handle in the bottom right corner. The width goes from 680 to 1280 pixels, and the plugin remembers your size.
-- **Light or dark window.** The switch in the bottom panel changes the plugin's window. The plugin remembers your choice, and it does not change your tokens.
+- **Light or dark window.** The switch in the top bar changes the plugin's window. The plugin remembers your choice, and it does not change your tokens.
 - **Try it in a test file first.** Check the result before you run the plugin in a real design file.
 - **Your settings stay with the file.** They are saved when you press Generate tokens, so each file keeps its own. Changes you did not generate are lost when you close the plugin.
 - **A file with no tokens starts fresh.** In a new file, or after you delete all the tokens, the form opens with the default settings.
@@ -79,7 +90,7 @@ The report under the form lists every error and warning. If there is an error, n
 | Problem | What to do |
 |---|---|
 | Figma cannot load the plugin after you moved or renamed its folder | Import `manifest.json` again from the folder's new location. |
-| The report says "Stopped" | Read the errors in the report. Each one names the token and the mode it is about. |
+| The report says "Stopped" | Read the errors in the report. Each one names the token and the mode it is about. Fix them in the Edit tab, then open the Generate tab again. |
 
 ## For developers
 

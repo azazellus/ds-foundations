@@ -57,18 +57,18 @@ async function loadFontStyles(): Promise<Record<string, string[]>> {
 }
 
 // The settings the form opens with: this file's, or the defaults when the file has no tokens (section 6.3).
-async function settingsForThisFile(): Promise<Inputs | null> {
+async function settingsForThisFile(): Promise<{ inputs: Inputs | null; hasTokens: boolean }> {
   const variables = await figma.variables.getLocalVariablesAsync();
   const collections = await figma.variables.getLocalVariableCollectionsAsync();
   const nameOf = new Map(collections.map((c) => [c.id, c.name]));
   const hasTokens = fileHasTokens(variables.map((v) => nameOf.get(v.variableCollectionId)));
   const older = (await figma.clientStorage.getAsync(OLDER_STORAGE_KEY)) ?? null;
-  return inputsToShow(hasTokens, readSavedInputs(figma.root.getPluginData(FILE_INPUTS)), older);
+  return { inputs: inputsToShow(hasTokens, readSavedInputs(figma.root.getPluginData(FILE_INPUTS)), older), hasTokens };
 }
 
 // Send the fonts and the settings to the form, so the user does not have to type them again.
 (async () => {
-  const saved = await settingsForThisFile();
+  const { inputs: saved, hasTokens } = await settingsForThisFile();
   // Values from spec/tokens.json that the form shows, so the form never holds its own copy.
   const ui = {
     gray: spec.primitives.neutralPalette.steps, // swatches of the canvas dropdowns
@@ -84,7 +84,7 @@ async function settingsForThisFile(): Promise<Inputs | null> {
     customThemeName: spec.collections.Theme.customModeName,
     customAppearanceName: spec.inputs.extraAppearances.defaultName,
   };
-  figma.ui.postMessage({ type: "saved-inputs", inputs: saved ?? null, fonts: await loadFontStyles(), ui });
+  figma.ui.postMessage({ type: "saved-inputs", inputs: saved ?? null, hasTokens, fonts: await loadFontStyles(), ui });
 })();
 
 figma.ui.onmessage = async (msg: {

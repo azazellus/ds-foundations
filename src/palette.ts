@@ -15,8 +15,13 @@ export const TARGET_L: Record<number, number> = {
 // Section 5.5 step 3: a smooth bell that peaks at 400 (tokens.json primitives.chromaMultiplier)
 export const CHROMA_MULT: Record<number, number> = {
   50: 0.3, 100: 0.43, 150: 0.55, 200: 0.68, 300: 0.87, 400: 1.0,
-  500: 0.93, 600: 0.76, 700: 0.56, 800: 0.38, 850: 0.32, 900: 0.28, 950: 0.27,
+  500: 0.93, 600: 0.76, 700: 0.56, 800: 0.323, 850: 0.192, 900: 0.154, 950: 0.135,
 };
+
+// Section 5.5 step 1: a brand anchored at a dark step divides its chroma by these values, not by its multiplier.
+// The dark multipliers are low, so dividing by them would make the lighter steps more saturated
+// (tokens.json primitives.anchorChromaReference).
+export const ANCHOR_CHROMA_REFERENCE: Record<number, number> = { 800: 0.38, 850: 0.32, 900: 0.28, 950: 0.27 };
 
 const MIN_CHROMA = 0.01;
 
@@ -280,7 +285,7 @@ function calibrate(p: Palette): void {
 export function buildPalette(name: string, hex: string, neutrals: Neutral[] = [GRAY_HEX]): Palette {
   const src = hexToOklch(hex);
   const { closest, anchor } = placeAnchor(hex, neutrals);
-  const C400 = src.C / CHROMA_MULT[anchor];
+  const C400 = src.C / (ANCHOR_CHROMA_REFERENCE[anchor] ?? CHROMA_MULT[anchor]);
   const H = r1(src.H);
   const respacedL = anchor === closest ? {} : respacedLightness(closest, anchor, src.L);
 

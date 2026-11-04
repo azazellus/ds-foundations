@@ -22,7 +22,7 @@
 
   // spec/tokens.json
   var tokens_default = {
-    version: "1.23.0",
+    version: "1.24.0",
     description: "Source of truth for the design foundations specification (foundations-spec.md). Palette HEX values are user inputs and palette names come from primitives.paletteNaming; this file defines the rules, inputs, Theme mappings, alpha tokens, Appearance mappings, and ColorScheme mappings.",
     collections: {
       Primitives: { modes: ["Default"] },
@@ -74,6 +74,13 @@
         "500": 0.93,
         "600": 0.76,
         "700": 0.56,
+        "800": 0.323,
+        "850": 0.192,
+        "900": 0.154,
+        "950": 0.135
+      },
+      anchorChromaReference: {
+        description: "A brand anchored at one of these steps divides its chroma by this value, not by chromaMultiplier, to find its chroma at step 400 (section 5.5). The steps lighter than the brand then do not get more saturated because the darkest multipliers are low.",
         "800": 0.38,
         "850": 0.32,
         "900": 0.28,
@@ -1093,11 +1100,12 @@
     500: 0.93,
     600: 0.76,
     700: 0.56,
-    800: 0.38,
-    850: 0.32,
-    900: 0.28,
-    950: 0.27
+    800: 0.323,
+    850: 0.192,
+    900: 0.154,
+    950: 0.135
   };
+  var ANCHOR_CHROMA_REFERENCE = { 800: 0.38, 850: 0.32, 900: 0.28, 950: 0.27 };
   var MIN_CHROMA = 0.01;
   var CHROMA_CEILING = { 300: 0.14, 400: 0.18 };
   var REFERENCE_C400 = 0.16;
@@ -1284,9 +1292,10 @@
     }
   }
   function buildPalette(name, hex, neutrals = [GRAY_HEX]) {
+    var _a;
     const src = hexToOklch(hex);
     const { closest, anchor } = placeAnchor(hex, neutrals);
-    const C400 = src.C / CHROMA_MULT[anchor];
+    const C400 = src.C / ((_a = ANCHOR_CHROMA_REFERENCE[anchor]) != null ? _a : CHROMA_MULT[anchor]);
     const H = r1(src.H);
     const respacedL = anchor === closest ? {} : respacedLightness(closest, anchor, src.L);
     const p = { name, anchor, steps: {}, warnings: [], errors: [], adjustments: 0, neutrals };
@@ -3362,10 +3371,10 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
     const nameOf = new Map(collections.map((c) => [c.id, c.name]));
     const hasTokens = fileHasTokens(variables.map((v) => nameOf.get(v.variableCollectionId)));
     const older = (_a = await figma.clientStorage.getAsync(OLDER_STORAGE_KEY)) != null ? _a : null;
-    return inputsToShow(hasTokens, readSavedInputs(figma.root.getPluginData(FILE_INPUTS)), older);
+    return { inputs: inputsToShow(hasTokens, readSavedInputs(figma.root.getPluginData(FILE_INPUTS)), older), hasTokens };
   }
   (async () => {
-    const saved = await settingsForThisFile();
+    const { inputs: saved, hasTokens } = await settingsForThisFile();
     const ui = {
       gray: tokens_default.primitives.neutralPalette.steps,
       // swatches of the canvas dropdowns
@@ -3382,7 +3391,7 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
       customThemeName: tokens_default.collections.Theme.customModeName,
       customAppearanceName: tokens_default.inputs.extraAppearances.defaultName
     };
-    figma.ui.postMessage({ type: "saved-inputs", inputs: saved != null ? saved : null, fonts: await loadFontStyles(), ui });
+    figma.ui.postMessage({ type: "saved-inputs", inputs: saved != null ? saved : null, hasTokens, fonts: await loadFontStyles(), ui });
   })();
   figma.ui.onmessage = async (msg) => {
     var _a;

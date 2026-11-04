@@ -1,7 +1,7 @@
 // Logic tests. Run with: node --experimental-strip-types test/logic.test.ts
 import assert from "node:assert/strict";
 import { hexToOklch, oklchToHex, contrast, inGamut, maxChroma } from "../src/color.ts";
-import { CHROMA_MULT, buildPalette, STEPS, CONTRAST_PAIRS, pairBackgroundHex, buildHuePalette, closestStep, yellowFactor,
+import { ANCHOR_CHROMA_REFERENCE, CHROMA_MULT, buildPalette, STEPS, CONTRAST_PAIRS, pairBackgroundHex, buildHuePalette, closestStep, yellowFactor,
   SATURATION_FACTORS, DEFAULT_SATURATION, CHROMA_CEILING, REFERENCE_C400, YELLOW_BOOST, SHIFT_NOTICE_DISTANCE, placeAnchor, TARGET_L, RESPACE_FROM_500_TO_400,
   buildNeutralPalette, NEUTRAL_CHROMA, NEUTRAL_FADE, GRAY_HEX, neutralOf } from "../src/palette.ts";
 import { validateHex } from "../src/validate.ts";
@@ -1170,5 +1170,25 @@ assert.deepEqual(clampWindowSize(100, 100), { width: WINDOW_SIZE.minWidth, heigh
 assert.deepEqual(clampWindowSize(9000, 9000), { width: WINDOW_SIZE.maxWidth, height: WINDOW_SIZE.maxHeight });
 assert.deepEqual(clampWindowSize(undefined, "tall"), { width: WINDOW_SIZE.defaultWidth, height: WINDOW_SIZE.defaultHeight });
 assert.deepEqual(clampWindowSize(Number.NaN, Infinity), { width: WINDOW_SIZE.defaultWidth, height: WINDOW_SIZE.defaultHeight });
+
+// Section 5.5 step 1: the reference values match the spec, and a dark brand keeps its exact HEX and its lighter steps' chroma.
+{
+  const { description, ...reference } = spec.primitives.anchorChromaReference;
+  assert.deepEqual(Object.fromEntries(Object.entries(ANCHOR_CHROMA_REFERENCE).map(([s, v]) => [s, v])), reference);
+  const dark = buildPalette("Dark", "#1C184D");
+  assert.equal(dark.anchor, 800);
+  assert.equal(dark.steps[800].hex, "#1C184D");
+  const C = hexToOklch("#1C184D").C;
+  const expected700 = (C / ANCHOR_CHROMA_REFERENCE[800]) * CHROMA_MULT[700];
+  assert.ok(Math.abs(dark.steps[700].lch.C - expected700) < 0.002, "step 700 follows the reference value");
+  assert.ok(dark.steps[850].lch.C < C && dark.steps[950].lch.C < dark.steps[850].lch.C, "the steps below the brand stay soft");
+}
+
+// Section 5.5: the softer darkest steps. The chroma keeps falling from step to step, so 800 to 950 stay in order.
+assert.deepEqual([CHROMA_MULT[800], CHROMA_MULT[850], CHROMA_MULT[900], CHROMA_MULT[950]], [0.323, 0.192, 0.154, 0.135]);
+{
+  const dark = [700, 800, 850, 900, 950].map((s) => CHROMA_MULT[s]);
+  dark.slice(1).forEach((m, i) => assert.ok(m < dark[i], "the multipliers fall toward 950"));
+}
 
 console.log("All logic tests passed.");
