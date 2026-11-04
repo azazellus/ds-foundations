@@ -56,6 +56,7 @@ tokenseed/
 │   ├── tables.ts        ← describes the color tables
 │   ├── color-maps.ts    ← describes the ColorScheme color maps
 │   ├── saved-inputs.ts  ← decides which settings the form opens with
+│   ├── window-size.ts   ← the limits of the plugin window's size
 │   ├── previews.ts      ← works out the real colors of each appearance card in the window
 │   ├── export.ts        ← builds the developer exports (JSON and Kotlin)
 │   ├── figma.ts         ← the Figma side: talks to the window and writes the variables

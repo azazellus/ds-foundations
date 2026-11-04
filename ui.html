@@ -1,5 +1,5 @@
 <!-- Plugin window: the input form (foundations-spec.md section 5.1) and the validation report (section 6.1).
-     Layout follows the "Plugin UI" design (Figma file vVJzXGPhbz2Zb5KXwuJfse, node 39:2602): a 960 × 880 window,
+     Layout follows the "Plugin UI" design (Figma file vVJzXGPhbz2Zb5KXwuJfse, node 39:2602): a 960 × 880 window that can be resized,
      with each color's palette shown next to it. The window is light or dark, by the switch in the bottom bar;
      each appearance card always shows its real colors. -->
 <meta charset="utf-8">
@@ -274,6 +274,13 @@
   .bottom-buttons .group { display: flex; gap: 8px; }
   .bottom-buttons .pill { height: 48px; padding: 0 24px; font-size: 16px; }
   .bottom-buttons .pill.icon-only { width: 48px; padding: 0; }
+  /* The handle that resizes the window, in its bottom right corner. */
+  .resize-handle { position: fixed; right: 0; bottom: 0; z-index: 30; width: 20px; height: 20px; color: var(--muted); cursor: nwse-resize; touch-action: none; }
+  .resize-handle svg { display: block; }
+  /* In a narrow window, the cards side by side do not fit: they stack in one column. */
+  @media (max-width: 919px) {
+    .mode-grid, .export-grid { grid-template-columns: 1fr; }
+  }
   .row-of-pills { display: flex; gap: 8px; justify-content: center; }
 
   /* Report. */
@@ -404,6 +411,8 @@
 
 </main>
 
+<div class="resize-handle" id="resizeHandle" aria-hidden="true" title="Drag to resize"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16 8 8 16M16 12 12 16" stroke="currentColor" stroke-linecap="round"/></svg></div>
+
 <div class="scrollbar" id="scrollbar" aria-hidden="true"><div class="thumb"></div></div>
 
 <div class="bottom-bar">
@@ -470,6 +479,26 @@
     el.className += ` tinted${iconTone(el.dataset.icon)}`;
     el.style.setProperty("--shape", `url('${iconUrl(el.dataset.icon)}')`);
   }
+
+  // ---------- Resizing the window ----------
+  // A plugin window cannot be resized by its edges, so this handle asks the plugin for a new size while it is dragged.
+  // The plugin keeps the size inside the limits (src/window-size.ts) and remembers it on release.
+  const resizeHandle = document.getElementById("resizeHandle");
+  let resizeOffset = null;
+  const sendSize = (type, e) => parent.postMessage({ pluginMessage: { type, width: e.clientX + resizeOffset.x, height: e.clientY + resizeOffset.y } }, "*");
+  resizeHandle.addEventListener("pointerdown", (e) => {
+    resizeHandle.setPointerCapture(e.pointerId);
+    resizeOffset = { x: innerWidth - e.clientX, y: innerHeight - e.clientY };
+    e.preventDefault();
+  });
+  resizeHandle.addEventListener("pointermove", (e) => { if (resizeOffset) sendSize("resize", e); });
+  const endResize = (e) => {
+    if (!resizeOffset) return;
+    sendSize("resize-end", e);
+    resizeOffset = null;
+  };
+  resizeHandle.addEventListener("pointerup", endResize);
+  resizeHandle.addEventListener("pointercancel", endResize);
 
   // ---------- Light and dark window ----------
   // The switch in the bottom bar. The plugin remembers the choice for this person (figma.clientStorage).

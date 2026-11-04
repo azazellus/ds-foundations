@@ -65,6 +65,7 @@ The report under the form lists every error and warning. If there is an error, n
 
 ## Good to know
 
+- **Resize the window.** Drag the handle in the bottom right corner. The width goes from 680 to 1280 pixels, and the plugin remembers your size.
 - **Light or dark window.** The switch in the bottom panel changes the plugin's window. The plugin remembers your choice, and it does not change your tokens.
 - **Try it in a test file first.** Check the result before you run the plugin in a real design file.
 - **Your settings stay with the file.** They are saved when you press Generate tokens, so each file keeps its own. Changes you did not generate are lost when you close the plugin.

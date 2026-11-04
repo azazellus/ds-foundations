@@ -2332,6 +2332,25 @@
     return (_a = fileInputs != null ? fileInputs : olderInputs) != null ? _a : null;
   }
 
+  // src/window-size.ts
+  var WINDOW_SIZE = {
+    defaultWidth: 960,
+    defaultHeight: 880,
+    minWidth: 680,
+    maxWidth: 1280,
+    minHeight: 480,
+    // A window taller than the screen would hide the resize handle in its corner.
+    maxHeight: 1200
+  };
+  var keepInside = (value, min, max, fallback) => typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : fallback;
+  function clampWindowSize(width, height) {
+    const s = WINDOW_SIZE;
+    return {
+      width: keepInside(width, s.minWidth, s.maxWidth, s.defaultWidth),
+      height: keepInside(height, s.minHeight, s.maxHeight, s.defaultHeight)
+    };
+  }
+
   // src/tables.ts
   var WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"];
   function countWord(n) {
@@ -3314,7 +3333,13 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
   var FILE_INPUTS = "form-inputs";
   var OLDER_STORAGE_KEY = "last-inputs";
   var UI_MODE_KEY = "ui-mode";
-  figma.showUI(__html__, { width: 960, height: 880 });
+  var WINDOW_SIZE_KEY = "window-size";
+  figma.showUI(__html__, { width: WINDOW_SIZE.defaultWidth, height: WINDOW_SIZE.defaultHeight });
+  figma.clientStorage.getAsync(WINDOW_SIZE_KEY).then((size) => {
+    if (!size) return;
+    const { width, height } = clampWindowSize(size.width, size.height);
+    figma.ui.resize(width, height);
+  });
   figma.clientStorage.getAsync(UI_MODE_KEY).then((mode) => {
     if (mode) figma.ui.postMessage({ type: "ui-mode", mode });
   });
@@ -3361,6 +3386,12 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
   })();
   figma.ui.onmessage = async (msg) => {
     var _a;
+    if (msg.type === "resize" || msg.type === "resize-end") {
+      const { width, height } = clampWindowSize(msg.width, msg.height);
+      figma.ui.resize(width, height);
+      if (msg.type === "resize-end") await figma.clientStorage.setAsync(WINDOW_SIZE_KEY, { width, height });
+      return;
+    }
     if (msg.type === "ui-mode") return figma.clientStorage.setAsync(UI_MODE_KEY, msg.mode);
     if (msg.type === "tables") return updateTablesOnly();
     if (msg.type === "export") return exportTokens(msg.options);

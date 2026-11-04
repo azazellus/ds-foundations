@@ -7,6 +7,7 @@ import { buildPlan, hueOnlyShifts, namePalettes } from "./foundations.ts";
 import type { CollectionName, Inputs, Plan, ReportEntry, Value, VariableDef } from "./foundations.ts";
 import { appearancePreviews } from "./previews.ts";
 import { fileHasTokens, inputsToShow, readSavedInputs } from "./saved-inputs.ts";
+import { clampWindowSize, WINDOW_SIZE } from "./window-size.ts";
 import { buildTables } from "./tables.ts";
 import { buildAppearanceExport, buildColorSchemeExport, exportFiles, kotlinFiles } from "./export.ts";
 import type { ExportOptions } from "./export.ts";
@@ -29,7 +30,15 @@ const OLDER_STORAGE_KEY = "last-inputs";
 // Light or dark window: this person's choice, in every file.
 const UI_MODE_KEY = "ui-mode";
 
-figma.showUI(__html__, { width: 960, height: 880 });
+// The size of the window: this person's choice too.
+const WINDOW_SIZE_KEY = "window-size";
+
+figma.showUI(__html__, { width: WINDOW_SIZE.defaultWidth, height: WINDOW_SIZE.defaultHeight });
+figma.clientStorage.getAsync(WINDOW_SIZE_KEY).then((size) => {
+  if (!size) return;
+  const { width, height } = clampWindowSize(size.width, size.height);
+  figma.ui.resize(width, height);
+});
 figma.clientStorage.getAsync(UI_MODE_KEY).then((mode) => {
   if (mode) figma.ui.postMessage({ type: "ui-mode", mode });
 });
@@ -79,8 +88,15 @@ async function settingsForThisFile(): Promise<Inputs | null> {
 })();
 
 figma.ui.onmessage = async (msg: {
-  type: string; inputs: Inputs; write: boolean; options: ExportChoice; mode: string;
+  type: string; inputs: Inputs; write: boolean; options: ExportChoice; mode: string; width: number; height: number;
 }) => {
+  // While the resize handle is dragged, the window follows it. The size is remembered when it is released.
+  if (msg.type === "resize" || msg.type === "resize-end") {
+    const { width, height } = clampWindowSize(msg.width, msg.height);
+    figma.ui.resize(width, height);
+    if (msg.type === "resize-end") await figma.clientStorage.setAsync(WINDOW_SIZE_KEY, { width, height });
+    return;
+  }
   if (msg.type === "ui-mode") return figma.clientStorage.setAsync(UI_MODE_KEY, msg.mode);
   if (msg.type === "tables") return updateTablesOnly();
   if (msg.type === "export") return exportTokens(msg.options);

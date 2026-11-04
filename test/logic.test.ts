@@ -12,6 +12,7 @@ import type { Inputs, Plan, ThemeInput } from "../src/foundations.ts";
 import { buildTables } from "../src/tables.ts";
 import { appearancePreviews } from "../src/previews.ts";
 import { fileHasTokens, inputsToShow, readSavedInputs } from "../src/saved-inputs.ts";
+import { clampWindowSize, WINDOW_SIZE } from "../src/window-size.ts";
 import { buildColorMaps, MAP_BLOCKS, MAP_HEIGHT, MAP_WIDTH } from "../src/color-maps.ts";
 import { buildAppearanceExport, buildColorSchemeExport, exportFiles, exportName, kotlinFiles } from "../src/export.ts";
 
@@ -1162,5 +1163,12 @@ assert.equal(SATURATION_FACTORS[DEFAULT_SATURATION], 1);
   for (const level of spec.inputs.saturation.allowed) assert.deepEqual(checksOf({ numberOfThemes: 1, themes: [theme(level)] }), [], `level ${level}`);
   for (const level of [0, 11, 2.5]) assert.deepEqual(checksOf({ numberOfThemes: 1, themes: [theme(level)] }), ["missing_input"], `level ${level}`);
 }
+
+// 30. Window size: always inside the limits, in whole pixels.
+assert.deepEqual(clampWindowSize(1000.4, 700.6), { width: 1000, height: 701 });
+assert.deepEqual(clampWindowSize(100, 100), { width: WINDOW_SIZE.minWidth, height: WINDOW_SIZE.minHeight });
+assert.deepEqual(clampWindowSize(9000, 9000), { width: WINDOW_SIZE.maxWidth, height: WINDOW_SIZE.maxHeight });
+assert.deepEqual(clampWindowSize(undefined, "tall"), { width: WINDOW_SIZE.defaultWidth, height: WINDOW_SIZE.defaultHeight });
+assert.deepEqual(clampWindowSize(Number.NaN, Infinity), { width: WINDOW_SIZE.defaultWidth, height: WINDOW_SIZE.defaultHeight });
 
 console.log("All logic tests passed.");
