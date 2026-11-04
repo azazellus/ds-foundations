@@ -42,7 +42,7 @@ tokenseed/
 ├── manifest.json        ← tells Figma the plugin's name and files
 ├── ui.html              ← the plugin window (the form and the report)
 ├── code.js              ← the built plugin that Figma runs (made by "npm run build")
-├── ui-assets/           ← icons used in the window, and the font embedded in it (fonts/, with its license)
+├── ui-assets/           ← icons used in the window, and the fonts embedded in it (fonts/, with their licenses)
 ├── spec/                ← the rules
 │   ├── foundations-spec.md   ← the full written specification
 │   ├── tokens.json           ← the same rules in machine-readable form (wins if the two disagree)
