@@ -108,7 +108,7 @@ export function ensureModes(col: VariableCollection, wanted: ModeMatch[]): Recor
       } catch (e) {
         throw new Error(
           `Figma did not allow adding the mode "${name}" to the ${col.name} collection. ` +
-          `Your Figma plan may limit the number of modes per collection. (${e instanceof Error ? e.message : e})`,
+          `Your Figma plan may limit the number of modes per collection. Token values were not updated, but some modes or palette names may have changed. (${e instanceof Error ? e.message : e})`,
         );
       }
       mode = col.modes.find((m) => m.name === name)!;

@@ -16,7 +16,7 @@ export type AppearanceExport = {
   themes: Record<string, { appearances: Record<string, Record<string, string>> }>;
 };
 
-export const EXPORT_VERSION = 1;
+const EXPORT_VERSION = 1;
 
 // The export name of one Appearance token, such as "color/bg/brand/bold".
 export function exportName(name: string, options: ExportOptions): string {
@@ -82,7 +82,7 @@ export function buildAppearanceExport(source: TableSource, options: ExportOption
   const themeHex = themeResolver(source);
   const appearance = source.variables
     .filter((v) => v.collection === "Appearance" && v.type === "COLOR")
-    .sort((a, b) => exportName(a.name, options).localeCompare(exportName(b.name, options)));
+    .sort((a, b) => exportName(a.name, options).localeCompare(exportName(b.name, options), "en")); // the same order on every computer
 
   // Export names must be unique: two tokens with the same export name would overwrite each other.
   const seen = new Map<string, string>();
@@ -210,9 +210,11 @@ export function kotlinFiles(
     if (!/^[A-Za-z]/.test(name)) name = `Scheme${name}`;
     for (let n = 2; usedNames.has(name); n++) name = `${kotlinWord(theme)}${kotlinWord(mode)}${n}ColorScheme`;
     usedNames.add(name);
-    const args = Object.entries(tokens)
-      .filter(([role]) => knownRoles.includes(role) || (unknown.add(role), false))
-      .map(([role, hex]) => `    ${role} = ${kotlinColor(hex)},`);
+    const args: string[] = [];
+    for (const [role, hex] of Object.entries(tokens)) {
+      if (knownRoles.includes(role)) args.push(`    ${role} = ${kotlinColor(hex)},`);
+      else unknown.add(role);
+    }
     const fn = exp.dark[theme]?.[mode] ? "darkColorScheme" : "lightColorScheme";
     return `// ${theme}, ${mode}\nval ${name} = ${fn}(\n${args.join("\n")}\n)\n`;
   }).join("\n");

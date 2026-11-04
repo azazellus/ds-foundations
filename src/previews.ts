@@ -4,9 +4,7 @@
 // Pure functions, no Figma API: src/figma.ts sends the result to ui.html.
 
 import { appearanceModes, appearanceValueFor } from "./foundations.ts";
-import type { Inputs } from "./foundations.ts";
-
-type Spec = any;
+import type { Inputs, Spec } from "./foundations.ts";
 
 // Every color is a HEX value. The border is the only one with opacity, as #RRGGBBAA.
 export type AppearancePreview = {

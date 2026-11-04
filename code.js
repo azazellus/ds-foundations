@@ -22,7 +22,7 @@
 
   // spec/tokens.json
   var tokens_default = {
-    version: "1.24.0",
+    version: "1.25.0",
     description: "Source of truth for the design foundations specification (foundations-spec.md). Palette HEX values are user inputs and palette names come from primitives.paletteNaming; this file defines the rules, inputs, Theme mappings, alpha tokens, Appearance mappings, and ColorScheme mappings.",
     collections: {
       Primitives: { modes: ["Default"] },
@@ -955,6 +955,76 @@
         { name: "onTertiaryFixedVariant", group: "fixed", kind: "content", role: "{tertiary}", Light: "color/{tertiary}/700", Dark: "color/{tertiary}/700", description: "Lower-emphasis version of onTertiaryFixed." }
       ]
     },
+    textStyles: {
+      description: "Figma text styles made with the variables (section 6.1.3). Each style links its font family and font weight to the Theme typography tokens, so it follows the Theme mode. Size, line height and letter spacing are plain pixel values. The emphasized variant of a style has the same size and line height, and its name ends in emphasizedSuffix.",
+      familyToken: "typography/font-family",
+      weightToken: "typography/font-weight/{weight}",
+      emphasizedSuffix: "-emphasized",
+      tables: {
+        page: "Text styles",
+        sample: "Foundation tokens",
+        notation: "Pixels",
+        descriptions: {
+          android: "The Material 3 type scale, with its emphasized variants.",
+          ios: "Apple's text styles at the default Dynamic Type size, with their emphasized variants.",
+          web: "A scale for the web, with emphasized variants for body, label and caption text."
+        }
+      },
+      weightFallback: {
+        description: "A weight token exists only when that weight is selected. A style that asks for a missing weight uses the first of these that exists.",
+        regular: ["medium", "light", "semibold", "bold"],
+        medium: ["semibold", "regular", "bold", "light"],
+        semibold: ["bold", "medium", "regular", "light"],
+        bold: ["semibold", "medium", "regular", "light"]
+      },
+      groups: {
+        android: [
+          { name: "display/large", size: 57, lineHeight: 64, letterSpacing: -0.2, weight: "regular", emphasized: { letterSpacing: 0, weight: "medium" } },
+          { name: "display/medium", size: 45, lineHeight: 52, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "medium" } },
+          { name: "display/small", size: 36, lineHeight: 44, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "medium" } },
+          { name: "headline/large", size: 32, lineHeight: 40, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "medium" } },
+          { name: "headline/medium", size: 28, lineHeight: 36, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "medium" } },
+          { name: "headline/small", size: 24, lineHeight: 32, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "medium" } },
+          { name: "title/large", size: 22, lineHeight: 28, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "medium" } },
+          { name: "title/medium", size: 16, lineHeight: 24, letterSpacing: 0.2, weight: "medium", emphasized: { letterSpacing: 0.15, weight: "bold" } },
+          { name: "title/small", size: 14, lineHeight: 20, letterSpacing: 0.1, weight: "medium", emphasized: { letterSpacing: 0.1, weight: "bold" } },
+          { name: "body/large", size: 16, lineHeight: 24, letterSpacing: 0.5, weight: "regular", emphasized: { letterSpacing: 0.15, weight: "medium" } },
+          { name: "body/medium", size: 14, lineHeight: 20, letterSpacing: 0.2, weight: "regular", emphasized: { letterSpacing: 0.25, weight: "medium" } },
+          { name: "body/small", size: 12, lineHeight: 16, letterSpacing: 0.4, weight: "regular", emphasized: { letterSpacing: 0.4, weight: "medium" } },
+          { name: "label/large", size: 14, lineHeight: 20, letterSpacing: 0.1, weight: "medium", emphasized: { letterSpacing: 0.1, weight: "bold" } },
+          { name: "label/medium", size: 12, lineHeight: 16, letterSpacing: 0.5, weight: "medium", emphasized: { letterSpacing: 0.5, weight: "bold" } },
+          { name: "label/small", size: 11, lineHeight: 16, letterSpacing: 0.5, weight: "medium", emphasized: { letterSpacing: 0.5, weight: "bold" } }
+        ],
+        ios: [
+          { name: "large-title", size: 34, lineHeight: 41, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "bold" } },
+          { name: "title", size: 28, lineHeight: 34, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "bold" } },
+          { name: "title2", size: 22, lineHeight: 28, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "bold" } },
+          { name: "title3", size: 20, lineHeight: 25, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "headline", size: 17, lineHeight: 22, letterSpacing: 0, weight: "semibold", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "body", size: 17, lineHeight: 22, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "callout", size: 16, lineHeight: 21, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "subheadline", size: 15, lineHeight: 20, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "footnote", size: 13, lineHeight: 18, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "caption", size: 12, lineHeight: 16, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "caption2", size: 11, lineHeight: 13, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "semibold" } }
+        ],
+        web: [
+          { name: "display", tableSection: "headings", size: 64, lineHeight: 72, letterSpacing: 0, weight: "bold" },
+          { name: "h1", tableSection: "headings", size: 48, lineHeight: 56, letterSpacing: 0, weight: "bold" },
+          { name: "h2", tableSection: "headings", size: 40, lineHeight: 48, letterSpacing: 0, weight: "bold" },
+          { name: "h3", tableSection: "headings", size: 32, lineHeight: 40, letterSpacing: 0, weight: "semibold" },
+          { name: "h4", tableSection: "headings", size: 28, lineHeight: 36, letterSpacing: 0, weight: "semibold" },
+          { name: "h5", tableSection: "headings", size: 24, lineHeight: 32, letterSpacing: 0, weight: "semibold" },
+          { name: "h6", tableSection: "headings", size: 20, lineHeight: 28, letterSpacing: 0, weight: "semibold" },
+          { name: "body/large", size: 20, lineHeight: 28, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "body/medium", size: 16, lineHeight: 24, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "body/small", size: 14, lineHeight: 20, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "label/medium", size: 14, lineHeight: 20, letterSpacing: 0, weight: "medium", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "label/small", size: 12, lineHeight: 16, letterSpacing: 0, weight: "medium", emphasized: { letterSpacing: 0, weight: "semibold" } },
+          { name: "caption", tableSection: "caption", size: 12, lineHeight: 16, letterSpacing: 0, weight: "regular", emphasized: { letterSpacing: 0, weight: "semibold" } }
+        ]
+      }
+    },
     validation: {
       reportSchema: {
         check: "string",
@@ -977,7 +1047,7 @@
           "contrast_minimum",
           "status_pairing"
         ],
-        warning: ["contrast_target", "gamut_clamp", "orphan_variable", "orphan_mode", "similar_palette", "close_to_brand", "hue_only_shift"]
+        warning: ["contrast_target", "gamut_clamp", "orphan_variable", "orphan_mode", "similar_palette", "close_to_brand", "hue_only_shift", "orphan_text_style", "text_style_emphasis", "text_style_weight"]
       },
       maxAdjustmentsPerPalette: 50
     }
@@ -1255,7 +1325,7 @@
         p.errors.push({
           check: "contrast_minimum",
           step: pair.text,
-          message: "Adjustment cap of 50 reached.",
+          message: `Adjustment cap of ${MAX_ADJUSTMENTS} reached.`,
           expected: `>= ${pair.min}`,
           actual: r2(ratio)
         });
@@ -1429,10 +1499,10 @@
         continue;
       }
       const level = (_a = c.saturation) != null ? _a : DEFAULT_SATURATION;
-      const same = c.exact ? palettes.find((p) => p.exact && p.hex === hex) : palettes.filter((p) => hueDistance(p.hue, hue) <= shareWithin && (p.exact ? level === DEFAULT_SATURATION : p.saturation === level)).sort((a, b) => hueDistance(a.hue, hue) - hueDistance(b.hue, hue))[0];
-      if (same) {
-        same.sources.push(c.source);
-        assignments.push({ source: c.source, hex, palette: same.name });
+      const same2 = c.exact ? palettes.find((p) => p.exact && p.hex === hex) : palettes.filter((p) => hueDistance(p.hue, hue) <= shareWithin && (p.exact ? level === DEFAULT_SATURATION : p.saturation === level)).sort((a, b) => hueDistance(a.hue, hue) - hueDistance(b.hue, hue))[0];
+      if (same2) {
+        same2.sources.push(c.source);
+        assignments.push({ source: c.source, hex, palette: same2.name });
         continue;
       }
       const home = rangeIndex(hue, width, names.length);
@@ -1719,8 +1789,8 @@
       }
     });
     themeModes.forEach((name, i) => {
-      var _a2;
-      const level = (_a2 = inputs.themes[i]) == null ? void 0 : _a2.saturation;
+      var _a2, _b2;
+      const level = (_b2 = (_a2 = inputs.themes) == null ? void 0 : _a2[i]) == null ? void 0 : _b2.saturation;
       if (level !== void 0 && !spec.inputs.saturation.allowed.includes(level)) {
         add("missing_input", "Theme", "saturation", name, spec.inputs.saturation.allowed.join(", "), String(level), `Saturation must be a whole level from 1 to 10.`);
       }
@@ -2568,7 +2638,7 @@
     if (appModes.length === 0) return { data, problems: ["There is no Appearance collection in this file. Generate tokens first."] };
     if (themeModes.length === 0) return { data, problems: ["There is no Theme collection in this file. Generate tokens first."] };
     const themeHex = themeResolver(source);
-    const appearance = source.variables.filter((v) => v.collection === "Appearance" && v.type === "COLOR").sort((a, b) => exportName(a.name, options).localeCompare(exportName(b.name, options)));
+    const appearance = source.variables.filter((v) => v.collection === "Appearance" && v.type === "COLOR").sort((a, b) => exportName(a.name, options).localeCompare(exportName(b.name, options), "en"));
     const seen = /* @__PURE__ */ new Map();
     const exported = appearance.filter((v) => {
       const key = exportName(v.name, options);
@@ -2664,7 +2734,11 @@
       if (!/^[A-Za-z]/.test(name)) name = `Scheme${name}`;
       for (let n = 2; usedNames.has(name); n++) name = `${kotlinWord(theme)}${kotlinWord(mode)}${n}ColorScheme`;
       usedNames.add(name);
-      const args = Object.entries(tokens).filter(([role]) => knownRoles.includes(role) || (unknown.add(role), false)).map(([role, hex]) => `    ${role} = ${kotlinColor(hex)},`);
+      const args = [];
+      for (const [role, hex] of Object.entries(tokens)) {
+        if (knownRoles.includes(role)) args.push(`    ${role} = ${kotlinColor(hex)},`);
+        else unknown.add(role);
+      }
       const fn = ((_a = exp.dark[theme]) == null ? void 0 : _a[mode]) ? "darkColorScheme" : "lightColorScheme";
       return `// ${theme}, ${mode}
 val ${name} = ${fn}(
@@ -3204,6 +3278,358 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
     }, opacity !== void 0 ? { opacity } : {});
   }
 
+  // src/text-styles.ts
+  var warning = (check, token, expected, actual, message) => ({ check, severity: "warning", collection: "Text styles", token, mode: "", expected, actual, message });
+  function buildTextStyles(spec, plan) {
+    var _a, _b;
+    const ts = spec.textStyles;
+    const inCollection = (collection) => new Map(plan.variables.filter((v) => v.collection === collection).map((v) => [v.name, v]));
+    const themeVariables = inCollection("Theme");
+    const primitives = inCollection("Primitives");
+    const tokenOf = (weight) => ts.weightToken.replace("{weight}", weight);
+    const exists = (weight) => themeVariables.has(tokenOf(weight));
+    const themeModes = (_b = (_a = plan.collections.find((c) => c.name === "Theme")) == null ? void 0 : _a.modes) != null ? _b : [];
+    const textOf = (token, mode) => {
+      const alias = themeVariables.get(token).values[mode].alias;
+      return Object.values(primitives.get(alias).values)[0];
+    };
+    const weightPrefix = ts.weightToken.replace("{weight}", "");
+    if (![...themeVariables.keys()].some((name) => name.startsWith(weightPrefix))) {
+      return {
+        styles: [],
+        report: [warning(
+          "text_style_weight",
+          "text styles",
+          "a selected weight that matches a weight slot",
+          "none",
+          "No text style was written: the selected weights match no weight slot, such as Regular or Bold."
+        )]
+      };
+    }
+    const styles = [];
+    const report = [];
+    for (const [group, rows] of Object.entries(ts.groups)) {
+      let sameAsNormal = 0;
+      for (const row2 of rows) {
+        const define = (name, letterSpacing, asked) => {
+          const weight = [asked, ...ts.weightFallback[asked]].find(exists);
+          const weightToken = tokenOf(weight);
+          styles.push({
+            name,
+            fontSize: row2.size,
+            lineHeight: row2.lineHeight,
+            letterSpacing,
+            familyToken: ts.familyToken,
+            weightToken,
+            fonts: themeModes.map((m) => ({ family: textOf(ts.familyToken, m), style: textOf(weightToken, m) }))
+          });
+          return weight;
+        };
+        const full = `${group}/${row2.name}`;
+        const normal = define(full, row2.letterSpacing, row2.weight);
+        if (!row2.emphasized) continue;
+        const emphasized = define(full + ts.emphasizedSuffix, row2.emphasized.letterSpacing, row2.emphasized.weight);
+        if (emphasized === normal && row2.emphasized.weight !== row2.weight) sameAsNormal++;
+      }
+      if (sameAsNormal > 0) {
+        report.push(warning(
+          "text_style_emphasis",
+          group,
+          "emphasized variants heavier than their normal style",
+          `${sameAsNormal} the same`,
+          `${sameAsNormal} emphasized text style(s) in ${group} look the same as their normal style, because a weight is not selected.`
+        ));
+      }
+    }
+    return { styles, report };
+  }
+  function findOrphanTextStyles(spec, namesInFile) {
+    const ts = spec.textStyles;
+    const groups = Object.entries(ts.groups);
+    const made = new Set(groups.flatMap(([group, rows]) => rows.flatMap((r) => [
+      `${group}/${r.name}`,
+      ...r.emphasized ? [`${group}/${r.name}${ts.emphasizedSuffix}`] : []
+    ])));
+    return namesInFile.filter((name) => groups.some(([g]) => name.startsWith(`${g}/`)) && !made.has(name)).map((name) => warning(
+      "orphan_text_style",
+      name,
+      "made by the plugin",
+      "not made by the plugin",
+      "This text style is not one the plugin makes. It was left untouched; the plugin never deletes text styles."
+    ));
+  }
+  var shortNumber = (n) => String(Math.round(n * 100) / 100);
+  function buildTextStyleTables(spec, live) {
+    const ts = spec.textStyles;
+    const byName = new Map(live.map((s) => [s.name, s]));
+    const tables = [];
+    for (const [group, rows] of Object.entries(ts.groups)) {
+      const sections = [];
+      for (const row2 of rows) {
+        const part = row2.name.includes("/") ? row2.name.split("/")[0] : row2.tableSection;
+        const sectionName = part ? `${group}/${part}` : group;
+        const found = [`${group}/${row2.name}`, `${group}/${row2.name}${ts.emphasizedSuffix}`].map((name) => byName.get(name)).filter((s) => !!s);
+        if (found.length === 0) continue;
+        let section = sections.find((x) => x.name === sectionName);
+        if (!section) sections.push(section = { name: sectionName, rows: [] });
+        section.rows.push(...found);
+      }
+      const count = sections.reduce((n, x) => n + x.rows.length, 0);
+      if (count > 0) tables.push({ group, count, description: ts.tables.descriptions[group], sections });
+    }
+    return tables;
+  }
+
+  // src/text-styles-figma.ts
+  var same = (a, b) => Math.abs(a - b) < 1e-3;
+  function fontLoader(problems) {
+    const loads = /* @__PURE__ */ new Map();
+    return (font) => {
+      const key = `${font.family}|${font.style}`;
+      let load = loads.get(key);
+      if (!load) {
+        load = figma.loadFontAsync(font).then(() => true, () => {
+          problems.push(`Font not available: ${font.family} ${font.style}.`);
+          return false;
+        });
+        loads.set(key, load);
+      }
+      return load;
+    };
+  }
+  function sameNumbers(style, def) {
+    const { lineHeight, letterSpacing } = style;
+    return same(style.fontSize, def.fontSize) && lineHeight.unit === "PIXELS" && same(lineHeight.value, def.lineHeight) && letterSpacing.unit === "PIXELS" && same(letterSpacing.value, def.letterSpacing);
+  }
+  async function writeTextStyles(defs) {
+    var _a, _b, _c, _d, _e;
+    const summary = { created: 0, updated: 0, unchanged: 0, problems: [] };
+    if (defs.length === 0) return summary;
+    const collections = await figma.variables.getLocalVariableCollectionsAsync();
+    const themeId = (_a = collections.find((c) => c.name === "Theme")) == null ? void 0 : _a.id;
+    const tokens = new Map((await figma.variables.getLocalVariablesAsync("STRING")).filter((v) => v.variableCollectionId === themeId).map((v) => [v.name, v]));
+    const existing = /* @__PURE__ */ new Map();
+    for (const style of await figma.getLocalTextStylesAsync()) if (!existing.has(style.name)) existing.set(style.name, style);
+    const load = fontLoader(summary.problems);
+    let noFont = 0;
+    for (const def of defs) {
+      try {
+        const family = tokens.get(def.familyToken);
+        const weight = tokens.get(def.weightToken);
+        if (!family || !weight) {
+          summary.problems.push(`${def.name}: token not found (${!family ? def.familyToken : def.weightToken}).`);
+          continue;
+        }
+        let style = existing.get(def.name);
+        const isNew = !style;
+        const linked = !!style && ((_c = (_b = style.boundVariables) == null ? void 0 : _b.fontFamily) == null ? void 0 : _c.id) === family.id && ((_e = (_d = style.boundVariables) == null ? void 0 : _d.fontStyle) == null ? void 0 : _e.id) === weight.id;
+        if (linked && sameNumbers(style, def)) {
+          summary.unchanged++;
+          continue;
+        }
+        const fontsReady = await Promise.all(def.fonts.map((font) => load(font)));
+        if (!fontsReady[0]) {
+          noFont++;
+          continue;
+        }
+        if (!style) {
+          style = figma.createTextStyle();
+          style.name = def.name;
+          existing.set(def.name, style);
+        }
+        if (!linked) style.fontName = def.fonts[0];
+        else await figma.loadFontAsync(style.fontName);
+        style.fontSize = def.fontSize;
+        style.lineHeight = { unit: "PIXELS", value: def.lineHeight };
+        style.letterSpacing = { unit: "PIXELS", value: def.letterSpacing };
+        style.setBoundVariable("fontFamily", family);
+        style.setBoundVariable("fontStyle", weight);
+        if (isNew) summary.created++;
+        else summary.updated++;
+      } catch (e) {
+        summary.problems.push(`${def.name}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    if (noFont > 0) summary.problems.push(`${noFont} text style(s) not written, because their font is not available.`);
+    return summary;
+  }
+
+  // src/text-style-tables-figma.ts
+  var PAGE_TAG2 = "text-styles-page";
+  var TABLE_TAG2 = "text-styles-table";
+  var TABLE_GAP2 = 120;
+  var NAME_W2 = 320;
+  var SAMPLE_W = 640;
+  var SIZE_W = 56;
+  var LINE_W = 80;
+  var SPACING_W = 96;
+  var WEIGHT_W = 96;
+  var GAP2 = 40;
+  var SIDE2 = 16;
+  var describe = (v) => {
+    if (v.unit === "AUTO") return "Auto";
+    return v.unit === "PERCENT" ? `${shortNumber(v.value)}%` : shortNumber(v.value);
+  };
+  async function drawTextStyleTables(spec) {
+    var _a, _b, _c, _d, _e;
+    const ts = spec.textStyles;
+    const problems = [];
+    const styles = await figma.getLocalTextStylesAsync();
+    const collections = await figma.variables.getLocalVariableCollectionsAsync();
+    const collection = collections.find((c) => c.name === "Theme");
+    if (!collection) return null;
+    const variables = await figma.variables.getLocalVariablesAsync("STRING");
+    const byId = new Map(variables.map((v) => [v.id, v]));
+    const textIn = (id, modeId) => {
+      var _a2;
+      const variable = id ? byId.get(id) : void 0;
+      if (!variable) return null;
+      const value = (_a2 = variable.valuesByMode[modeId]) != null ? _a2 : Object.values(variable.valuesByMode)[0];
+      if (typeof value === "string") return value;
+      return value && typeof value === "object" && "type" in value && value.type === "VARIABLE_ALIAS" ? textIn(value.id, "") : null;
+    };
+    const live = styles.map((s) => {
+      var _a2, _b2, _c2;
+      const weightId = (_b2 = (_a2 = s.boundVariables) == null ? void 0 : _a2.fontStyle) == null ? void 0 : _b2.id;
+      const token = weightId ? (_c2 = byId.get(weightId)) == null ? void 0 : _c2.name : void 0;
+      return {
+        id: s.id,
+        name: s.name,
+        fontSize: s.fontSize,
+        lineHeight: describe(s.lineHeight),
+        letterSpacing: describe(s.letterSpacing),
+        weight: token ? token.split("/").pop() : s.fontName.style
+      };
+    });
+    const tables = buildTextStyleTables(spec, live);
+    if (tables.length === 0) return null;
+    const load = fontLoader(problems);
+    const inTables = new Set(tables.flatMap((t) => t.sections.flatMap((x2) => x2.rows.map((r) => r.id))));
+    const ready = /* @__PURE__ */ new Map();
+    for (const s of styles) {
+      if (!inTables.has(s.id)) continue;
+      const own = await load(s.fontName);
+      for (const { modeId } of collection.modes) {
+        const family = textIn((_b = (_a = s.boundVariables) == null ? void 0 : _a.fontFamily) == null ? void 0 : _b.id, modeId);
+        const style = textIn((_d = (_c = s.boundVariables) == null ? void 0 : _c.fontStyle) == null ? void 0 : _d.id, modeId);
+        const inTheme = family && style ? await load({ family, style }) : true;
+        ready.set(`${s.id}|${modeId}`, own && inTheme);
+      }
+    }
+    let page = (_e = figma.root.children.find((p) => p.getPluginData(PAGE_TAG2) === "1")) != null ? _e : figma.root.children.find((p) => p.name === ts.tables.page);
+    if (!page) {
+      page = figma.createPage();
+      page.name = ts.tables.page;
+    }
+    page.setPluginData(PAGE_TAG2, "1");
+    await page.loadAsync();
+    const ctx = {
+      fonts: await loadFonts(),
+      collection,
+      sample: ts.tables.sample,
+      available: (id, modeId) => {
+        var _a2;
+        return (_a2 = ready.get(`${id}|${modeId}`)) != null ? _a2 : false;
+      }
+    };
+    const old = page.children.filter((n) => n.getPluginData(TABLE_TAG2) !== "");
+    let x = old.length ? Math.min(...old.map((n) => n.x)) : page.children.length ? Math.max(...page.children.map((n) => n.x + n.width)) + 200 : 0;
+    const y = old.length ? Math.min(...old.map((n) => n.y)) : 0;
+    const drawn = [];
+    try {
+      for (const t of tables) {
+        const frame = await drawTable2(t, ctx, page, ts.tables.notation, drawn);
+        frame.x = x;
+        frame.y = y;
+        x += frame.width + TABLE_GAP2;
+      }
+    } catch (e) {
+      for (const f of drawn) if (!f.removed) f.remove();
+      throw e;
+    }
+    for (const n of old) n.remove();
+    return { page: page.name, tables: tables.length, problems };
+  }
+  async function drawTable2(t, ctx, page, notation, drawn) {
+    const f = ctx.fonts;
+    const themes = ctx.collection.modes;
+    const contentW = SIDE2 + NAME_W2 + themes.length * (GAP2 + SAMPLE_W) + GAP2 + SIZE_W + GAP2 + LINE_W + GAP2 + SPACING_W + GAP2 + WEIGHT_W + SIDE2;
+    const outer = stack(page, "VERTICAL", { name: `${t.group} text styles`, gap: 0, pad: [40, 40, 40, 40] });
+    drawn.push(outer);
+    outer.fills = [solid(C.white)];
+    outer.cornerRadius = 32;
+    fixedWidth(outer, contentW + 80);
+    const block = stack(outer, "VERTICAL", { name: "Title", gap: 32, pad: [32, 16, 32, 16] });
+    block.layoutSizingHorizontal = "FILL";
+    const header = stack(block, "HORIZONTAL", { name: "Header", gap: 32 });
+    header.layoutSizingHorizontal = "FILL";
+    header.primaryAxisAlignItems = "SPACE_BETWEEN";
+    header.counterAxisAlignItems = "BASELINE";
+    text(header, t.group, f.bold, 64, null, C.black);
+    text(header, `${t.count} styles`, f.bold, 24, null, C.black);
+    text(block, t.description, f.body, 16, 20, C.black);
+    const meta = stack(block, "HORIZONTAL", { name: "Metadata", gap: 64, pad: [18, 0, 18, 0] });
+    meta.layoutSizingHorizontal = "FILL";
+    divider(meta, true);
+    const modes = themes.map((m) => m.name).join(" / ");
+    for (const [label, value] of [["GROUP", t.group], [themes.length > 1 ? "EXPLICIT MODES" : "EXPLICIT MODE", modes], ["VALUE NOTATION", notation]]) {
+      const item = stack(meta, "VERTICAL", { name: label, gap: 6 });
+      text(item, label, f.medium, 10, 12, C.muted);
+      text(item, value, f.regular, 14, 16, C.black);
+    }
+    const columns = [
+      ["FULL STYLE NAME", NAME_W2],
+      ...themes.map((m) => [m.name, SAMPLE_W]),
+      ["SIZE", SIZE_W],
+      ["LINE HEIGHT", LINE_W],
+      ["LETTER SPACING", SPACING_W],
+      ["WEIGHT", WEIGHT_W]
+    ];
+    for (const section of t.sections) {
+      const head = stack(outer, "VERTICAL", { name: "GroupHeader", gap: 32, pad: [48, 0, 0, 0] });
+      head.layoutSizingHorizontal = "FILL";
+      const title = stack(head, "HORIZONTAL", { name: "Group title", gap: 8, pad: [8, 16, 8, 16] });
+      text(title, section.name, f.bold, 32, null, C.black);
+      const legend = stack(head, "HORIZONTAL", { name: "Legend", gap: GAP2, pad: [16, SIDE2, 16, SIDE2] });
+      legend.fills = [solid(C.legendBg)];
+      legend.cornerRadius = 8;
+      legend.counterAxisAlignItems = "CENTER";
+      legend.resize(1, 64);
+      legend.layoutSizingHorizontal = "FILL";
+      for (const [label, width] of columns) {
+        const l = text(legend, label, f.medium, 10, 12, C.legendText, width);
+        l.letterSpacing = { value: 0.7, unit: "PIXELS" };
+      }
+      for (const r of section.rows) await drawRow(outer, r, ctx);
+    }
+    outer.setPluginData(TABLE_TAG2, t.group);
+    return outer;
+  }
+  async function drawRow(parent, r, ctx) {
+    const f = ctx.fonts;
+    const line = stack(parent, "HORIZONTAL", { name: r.name, gap: GAP2, pad: [16, SIDE2, 16, SIDE2] });
+    line.counterAxisAlignItems = "CENTER";
+    line.layoutSizingHorizontal = "FILL";
+    divider(line, false);
+    text(line, r.name, f.medium, 16, 20, C.black, NAME_W2);
+    for (const theme of ctx.collection.modes) {
+      const cell = stack(line, "HORIZONTAL", { name: theme.name, gap: 0 });
+      fixedWidth(cell, SAMPLE_W);
+      cell.clipsContent = true;
+      cell.setExplicitVariableModeForCollection(ctx.collection, theme.modeId);
+      if (ctx.available(r.id, theme.modeId)) {
+        const sample = text(cell, ctx.sample, f.regular, 16, null, C.black);
+        await sample.setTextStyleIdAsync(r.id);
+      } else {
+        text(cell, "Font not available", f.regular, 14, 16, C.muted);
+      }
+    }
+    text(line, shortNumber(r.fontSize), f.regular, 14, 16, C.black, SIZE_W);
+    text(line, r.lineHeight, f.regular, 14, 16, C.black, LINE_W);
+    text(line, r.letterSpacing, f.regular, 14, 16, C.black, SPACING_W);
+    text(line, r.weight, f.regular, 14, 16, C.black, WEIGHT_W);
+  }
+
   // src/modes-figma.ts
   var MODE_KEYS = "mode-keys";
   function plannedModes(plan, inputs) {
@@ -3284,7 +3710,7 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
           col.addMode(name);
         } catch (e) {
           throw new Error(
-            `Figma did not allow adding the mode "${name}" to the ${col.name} collection. Your Figma plan may limit the number of modes per collection. (${e instanceof Error ? e.message : e})`
+            `Figma did not allow adding the mode "${name}" to the ${col.name} collection. Your Figma plan may limit the number of modes per collection. Token values were not updated, but some modes or palette names may have changed. (${e instanceof Error ? e.message : e})`
           );
         }
         mode = col.modes.find((m) => m.name === name);
@@ -3386,13 +3812,16 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
       darkFillSteps: tokens_default.inputs.darkTextFillStep.allowed,
       steps: [...tokens_default.primitives.steps].sort((a, b) => a - b),
       // palette steps, lightest first
+      maxThemes: tokens_default.inputs.numberOfThemes.maximum,
       firstThemeName: tokens_default.collections.Theme.firstModeName,
       // default names
       customThemeName: tokens_default.collections.Theme.customModeName,
       customAppearanceName: tokens_default.inputs.extraAppearances.defaultName
     };
     figma.ui.postMessage({ type: "saved-inputs", inputs: saved != null ? saved : null, hasTokens, fonts: await loadFontStyles(), ui });
-  })();
+  })().catch((e) => {
+    figma.closePlugin(`Tokenseed could not read this file: ${e instanceof Error ? e.message : String(e)}`);
+  });
   figma.ui.onmessage = async (msg) => {
     var _a;
     if (msg.type === "resize" || msg.type === "resize-end") {
@@ -3420,13 +3849,16 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
       const report = [...plan.report];
       let modes = [];
       let renames = {};
+      const textStyles = plan.ok ? buildTextStyles(tokens_default, plan) : { styles: [], report: [] };
       if (plan.ok) {
         modes = matchModes(plan, inputs, collections);
         renames = plannedPaletteRenames(plan, existing, collections);
         const renamed = (name) => Object.keys(renames).some((old) => name.startsWith(`Color/${old}/`));
         report.push(
           ...findOrphans(plan, existing, collections).filter((r) => !(r.collection === "Primitives" && renamed(r.token))),
-          ...findOrphanModes(modes, collections)
+          ...findOrphanModes(modes, collections),
+          ...textStyles.report,
+          ...findOrphanTextStyles(tokens_default, (await figma.getLocalTextStylesAsync()).map((s) => s.name))
         );
       }
       let summary = null;
@@ -3436,12 +3868,22 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
         summary = writePlan(plan, existing, collections, modes);
         summary.renamed = renamedPalettes;
         await storePaletteSources(plan);
-        figma.root.setPluginData(FILE_INPUTS, JSON.stringify(msg.inputs));
+        try {
+          summary.textStyles = await writeTextStyles(textStyles.styles);
+          summary.problems.push(...summary.textStyles.problems);
+        } catch (e) {
+          summary.problems.push(`Text styles were not written: ${e instanceof Error ? e.message : String(e)}`);
+        }
         try {
           summary.tablesPage = (await drawColorTables(buildTables(tokens_default, plan), buildColorMaps(plan))).page;
         } catch (e) {
           summary.problems.push(`Color tables were not drawn: ${e instanceof Error ? e.message : String(e)}`);
         }
+        const textTables = await drawTextTables();
+        summary.textTablesPage = textTables.page;
+        summary.problems.push(...textTables.problems);
+        summary.problems = [...new Set(summary.problems)];
+        figma.root.setPluginData(FILE_INPUTS, JSON.stringify(msg.inputs));
       }
       figma.ui.postMessage({
         type: "result",
@@ -3455,9 +3897,12 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
       });
       if (summary) figma.notify(`Variables: ${summary.created} created, ${summary.updated} updated, ${summary.unchanged} unchanged.`);
     } catch (e) {
-      figma.ui.postMessage({ type: "failure", message: e instanceof Error ? e.message : String(e) });
+      sendFailure("run", e);
     }
   };
+  function sendFailure(action, e) {
+    figma.ui.postMessage({ type: "failure", action, message: e instanceof Error ? e.message : String(e) });
+  }
   function previewNames(inputs) {
     var _a;
     try {
@@ -3486,20 +3931,30 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
       figma.ui.postMessage({ type: "names-result", similar: [], palettes: [], previews: [] });
     }
   }
+  async function drawTextTables() {
+    var _a;
+    try {
+      const drawn = await drawTextStyleTables(tokens_default);
+      return { page: drawn == null ? void 0 : drawn.page, problems: (_a = drawn == null ? void 0 : drawn.problems) != null ? _a : [] };
+    } catch (e) {
+      return { problems: [`Text style tables were not drawn: ${e instanceof Error ? e.message : String(e)}`] };
+    }
+  }
   async function updateTablesOnly() {
     try {
       const source = await readLiveVariables();
       const names = source.collections.map((c) => c.name);
       const missing = ["Primitives", "Theme", "Appearance", "ColorScheme"].filter((n) => !names.includes(n));
       if (names.length === 0) {
-        figma.ui.postMessage({ type: "failure", message: "No Primitives, Theme or Appearance collection in this file. Generate tokens first." });
+        sendFailure("tables", new Error("No Primitives, Theme or Appearance collection in this file. Generate tokens first."));
         return;
       }
       const result = await drawColorTables(buildTables(tokens_default, source), buildColorMaps(source));
-      figma.ui.postMessage({ type: "tables-result", page: result.page, tables: result.tables, missing });
-      figma.notify(`Color tables updated on "${result.page}".`);
+      const textTables = await drawTextTables();
+      figma.ui.postMessage({ type: "tables-result", page: result.page, tables: result.tables, missing, textTables: textTables.page, problems: textTables.problems });
+      figma.notify("Tables updated.");
     } catch (e) {
-      figma.ui.postMessage({ type: "failure", message: e instanceof Error ? e.message : String(e) });
+      sendFailure("tables", e);
     }
   }
   async function exportTokens(options) {
@@ -3524,7 +3979,7 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
       const files = Object.keys(data.themes).length > 0 ? exportFiles(data, split) : [];
       figma.ui.postMessage({ type: "export-result", data, files, problems });
     } catch (e) {
-      figma.ui.postMessage({ type: "failure", message: e instanceof Error ? e.message : String(e) });
+      sendFailure("export", e);
     }
   }
   async function readLiveVariables(keepAlpha = false) {

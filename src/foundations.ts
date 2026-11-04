@@ -3,8 +3,7 @@
 
 import { contrast, hexToOklch } from "./color.ts";
 import { buildHuePalette, buildNeutralPalette, buildPalette, closestStep, GRAY_HEX, neutralOf, paletteDifference, SHIFT_NOTICE_DISTANCE } from "./palette.ts";
-import type { Neutral } from "./palette.ts";
-import type { Palette } from "./palette.ts";
+import type { Neutral, Palette } from "./palette.ts";
 import { validateHex } from "./validate.ts";
 import { assignPaletteNames, hslHue, hueDistance, similarPalettes } from "./naming.ts";
 import type { NamedColorInput, NamedPalette, SimilarNotice } from "./naming.ts";
@@ -231,7 +230,7 @@ function sizeName(v: number): string {
 
 // The colors to name, in the spec's fixed order: theme by theme; within a theme brand, the status
 // roles in use, then the custom roles. Colors without a valid HEX are left out.
-export function orderedColors(spec: Spec, inputs: Inputs): (NamedColorInput & { theme: number; role: string })[] {
+function orderedColors(spec: Spec, inputs: Inputs): (NamedColorInput & { theme: number; role: string })[] {
   const n = Math.max(0, Math.min(inputs?.numberOfThemes ?? 0, inputs?.themes?.length ?? 0));
   const modes = themeModeNames(spec, n, inputs?.themeNames);
   const statusRoles: string[] = inputs?.statusRoles ?? spec.inputs.statusRoles.default;
@@ -379,7 +378,7 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
 
   // The saturation slider of each theme, when given, is a whole level from 1 to 10.
   themeModes.forEach((name, i) => {
-    const level = inputs.themes[i]?.saturation;
+    const level = inputs.themes?.[i]?.saturation;
     if (level !== undefined && !spec.inputs.saturation.allowed.includes(level)) {
       add("missing_input", "Theme", "saturation", name, spec.inputs.saturation.allowed.join(", "), String(level), `Saturation must be a whole level from 1 to 10.`);
     }
@@ -930,7 +929,7 @@ export function themeModeNames(spec: Spec, n: number, names: string[] = []): str
 }
 
 // Names of the extra appearances: the user's names, or the default names (section 5.1).
-export function extraAppearanceNames(spec: Spec, extras: AppearanceInput[]): string[] {
+function extraAppearanceNames(spec: Spec, extras: AppearanceInput[]): string[] {
   return fillDefaultNames(extras.map((a) => a?.name), () => spec.inputs.extraAppearances.defaultName);
 }
 

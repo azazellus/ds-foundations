@@ -15,7 +15,11 @@ You pick a few colors and fonts. The plugin builds full color palettes, checks t
 | Appearance | The tokens you use in your designs, such as a brand background. There is one mode for each appearance, such as Light and Dark |
 | ColorScheme | The same colors with Android names, for teams that build with Jetpack Compose |
 
+**Text styles** for Android, iOS, and web, such as `android/display/medium` or `ios/title2-emphasized`. They take their font and weights from your theme, so they change with the Theme mode.
+
 **Color tables and color maps**, drawn on a page called "Color tokens", so you can see all your colors at a glance.
+
+**Text style tables**, one each for Android, iOS, and web, drawn on a page called "Text styles". Each row shows a real sample for every theme, with its size, line height, letter spacing, and weight.
 
 **Exports for developers:** Appearance or ColorScheme tokens as JSON, or ColorScheme tokens as Kotlin.
 
@@ -46,7 +50,7 @@ A theme is one look for your product, with its own colors and fonts. Each theme 
 - any other colors you want to add
 - a font family with its weights
 
-The Saturation slider makes the status colors and any added colors softer or stronger, from level 1 to 10. It does not change the brand or neutral colors. Each color row shows the palette the plugin will make, as you type. A note appears under a color when its palette looks almost the same as another one, when its hue is close to the brand color, or when it will look quite different from the color you picked. The brand color never gets a closeness note, because it has priority.
+The Saturation slider makes the status colors and any added colors softer or stronger, from level 1 to 10. It does not change the brand or neutral colors. Each color row shows the palette the plugin will make, as you type. You can type or paste a color as HEX, with or without the `#`, or as HSL, HSB or RGB, such as `HSL 160° 100 32` or `rgb(0, 133, 102)`. It becomes HEX, so the value can round slightly. A note appears under a color when its palette looks almost the same as another one, when its hue is close to the brand color, or when it will look quite different from the color you picked. The brand color never gets a closeness note, because it has priority.
 
 ### 2. Set up your color modes
 
@@ -64,9 +68,9 @@ Open the Generate tab. It runs every check straight away and writes nothing to y
 
 | Button | What it does |
 |---|---|
-| Generate tokens | Runs every check. If there is no error, it creates the variables and draws the color tables and color maps. |
-| Update tokens | The same button, in a file that already has tokens. It updates the variables and redraws the color tables and color maps. |
-| Update tables | Redraws the color tables and color maps from the variables in the file, including changes made by hand. It appears when the file has tokens. |
+| Generate tokens | Runs every check. If there is no error, it creates the variables and text styles, and draws the color tables, color maps, and text style tables. |
+| Update tokens | The same button, in a file that already has tokens. It updates the variables and text styles, and redraws the color tables, color maps, and text style tables. |
+| Update tables | Redraws the color tables, color maps, and text style tables from what is in the file, including changes made by hand. It appears when the file has tokens. |
 
 The Report card lists every error and warning. Press it to open or close it. If there is an error, the report opens and the buttons are hidden until you fix it in the Edit tab. Nothing is written.
 
@@ -78,18 +82,20 @@ The Export tab exports tokens for developers. It changes nothing in your file.
 
 - **Resize the window.** Drag the handle in the bottom right corner. The width goes from 680 to 1280 pixels, and the plugin remembers your size.
 - **Light or dark window.** The switch in the top bar changes the plugin's window. The plugin remembers your choice, and it does not change your tokens.
+- **Esc leaves a field.** What you typed still counts, as when you click away.
 - **Try it in a test file first.** Check the result before you run the plugin in a real design file.
 - **Your settings stay with the file.** They are saved when you press Generate tokens, so each file keeps its own. Changes you did not generate are lost when you close the plugin.
 - **A file with no tokens starts fresh.** In a new file, or after you delete all the tokens, the form opens with the default settings.
 - **Running it again updates your variables.** It does not make duplicates.
-- **Manual edits are replaced.** If you changed the value of one of the plugin's variables by hand, Generate tokens sets it back.
-- **Nothing is deleted.** Variables and modes the plugin no longer makes stay in your file, and the report lists them as `orphan_variable` and `orphan_mode`.
+- **Manual edits are replaced.** If you changed the value of one of the plugin's variables or text styles by hand, Generate tokens sets it back.
+- **Nothing is deleted.** Variables, modes, and text styles the plugin no longer makes stay in your file, and the report lists them as `orphan_variable`, `orphan_mode`, and `orphan_text_style`.
 
 ## Common problems
 
 | Problem | What to do |
 |---|---|
 | Figma cannot load the plugin after you moved or renamed its folder | Import `manifest.json` again from the folder's new location. |
+| A text style table says "Font not available" | That theme's font is not installed on this computer. Install it, then press Update tables. |
 | The report says "Stopped" | Read the errors in the report. Each one names the token and the mode it is about. Fix them in the Edit tab, then open the Generate tab again. |
 
 ## For developers

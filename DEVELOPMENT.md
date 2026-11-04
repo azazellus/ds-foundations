@@ -6,7 +6,7 @@ This guide is for people who want to change the plugin's code. To install and us
 
 You need two programs.
 
-1. **Node.js**, version 22 or newer. Download the LTS version from https://nodejs.org and run the installer.
+1. **Node.js**, version 22.6 or newer. Download the LTS version from https://nodejs.org and run the installer.
 2. **The Figma desktop app**, from https://www.figma.com/downloads.
 
 Then open a terminal in the project folder and install the project's tools:
@@ -55,6 +55,7 @@ tokenseed/
 │   ├── validate.ts      ← checks HEX values
 │   ├── tables.ts        ← describes the color tables
 │   ├── color-maps.ts    ← describes the ColorScheme color maps
+│   ├── text-styles.ts   ← describes the Android, iOS, and web text styles
 │   ├── saved-inputs.ts  ← decides which settings the form opens with
 │   ├── window-size.ts   ← the limits of the plugin window's size
 │   ├── previews.ts      ← works out the real colors of each appearance card in the window
@@ -62,7 +63,9 @@ tokenseed/
 │   ├── figma.ts         ← the Figma side: talks to the window and writes the variables
 │   ├── modes-figma.ts   ← finds, renames, and adds modes in the file
 │   ├── palettes-figma.ts← renames palettes whose name changed
-│   └── tables-figma.ts  ← draws the color tables in Figma
+│   ├── tables-figma.ts  ← draws the color tables in Figma
+│   ├── text-styles-figma.ts ← writes the text styles in Figma
+│   └── text-style-tables-figma.ts ← draws the text style tables in Figma
 └── test/
     └── logic.test.ts    ← automatic checks of all the logic
 ```
@@ -77,6 +80,8 @@ Files ending in `-figma.ts`, and `figma.ts` itself, are the only ones that touch
 | Theme | Roles such as `color/brand/500`, linked to Primitives | One per theme (Main theme, Custom theme, …) |
 | Appearance | What designs use, such as `color/bg/brand/bold`, linked to Theme tokens | Light, Dark, and any extra appearances |
 | ColorScheme | The same colors with Android (Jetpack Compose) names, such as `primary` | Same as Appearance |
+
+It also makes text styles for Android, iOS, and web, linked to the Theme typography tokens, and draws tables of the colors and text styles.
 
 All the rules live in `spec/`. The plugin follows them exactly.
 

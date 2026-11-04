@@ -142,7 +142,6 @@
   .panel-title .icons { display: flex; gap: 16px; align-items: center; }
   .appearance .panel-title .icons { gap: 8px; }
   .icon { display: block; position: relative; flex-shrink: 0; }
-  .icon img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* An icon in the color of its card: the design's icon is the shape, --icon fills it. */
   .icon.tinted.brand { background: var(--accent); }
   .icon.tinted { background: var(--icon); -webkit-mask: var(--shape) center / contain no-repeat; mask: var(--shape) center / contain no-repeat; }
@@ -275,7 +274,6 @@
 
   /* Pill buttons: white with a thin line and a soft inner shadow; the main one is purple. */
   .pill { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 2px 12px 2px 8px; border-radius: 512px; background: var(--action-bg); box-shadow: var(--brand-border), var(--shadow-secondary); color: var(--action); font-weight: 600; white-space: nowrap; }
-  .pill.small { height: 24px; padding-top: 0; padding-bottom: 0; }
   .pill.text-only { padding: 2px 12px; }
   .pill.primary { background: var(--action); box-shadow: var(--shadow-primary); color: var(--on-action); }
   .pill.primary .icon.tinted, .pill.primary .icon.tinted.brand { background: var(--icon-inverse); }
@@ -409,7 +407,7 @@
   <div class="action-row" id="actionRow">
     <div class="status-line" id="statusLine" role="status"><span id="statusIcon"></span><span id="statusText"></span></div>
     <div class="group">
-      <button type="button" class="pill text-only hidden" id="tables" title="Redraw the color tables from the variables as they are now in this file">Update tables</button>
+      <button type="button" class="pill text-only hidden" id="tables" title="Redraw the color and text style tables from the file as it is now">Update tables</button>
       <button type="button" class="pill text-only primary" id="create">Generate tokens</button>
     </div>
   </div>
@@ -760,6 +758,7 @@
   let LIGHT_FILL_STEPS = [700, 800, 850, 900, 950, "black"]; // text fill steps; the first is the default
   let DARK_FILL_STEPS = [150, 100, 50, "white"];
   // Default names, used when the user types no name (section 5.1).
+  let MAX_THEMES = 26;
   let FIRST_THEME_NAME = "Main theme";
   let CUSTOM_THEME_NAME = "Custom theme";
   let CUSTOM_APPEARANCE_NAME = "Custom appearance";
@@ -820,6 +819,36 @@
     return row;
   }
 
+  // ---------- Reading a pasted or typed color ----------
+  // color-input start (test/logic.test.ts reads this function from this file)
+  // Turns what is in a color field into #RRGGBB, or null when it is not a color it can be sure about.
+  // Accepts HEX with or without "#", and HSL, HSB, HSV or RGB with their label: "HSL 160° 100 32", "hsl(160, 100%, 32%)", "rgb(0 133 102)".
+  // Numbers without a label are refused, because they could mean any of these. So is transparency,
+  // because a palette color has none (a fourth number, or rgba and hsla).
+  function parseColorInput(text) {
+    const t = String(text ?? "").trim().toUpperCase();
+    if (/^#?[0-9A-F]{6}$/.test(t)) return "#" + t.replace("#", "");
+    const match = t.match(/^(HSL|HSB|HSV|RGB)\s*:?\s*\(?([^()]*)\)?$/);
+    if (!match) return null;
+    const model = match[1];
+    if (model === "RGB" && match[2].includes("%")) return null; // RGB as percentages is too rare to guess at
+    const parts = match[2].replace(/°|DEG|%/g, " ").trim().split(/[\s,]+/);
+    if (parts.length !== 3 || !parts.every((p) => /^(\d+\.?\d*|\.\d+)$/.test(p))) return null;
+    const [a, b, c] = parts.map(Number);
+    const toHex = (rgb) => "#" + rgb.map((x) => Math.round(x).toString(16).padStart(2, "0")).join("").toUpperCase();
+    if (model === "RGB") return a <= 255 && b <= 255 && c <= 255 ? toHex([a, b, c]) : null;
+    if (a > 360 || b > 100 || c > 100) return null;
+    const s = b / 100, v = c / 100;
+    if (model === "HSL") {
+      const amount = s * Math.min(v, 1 - v);
+      const channel = (n) => { const k = (n + a / 30) % 12; return 255 * (v - amount * Math.max(-1, Math.min(k - 3, 9 - k, 1))); };
+      return toHex([channel(0), channel(8), channel(4)]);
+    }
+    const channel = (n) => { const k = (n + a / 60) % 6; return 255 * (v - v * s * Math.max(0, Math.min(k, 4 - k, 1))); };
+    return toHex([channel(5), channel(3), channel(1)]);
+  }
+  // color-input end
+
   // ---------- Color fields: HEX with a swatch that opens the color picker ----------
   // The palette name is chosen by the plugin from the hue (foundations-spec.md section 1.1.8).
   function colorFields(value) {
@@ -827,16 +856,13 @@
     box.className = "fields";
     box.innerHTML = `
       <div class="hex"><label class="swatch"><input type="color" tabindex="-1" aria-label="Pick color"></label>
-        <input type="text" placeholder="HEX" maxlength="7" aria-label="HEX value"></div>`;
+        <input type="text" placeholder="HEX" aria-label="Color value: HEX, HSL, HSB or RGB"></div>`;
     const hex = box.querySelector('input[type="text"]');
     const pick = box.querySelector('input[type="color"]');
     const swatch = box.querySelector(".swatch");
-    // What the field means: a code without its "#" (008566) already counts as #008566, so the swatch and palette
-    // update as soon as it is pasted. Anything else stays as typed, for the usual HEX check.
-    const code = () => {
-      const v = hex.value.trim().toUpperCase();
-      return /^[0-9A-F]{6}$/.test(v) ? "#" + v : v;
-    };
+    // What the field means: anything parseColorInput can read counts as its HEX, so the swatch and palette
+    // update right away. Anything else stays as typed, for the usual HEX check.
+    const code = () => parseColorInput(hex.value) ?? hex.value.trim().toUpperCase();
     const paint = () => {
       const v = code();
       const ok = HEX_RE.test(v);
@@ -845,10 +871,19 @@
       if (ok) pick.value = v;
     };
     hex.addEventListener("input", paint);
-    // The "#" itself appears in the field on Enter, or when the field is left.
-    const addMissingHash = () => { if (HEX_RE.test(code())) hex.value = code(); };
-    hex.addEventListener("keydown", (e) => { if (e.key === "Enter") addMissingHash(); });
-    hex.addEventListener("blur", addMissingHash);
+    // A pasted color replaces the whole field and shows as HEX at once, even with the cursor inside an old value.
+    // Anything else is pasted as usual.
+    hex.addEventListener("paste", (e) => {
+      const pasted = parseColorInput(e.clipboardData?.getData("text"));
+      if (!pasted) return;
+      e.preventDefault();
+      hex.value = pasted;
+      hex.dispatchEvent(new Event("input", { bubbles: true })); // the same path as typing: swatch and palette follow
+    });
+    // A typed color turns into its HEX on Enter, or when the field is left.
+    const showAsHex = () => { if (HEX_RE.test(code())) hex.value = code(); };
+    hex.addEventListener("keydown", (e) => { if (e.key === "Enter") showAsHex(); });
+    hex.addEventListener("blur", showAsHex);
     pick.addEventListener("input", () => { hex.value = pick.value.toUpperCase(); paint(); });
     box.get = () => ({ hex: code() });
     box.set = (h) => { hex.value = h?.hex || ""; paint(); };
@@ -876,7 +911,7 @@
   }
 
   function addTheme(saved, copyFrom) {
-    if (themePanels().length >= 26) return;
+    if (themePanels().length >= MAX_THEMES) return;
     const first = themePanels().length === 0;
     const panel = document.createElement("div");
     panel.className = "panel theme";
@@ -1091,11 +1126,11 @@
   }
 
   function refreshAddTheme() {
-    document.getElementById("addTheme").disabled = themePanels().length >= 26;
+    document.getElementById("addTheme").disabled = themePanels().length >= MAX_THEMES;
   }
   document.getElementById("addTheme").onclick = () => {
     const a = themePanels()[0];
-    // Show the new theme from its top, so the bottom bar does not cover its name while it is typed.
+    // Show the new theme from its top, so its name is in view while it is typed.
     addTheme(null, a)?.scrollIntoView({ block: "start" });
   };
 
@@ -1267,7 +1302,7 @@
     themesBox.innerHTML = "";
     appearancesBox.innerHTML = "";
     customIds = [];
-    const n = Math.min(26, Math.max(1, inputs.numberOfThemes || 1));
+    const n = Math.min(MAX_THEMES, Math.max(1, inputs.numberOfThemes || 1));
     const savedRoles = inputs.statusRoles || STATUS;
     for (let i = 0; i < n; i++) {
       const t = (inputs.themes || [])[i] || {};
@@ -1295,6 +1330,12 @@
     }
     refreshAddDark();
   }
+
+  // ---------- Keyboard ----------
+  // Esc leaves the field being edited. What was typed counts, as when clicking away.
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.activeElement?.matches("input, textarea, select")) document.activeElement.blur();
+  });
 
   // ---------- Tabs ----------
   const TAB_PAGES = { edit: "tabEdit", generate: "tabGenerate", export: "tabExport" };
@@ -1327,7 +1368,6 @@
   // ---------- Generate tab ----------
   let hasTokens = false;  // does the file already have tokens? Sent by the plugin, and true after a write.
   let busy = false;       // a check, a write or a table update is running
-  let lastAction = "run"; // what a "failure" message from the plugin is about
   const statusLine = document.getElementById("statusLine");
   const statusIcons = { ok: "statusCheck", error: "warning" };
   // The line next to the buttons. tone: "ok" (green check), "error" (red warning) or "" (plain, no icon).
@@ -1357,7 +1397,6 @@
   };
   function run(write) {
     document.activeElement?.blur(); // finish a rename that is being typed
-    lastAction = "run";
     setBusy(true);
     setStatus(write ? "Generating tokens..." : "Checking...");
     parent.postMessage({ pluginMessage: { type: "run", inputs: readInputs(), write } }, "*");
@@ -1366,7 +1405,6 @@
 
   // Redraw the tables from the file's current variables. The form inputs are not used.
   document.getElementById("tables").onclick = () => {
-    lastAction = "tables";
     setBusy(true);
     setStatus("Updating color tables...");
     parent.postMessage({ pluginMessage: { type: "tables" } }, "*");
@@ -1405,7 +1443,6 @@
   for (const id of ["naming", "split", "exportFormat", "schemeSplit"]) document.getElementById(id).onchange = showNaming;
   showNaming();
   function startExport(collection) {
-    lastAction = "export";
     const status = document.getElementById("exportStatus");
     status.textContent = collection === "colorScheme" ? "Exporting ColorScheme tokens..." : "Exporting appearance tokens...";
     status.className = "result-status";
@@ -1500,6 +1537,7 @@
       LIGHT_FILL_STEPS = msg.ui?.lightFillSteps || LIGHT_FILL_STEPS;
       DARK_FILL_STEPS = msg.ui?.darkFillSteps || DARK_FILL_STEPS;
       STEPS = msg.ui?.steps || STEPS;
+      MAX_THEMES = msg.ui?.maxThemes || MAX_THEMES;
       FIRST_THEME_NAME = msg.ui?.firstThemeName || FIRST_THEME_NAME;
       CUSTOM_THEME_NAME = msg.ui?.customThemeName || CUSTOM_THEME_NAME;
       CUSTOM_APPEARANCE_NAME = msg.ui?.customAppearanceName || CUSTOM_APPEARANCE_NAME;
@@ -1511,7 +1549,7 @@
     }
     if (msg.type === "names-result") { showPalettes(msg.palettes || []); showSimilar(msg.similar || []); showPreviews(msg.previews || []); }
     if (msg.type === "failure") {
-      if (lastAction === "export") {
+      if (msg.action === "export") {
         const status = document.getElementById("exportStatus");
         status.textContent = "Figma error: " + msg.message;
         status.className = "result-status error";
@@ -1544,7 +1582,9 @@
     if (msg.type === "tables-result") {
       setBusy(false);
       const skipped = msg.missing.length ? ` No ${msg.missing.join(", ")} collection in this file, so that table was skipped.` : "";
-      setStatus(`Color tables updated on the page "${msg.page}" (${msg.tables} table(s)).${skipped}`, "ok");
+      const textTables = msg.textTables ? ` Text style tables updated on the page "${msg.textTables}".` : "";
+      const problems = msg.problems?.length ? ` ${msg.problems.join(" ")}` : "";
+      setStatus(`Color tables updated on the page "${msg.page}" (${msg.tables} table(s)).${skipped}${textTables}${problems}`, problems ? "error" : "ok");
     }
     if (msg.type === "result") {
       last = msg;
@@ -1586,7 +1626,9 @@
       document.getElementById("summary").innerHTML = s
         ? `${s.created} created, ${s.updated} updated, ${s.unchanged} unchanged` +
           (s.renamed?.length ? `<br>${s.renamed.map(esc).join("<br>")}` : "") +
+          (s.textStyles ? `<br>Text styles: ${s.textStyles.created} created, ${s.textStyles.updated} updated, ${s.textStyles.unchanged} unchanged` : "") +
           (s.tablesPage ? `<br>Color tables updated on the page "${esc(s.tablesPage)}".` : "") +
+          (s.textTablesPage ? `<br>Text style tables updated on the page "${esc(s.textTablesPage)}".` : "") +
           (s.problems.length ? `<br><b>Problems:</b><br>${s.problems.map(esc).join("<br>")}` : "")
         : "";
       renderFindings();

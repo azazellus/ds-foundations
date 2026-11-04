@@ -1,7 +1,7 @@
 // Logic tests. Run with: node --experimental-strip-types test/logic.test.ts
 import assert from "node:assert/strict";
 import { hexToOklch, oklchToHex, contrast, inGamut, maxChroma } from "../src/color.ts";
-import { ANCHOR_CHROMA_REFERENCE, CHROMA_MULT, buildPalette, STEPS, CONTRAST_PAIRS, pairBackgroundHex, buildHuePalette, closestStep, yellowFactor,
+import { ANCHOR_CHROMA_REFERENCE, MAX_ADJUSTMENTS, MIN_CHROMA, CHROMA_MULT, buildPalette, STEPS, CONTRAST_PAIRS, pairBackgroundHex, buildHuePalette, closestStep, yellowFactor,
   SATURATION_FACTORS, DEFAULT_SATURATION, CHROMA_CEILING, REFERENCE_C400, YELLOW_BOOST, SHIFT_NOTICE_DISTANCE, placeAnchor, TARGET_L, RESPACE_FROM_500_TO_400,
   buildNeutralPalette, NEUTRAL_CHROMA, NEUTRAL_FADE, GRAY_HEX, neutralOf } from "../src/palette.ts";
 import { validateHex } from "../src/validate.ts";
@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { buildPlan, namePalettes, themeModeNames, weightSlotOf } from "../src/foundations.ts";
 import type { Inputs, Plan, ThemeInput } from "../src/foundations.ts";
 import { buildTables } from "../src/tables.ts";
+import { buildTextStyles, buildTextStyleTables, findOrphanTextStyles, shortNumber } from "../src/text-styles.ts";
 import { appearancePreviews } from "../src/previews.ts";
 import { fileHasTokens, inputsToShow, readSavedInputs } from "../src/saved-inputs.ts";
 import { clampWindowSize, WINDOW_SIZE } from "../src/window-size.ts";
@@ -1170,6 +1171,131 @@ assert.deepEqual(clampWindowSize(100, 100), { width: WINDOW_SIZE.minWidth, heigh
 assert.deepEqual(clampWindowSize(9000, 9000), { width: WINDOW_SIZE.maxWidth, height: WINDOW_SIZE.maxHeight });
 assert.deepEqual(clampWindowSize(undefined, "tall"), { width: WINDOW_SIZE.defaultWidth, height: WINDOW_SIZE.defaultHeight });
 assert.deepEqual(clampWindowSize(Number.NaN, Infinity), { width: WINDOW_SIZE.defaultWidth, height: WINDOW_SIZE.defaultHeight });
+
+// tokens.json is the source of truth: every value palette.ts keeps its own copy of must match it.
+{
+  const p = spec.primitives;
+  const withoutDescription = ({ description, ...values }: any) => values;
+  assert.deepEqual(STEPS, p.steps);
+  assert.deepEqual(GRAY_HEX, p.neutralPalette.steps);
+  assert.equal(MIN_CHROMA, p.minChroma);
+  assert.equal(MAX_ADJUSTMENTS, spec.validation.maxAdjustmentsPerPalette);
+  assert.equal(REFERENCE_C400, p.hueOnlyPalette.referenceChroma400);
+  assert.deepEqual(YELLOW_BOOST, withoutDescription(p.hueOnlyPalette.yellowBoost));
+  assert.equal(SHIFT_NOTICE_DISTANCE, p.hueOnlyPalette.shiftNotice.maxDistance);
+  assert.equal(DEFAULT_SATURATION, spec.inputs.saturation.default);
+  assert.equal(NEUTRAL_CHROMA, p.neutralTint.chroma);
+  assert.deepEqual(NEUTRAL_FADE, p.neutralTint.fade.steps);
+  assert.deepEqual(CONTRAST_PAIRS, p.contrastPairs.map((x: any) => ({ text: x.text, bg: x.background, bgPalette: x.backgroundPalette, min: x.minimum, target: x.target })));
+}
+
+// A plan with no themes at all reports it, and does not crash.
+assert.equal(buildPlan(spec, { numberOfThemes: 1 } as unknown as Inputs).ok, false);
+
+// Section 6.1.3: text styles.
+{
+  const inputsWith = (weights: string[][], families = ["Inter"]): Inputs => {
+    const themes = families.map((fontFamily, i) => ({
+      brand: { hex: "#553ADF" }, neutral: { hex: "#808080" }, saturation: 5, success: { hex: "#48A13F" }, danger: { hex: "#E74B3C" },
+      warning: { hex: "#CE6924" }, info: { hex: "#4785E6" }, custom: {}, fontFamily, fontWeights: weights[i], availableWeights: weights[i],
+    })) as unknown as ThemeInput[];
+    return {
+      numberOfThemes: themes.length, themes, themeNames: themes.map((_, i) => (i ? "Custom theme" : "Main theme")),
+      statusRoles: ["success", "danger", "warning", "info"], customRoles: [], includeDark: true,
+      lightCanvasStep: "white", lightTextFillStep: 900, darkCanvasStep: 900, darkTextFillStep: "white", extraAppearances: [],
+    } as unknown as Inputs;
+  };
+  const stylesFor = (weights: string[][], families?: string[]) => {
+    const plan = buildPlan(spec, inputsWith(weights, families));
+    assert.ok(plan.ok, JSON.stringify(plan.report.filter((r) => r.severity === "error").slice(0, 2)));
+    return buildTextStyles(spec, plan);
+  };
+  const named = (list: { name: string }[], name: string) => list.find((s) => s.name === name) as any;
+
+  // All weights selected: 71 styles with the agreed names and values, and no warning.
+  const all = stylesFor([["Light", "Regular", "Medium", "Semi Bold", "Bold"]]);
+  assert.equal(all.styles.length, 71);
+  assert.equal(new Set(all.styles.map((s) => s.name)).size, 71, "no duplicate names");
+  assert.equal(all.styles.filter((s) => s.name.startsWith("android/")).length, 30);
+  assert.equal(all.styles.filter((s) => s.name.startsWith("ios/")).length, 22);
+  assert.equal(all.styles.filter((s) => s.name.startsWith("web/")).length, 19);
+  assert.deepEqual(all.report, []);
+  for (const s of all.styles) assert.ok(/^(android|ios|web)(\/[a-z0-9-]+)+$/.test(s.name), `lowercase name: ${s.name}`);
+  const medium = named(all.styles, "android/display/medium");
+  assert.deepEqual([medium.fontSize, medium.lineHeight, medium.letterSpacing, medium.weightToken], [45, 52, 0, "typography/font-weight/regular"]);
+  assert.equal(medium.familyToken, "typography/font-family");
+  assert.equal(named(all.styles, "android/display/medium-emphasized").weightToken, "typography/font-weight/medium");
+  assert.equal(named(all.styles, "ios/title2-emphasized").weightToken, "typography/font-weight/bold");
+  assert.equal(named(all.styles, "web/h1-emphasized"), undefined, "headings have no emphasized variant");
+  assert.equal(named(all.styles, "web/body/medium-emphasized").weightToken, "typography/font-weight/semibold");
+
+  // Each theme shows its own font, with that font's own weight name.
+  const two = stylesFor([["Regular", "Semi Bold"], ["Regular", "SemiBold"]], ["Inter", "Playfair Display"]);
+  assert.deepEqual(named(two.styles, "ios/title2-emphasized").fonts.length, 2);
+  assert.deepEqual(named(two.styles, "ios/body-emphasized").fonts, [{ family: "Inter", style: "Semi Bold" }, { family: "Playfair Display", style: "SemiBold" }]);
+
+  // A missing weight falls back: Medium to Semibold, Bold to Semibold.
+  const noMedium = stylesFor([["Regular", "Semi Bold"]]);
+  assert.equal(named(noMedium.styles, "android/label/medium").weightToken, "typography/font-weight/semibold");
+  assert.equal(named(noMedium.styles, "ios/title-emphasized").weightToken, "typography/font-weight/semibold");
+
+  // Only Regular: emphasized variants look the same as their normal style. That is a warning per group.
+  const regularOnly = stylesFor([["Regular"]]);
+  assert.equal(regularOnly.styles.length, 71);
+  assert.deepEqual(regularOnly.report.map((r) => [r.check, r.severity, r.token]), [
+    ["text_style_emphasis", "warning", "android"], ["text_style_emphasis", "warning", "ios"], ["text_style_emphasis", "warning", "web"],
+  ]);
+  // ios/headline-emphasized is the same by design, so it alone is not a warning.
+  assert.ok(regularOnly.report[1].message.startsWith("10 "));
+
+  // No weight slot at all: no style is written, and the report says so.
+  const none = stylesFor([["Black"]]);
+  assert.deepEqual(none.styles, []);
+  assert.deepEqual(none.report.map((r) => r.check), ["text_style_weight"]);
+
+  // Tables: one per group, rows in the spec's order, each emphasized variant right after its style.
+  const liveFrom = (list: { name: string; fontSize: number; lineHeight: number; letterSpacing: number; weightToken: string }[]) => list.map((s) => ({
+    id: s.name, name: s.name, fontSize: s.fontSize, lineHeight: shortNumber(s.lineHeight), letterSpacing: shortNumber(s.letterSpacing), weight: s.weightToken.split("/").pop()!,
+  }));
+  const tables = buildTextStyleTables(spec, liveFrom(all.styles).reverse());
+  assert.deepEqual(tables.map((t) => [t.group, t.count]), [["android", 30], ["ios", 22], ["web", 19]]);
+  assert.deepEqual(tables[0].sections.map((s) => s.name), ["android/display", "android/headline", "android/title", "android/body", "android/label"]);
+  assert.deepEqual(tables[1].sections.map((s) => s.name), ["ios"]);
+  assert.deepEqual(tables[2].sections.map((s) => [s.name, s.rows.length]), [["web/headings", 7], ["web/body", 6], ["web/label", 4], ["web/caption", 2]]);
+  assert.deepEqual(tables[0].sections[0].rows.slice(0, 2).map((r) => r.name), ["android/display/large", "android/display/large-emphasized"]);
+  assert.ok(tables.every((t) => t.description), "every table has a description");
+  // A style that is not in the file has no row, a group with no style has no table, and other styles are ignored.
+  const partial = buildTextStyleTables(spec, liveFrom(all.styles.filter((s) => s.name === "ios/body")).concat([{ id: "x", name: "brand/title", fontSize: 1, lineHeight: "1", letterSpacing: "0", weight: "bold" }]));
+  assert.deepEqual(partial.map((t) => [t.group, t.count]), [["ios", 1]]);
+  assert.deepEqual(buildTextStyleTables(spec, []), []);
+  assert.equal(shortNumber(-0.20000000298023224), "-0.2");
+
+  // Styles the plugin no longer makes are reported, in its own groups only.
+  const orphans = findOrphanTextStyles(spec, ["android/old", "web/h1", "web/h1-emphasized", "web/body/medium-emphasized", "brand/title", "webby/x"]);
+  assert.deepEqual(orphans.map((r) => [r.check, r.severity, r.token]), [
+    ["orphan_text_style", "warning", "android/old"], ["orphan_text_style", "warning", "web/h1-emphasized"],
+  ]);
+  // Every style the plugin makes counts as its own, even in a run that writes none (no weight selected).
+  assert.deepEqual(findOrphanTextStyles(spec, all.styles.map((s) => s.name)), []);
+}
+
+// The color fields (ui.html). The window is a plain page with no build step, so the test reads the function from it.
+{
+  const page = readFileSync(new URL("../ui.html", import.meta.url), "utf8");
+  const source = page.slice(page.indexOf("// color-input start"), page.indexOf("// color-input end"));
+  const parse = new Function(`${source}; return parseColorInput;`)() as (text: unknown) => string | null;
+  const reads: [string, string][] = [
+    ["HSL 160° 100 32", "#00A36D"], ["hsl(160, 100%, 32%)", "#00A36D"], ["hsl(160deg 100% 32%)", "#00A36D"], ["  HSL: 160 100 32 ", "#00A36D"],
+    ["HSB 160 100 64", "#00A36D"], ["hsv(160, 100%, 64%)", "#00A36D"],
+    ["RGB 0 133 102", "#008566"], ["rgb(0, 133, 102)", "#008566"], ["rgb(0 133 102)", "#008566"],
+    ["008566", "#008566"], ["#008566", "#008566"], ["abcdef", "#ABCDEF"],
+    ["hsl(0, 0%, 100%)", "#FFFFFF"], ["hsl(0, 0%, 0%)", "#000000"], ["HSL 360 100 50", "#FF0000"], ["HSL 120.5 50.5 40.5", "#339B34"],
+  ];
+  for (const [text, hex] of reads) assert.equal(parse(text), hex, text);
+  const refused = ["160 100 32", "HSL 400 100 32", "HSL 160 120 32", "RGB 256 0 0", "HSL 160 100", "HSL 160 100 32 50", "rgba(0, 0, 0, .5)", "hsla(160, 100%, 32%, 50%)",
+    "hsl(160 100% 32% / 50%)", "rgb(50% 50% 50%)", "HSL -10 100 32", "#12", "red", "", null, undefined];
+  for (const text of refused) assert.equal(parse(text), null, String(text));
+}
 
 // Section 5.5 step 1: the reference values match the spec, and a dark brand keeps its exact HEX and its lighter steps' chroma.
 {

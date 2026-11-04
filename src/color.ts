@@ -18,7 +18,7 @@ export function hexToRgb255(hex: string): [number, number, number] {
   ];
 }
 
-export function rgb255ToHex(rgb: number[]): string {
+function rgb255ToHex(rgb: number[]): string {
   return "#" + rgb.map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase();
 }
 
@@ -57,7 +57,7 @@ export function hexToOklch(hex: string): Lch {
 }
 
 // OKLCH -> linear sRGB, unclamped (section 5.7 steps 1 to 3).
-export function oklchToLinear({ L, C, H }: Lch): [number, number, number] {
+function oklchToLinear({ L, C, H }: Lch): [number, number, number] {
   const a = C * Math.cos((H * Math.PI) / 180);
   const b = C * Math.sin((H * Math.PI) / 180);
 

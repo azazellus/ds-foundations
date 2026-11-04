@@ -19,7 +19,7 @@ Sections 1 to 3 describe what the collections contain. Section 5 describes how t
 | 3.5 | ColorScheme collection (Android) | `colorScheme` |
 | 4 | Accessibility reference | — |
 | 5 | Generation: inputs, canvas and text fill rules, palettes, contrast adjustment, chroma, modes | `inputs`, `appearance.darkCanvas`, `appearance.lightCanvas`, `appearance.textFill`, `primitives` |
-| 6 | Outputs (manifest, report, color tables and maps, developer exports), checks, failure conditions, implementation steps | `validation` |
+| 6 | Outputs (manifest, report, color tables and maps, developer exports, text styles), checks, failure conditions, implementation steps | `validation`, `textStyles` |
 
 ### Terms
 
@@ -1104,7 +1104,7 @@ Contrast is WCAG 2.x contrast on sRGB. Compute it from the rounded HEX values th
 
 ### 6.1 Outputs
 
-The plugin produces five outputs. The first three come from the check that runs when the Generate tab opens and from Generate tokens, and are shown in the plugin's report; when generation stops, only the validation report is produced (section 6.2). The color tables are drawn after the variables are written. The developer exports are made on request.
+The plugin produces six outputs. The first three come from the check that runs when the Generate tab opens and from Generate tokens, and are shown in the plugin's report; when generation stops, only the validation report is produced (section 6.2). The text styles and the color tables are made after the variables are written. The developer exports are made on request.
 
 1. **Token manifest (JSON).** One entry per token:
    - `collection` (Primitives, Theme, Appearance, or ColorScheme)
@@ -1149,10 +1149,14 @@ The plugin produces five outputs. The first three come from the check that runs 
    | `similar_palette` | warning |
    | `close_to_brand` | warning |
    | `hue_only_shift` | warning |
+   | `orphan_text_style` | warning |
+   | `text_style_emphasis` | warning |
+   | `text_style_weight` | warning |
 
 3. **Figma-ready variable definitions**, grouped by collection and mode.
 4. **Color tables and ColorScheme color maps** (section 6.1.1), drawn in the Figma file.
 5. **Developer exports** (section 6.1.2): Appearance tokens as JSON, and ColorScheme tokens as JSON or Kotlin.
+6. **Text styles and their tables** (section 6.1.3), written in the Figma file.
 
 Do not invent hues, roles, emphasis levels, font weights, or Appearance tokens that this specification does not define.
 
@@ -1232,6 +1236,94 @@ Both JSON exports use the same structure:
 - Each role is written as `role = Color(0xAARRGGBB)`. Compose puts the alpha first, so `#RRGGBB` becomes `0xFFRRGGBB` and `#RRGGBBAA` becomes `0xAARRGGBB`.
 - A role that is not in `colorScheme.tokens` (one added by hand in Figma) would not compile. It is left out and listed as a problem.
 
+#### 6.1.3 Text styles
+
+- **When.** After Generate tokens writes the variables. The check that runs when the Generate tab opens writes no text style.
+- **What.** One group of Figma text styles per platform: android, ios, and web. The values are in `tokens.json` under `textStyles`.
+- **Font family and weight.** Each style links its font family to `typography/font-family`, and its font weight to `typography/font-weight/{weight}`. There is one set of styles for all themes. A frame's Theme mode decides which font it shows.
+- **Other values.** Size, line height, and letter spacing are plain pixel values. They do not link to Size tokens.
+- **Names.** Lowercase, with a slash only where a group exists: `{platform}/{role}/{size}` or `{platform}/{name}`. An emphasized variant adds `-emphasized` to the name. It has the same size and line height.
+- **Finding styles.** The plugin finds an existing style by its name, and updates it. It never creates duplicates, and a style whose values match is not changed. A change made by hand to one of these styles is replaced.
+- **Removed styles.** The plugin never deletes a text style. A style in the android, ios, or web group that the plugin no longer makes is reported as `orphan_text_style`. Styles in other groups are not the plugin's.
+- **A problem while writing.** The variables are already written, so a problem with a text style, such as a font that is not installed, is reported and does not undo anything.
+
+A weight token exists only when that weight is selected (section 5.1). A style that asks for a missing weight uses the first of these that exists:
+
+| Style asks for | Then tries |
+|---|---|
+| regular | medium, light, semibold, bold |
+| medium | semibold, regular, bold, light |
+| semibold | bold, medium, regular, light |
+| bold | semibold, medium, regular, light |
+
+Two warnings cover what this can cause:
+
+- `text_style_emphasis`: in a group, one or more emphasized variants end up with the same weight as their normal style because a weight is missing. `ios/headline-emphasized` is not counted, because Apple lists the same weight for both.
+- `text_style_weight`: no weight token exists, because the selected weights match no weight slot. No text style is written.
+
+**Tables.** The plugin draws one table per group on a page called "Text styles", in this order: android, ios, web. A group with no style in the file has no table. With no Theme collection in the file, no table is drawn.
+
+- **When.** After Generate tokens writes the text styles, and when the user presses Update tables. The tables read the text styles as they are in the file, including changes made by hand, and change no style.
+- **Page.** The plugin finds the page it made before (it carries a hidden tag, so it is found even if renamed), or a page named "Text styles". Otherwise it creates one.
+- **Replacing.** The rules are the same as for the color tables (section 6.1.1). The new tables are drawn first, and the earlier ones are removed only once all new ones are finished. Nothing else on the page is touched.
+- **Rows.** One per text style, in the order of the tables below, grouped by role. A style's emphasized variant follows it.
+- **Columns.** The style's name, one sample per theme, then size, line height, letter spacing, and weight. Each sample uses the text style itself, in an explicit Theme mode, so it shows that theme's font. The weight is the weight token the style links to.
+- **A font that is not available.** The sample is drawn in the table's own font and says so, and the report lists the problem.
+
+**android.** The Material 3 type scale. `display/medium` is `displayMedium` in Jetpack Compose, and `display/medium-emphasized` is `displayMediumEmphasized`. The values come from the Compose Material 3 type scale tokens.
+
+| Style | Size | Line height | Letter spacing | Weight | Emphasized letter spacing | Emphasized weight |
+|---|---:|---:|---:|---|---:|---|
+| android/display/large | 57 | 64 | -0.2 | regular | 0 | medium |
+| android/display/medium | 45 | 52 | 0 | regular | 0 | medium |
+| android/display/small | 36 | 44 | 0 | regular | 0 | medium |
+| android/headline/large | 32 | 40 | 0 | regular | 0 | medium |
+| android/headline/medium | 28 | 36 | 0 | regular | 0 | medium |
+| android/headline/small | 24 | 32 | 0 | regular | 0 | medium |
+| android/title/large | 22 | 28 | 0 | regular | 0 | medium |
+| android/title/medium | 16 | 24 | 0.2 | medium | 0.15 | bold |
+| android/title/small | 14 | 20 | 0.1 | medium | 0.1 | bold |
+| android/body/large | 16 | 24 | 0.5 | regular | 0.15 | medium |
+| android/body/medium | 14 | 20 | 0.2 | regular | 0.25 | medium |
+| android/body/small | 12 | 16 | 0.4 | regular | 0.4 | medium |
+| android/label/large | 14 | 20 | 0.1 | medium | 0.1 | bold |
+| android/label/medium | 12 | 16 | 0.5 | medium | 0.5 | bold |
+| android/label/small | 11 | 16 | 0.5 | medium | 0.5 | bold |
+
+**ios.** Apple's text styles at the default Dynamic Type size, with the emphasized weight from Apple's table. The names follow SwiftUI, in lowercase: `large-title` is `.largeTitle`, `title` is Apple's Title 1, and `caption` is Apple's Caption 1. Letter spacing is 0, because Apple's values are for its San Francisco fonts.
+
+| Style | Size | Line height | Letter spacing | Weight | Emphasized letter spacing | Emphasized weight |
+|---|---:|---:|---:|---|---:|---|
+| ios/large-title | 34 | 41 | 0 | regular | 0 | bold |
+| ios/title | 28 | 34 | 0 | regular | 0 | bold |
+| ios/title2 | 22 | 28 | 0 | regular | 0 | bold |
+| ios/title3 | 20 | 25 | 0 | regular | 0 | semibold |
+| ios/headline | 17 | 22 | 0 | semibold | 0 | semibold |
+| ios/body | 17 | 22 | 0 | regular | 0 | semibold |
+| ios/callout | 16 | 21 | 0 | regular | 0 | semibold |
+| ios/subheadline | 15 | 20 | 0 | regular | 0 | semibold |
+| ios/footnote | 13 | 18 | 0 | regular | 0 | semibold |
+| ios/caption | 12 | 16 | 0 | regular | 0 | semibold |
+| ios/caption2 | 11 | 13 | 0 | regular | 0 | semibold |
+
+**web.** The web has no official scale, so this one belongs to this specification. Only body, label, and caption styles have emphasized variants. Headings are already Semibold or Bold, so they have no clearly heavier version.
+
+| Style | Size | Line height | Letter spacing | Weight | Emphasized letter spacing | Emphasized weight |
+|---|---:|---:|---:|---|---:|---|
+| web/display | 64 | 72 | 0 | bold | — | — |
+| web/h1 | 48 | 56 | 0 | bold | — | — |
+| web/h2 | 40 | 48 | 0 | bold | — | — |
+| web/h3 | 32 | 40 | 0 | semibold | — | — |
+| web/h4 | 28 | 36 | 0 | semibold | — | — |
+| web/h5 | 24 | 32 | 0 | semibold | — | — |
+| web/h6 | 20 | 28 | 0 | semibold | — | — |
+| web/body/large | 20 | 28 | 0 | regular | 0 | semibold |
+| web/body/medium | 16 | 24 | 0 | regular | 0 | semibold |
+| web/body/small | 14 | 20 | 0 | regular | 0 | semibold |
+| web/label/medium | 14 | 20 | 0 | medium | 0 | semibold |
+| web/label/small | 12 | 16 | 0 | medium | 0 | semibold |
+| web/caption | 12 | 16 | 0 | regular | 0 | semibold |
+
 ### 6.2 Failure conditions
 
 Stop generation and produce only the validation report if any of the following occurs:
@@ -1281,9 +1373,10 @@ Steps are sequential.
 7. Create or update alpha tokens (section 2.1).
 8. Create or update Appearance tokens, with aliases pointing to Theme IDs.
 9. Create or update ColorScheme tokens, with aliases pointing to Theme IDs.
-10. Redraw the color tables and the ColorScheme color maps (section 6.1.1).
-11. Save the form's settings in the file (see "Saved settings" below).
-12. Show the manifest, the report, and a summary of what was created, updated, unchanged, and renamed.
+10. Create or update the text styles (section 6.1.3).
+11. Redraw the color tables and the ColorScheme color maps (section 6.1.1), and the text style tables (section 6.1.3).
+12. Save the form's settings in the file (see "Saved settings" below).
+13. Show the manifest, the report, and a summary of what was created, updated, unchanged, and renamed.
 
 Variables in the file that are not in the manifest are reported as `orphan_variable`. Modes that the inputs do not list are reported as `orphan_mode`. The plugin never deletes either.
 

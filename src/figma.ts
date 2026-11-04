@@ -1,4 +1,4 @@
-// Figma side of the plugin. This is the only file that uses the Figma API.
+// Figma side of the plugin: its entry point. Only this file and the *-figma.ts files use the Figma API.
 // It shows the form (ui.html), asks src/foundations.ts for a plan, and writes the plan into the open file.
 // Implements foundations-spec.md sections 5.8 and 6.3. It never deletes variables or modes.
 
@@ -13,6 +13,10 @@ import { buildAppearanceExport, buildColorSchemeExport, exportFiles, kotlinFiles
 import type { ExportOptions } from "./export.ts";
 import type { TableSource } from "./tables.ts";
 import { drawColorTables } from "./tables-figma.ts";
+import { buildTextStyles, findOrphanTextStyles } from "./text-styles.ts";
+import { writeTextStyles } from "./text-styles-figma.ts";
+import { drawTextStyleTables } from "./text-style-tables-figma.ts";
+import type { TextStyleSummary } from "./text-styles-figma.ts";
 import { buildColorMaps } from "./color-maps.ts";
 import { checkRenames, ensureModes, findOrphanModes, matchModes } from "./modes-figma.ts";
 import type { ModeMatch } from "./modes-figma.ts";
@@ -20,7 +24,7 @@ import { plannedPaletteRenames, renamePalettes, storePaletteSources } from "./pa
 
 // What happened during a write, shown to the user next to the validation report.
 // updated = an existing variable had at least one value or its scopes changed; unchanged = nothing to write.
-type WriteSummary = { created: number; updated: number; unchanged: number; problems: string[]; renamed: string[]; tablesPage?: string };
+type WriteSummary = { created: number; updated: number; unchanged: number; problems: string[]; renamed: string[]; tablesPage?: string; textStyles?: TextStyleSummary; textTablesPage?: string };
 
 // Where the form's settings are saved: in the file, so each file keeps its own (section 6.3).
 const FILE_INPUTS = "form-inputs";
@@ -80,12 +84,16 @@ async function settingsForThisFile(): Promise<{ inputs: Inputs | null; hasTokens
     lightFillSteps: spec.inputs.lightTextFillStep.allowed,
     darkFillSteps: spec.inputs.darkTextFillStep.allowed,
     steps: [...spec.primitives.steps].sort((a, b) => a - b), // palette steps, lightest first
+    maxThemes: spec.inputs.numberOfThemes.maximum,
     firstThemeName: spec.collections.Theme.firstModeName, // default names
     customThemeName: spec.collections.Theme.customModeName,
     customAppearanceName: spec.inputs.extraAppearances.defaultName,
   };
   figma.ui.postMessage({ type: "saved-inputs", inputs: saved ?? null, hasTokens, fonts: await loadFontStyles(), ui });
-})();
+})().catch((e) => {
+  // The window stays hidden until these settings arrive, so without them there is nothing to show.
+  figma.closePlugin(`Tokenseed could not read this file: ${e instanceof Error ? e.message : String(e)}`);
+});
 
 figma.ui.onmessage = async (msg: {
   type: string; inputs: Inputs; write: boolean; options: ExportChoice; mode: string; width: number; height: number;
@@ -118,6 +126,8 @@ figma.ui.onmessage = async (msg: {
     let modes: ModeMatch[] = [];
     // Palettes whose name changed are renamed in place (section 1.1.8), so they are not orphans.
     let renames: Record<string, string> = {};
+    // The text styles this plan asks for (section 6.1.3). Nothing is written yet.
+    const textStyles = plan.ok ? buildTextStyles(spec, plan) : { styles: [], report: [] };
     if (plan.ok) {
       modes = matchModes(plan, inputs, collections);
       renames = plannedPaletteRenames(plan, existing, collections);
@@ -125,6 +135,8 @@ figma.ui.onmessage = async (msg: {
       report.push(
         ...findOrphans(plan, existing, collections).filter((r) => !(r.collection === "Primitives" && renamed(r.token))),
         ...findOrphanModes(modes, collections),
+        ...textStyles.report,
+        ...findOrphanTextStyles(spec, (await figma.getLocalTextStylesAsync()).map((s) => s.name)),
       );
     }
 
@@ -135,7 +147,13 @@ figma.ui.onmessage = async (msg: {
       summary = writePlan(plan, existing, collections, modes);
       summary.renamed = renamedPalettes;
       await storePaletteSources(plan);
-      figma.root.setPluginData(FILE_INPUTS, JSON.stringify(msg.inputs)); // the variables are written, so keep these settings
+      // The variables are already written, so a problem with a text style is reported but does not undo anything.
+      try {
+        summary.textStyles = await writeTextStyles(textStyles.styles);
+        summary.problems.push(...summary.textStyles.problems);
+      } catch (e) {
+        summary.problems.push(`Text styles were not written: ${e instanceof Error ? e.message : String(e)}`);
+      }
       // Redraw the color tables on the "Color tokens" page. The variables are already written,
       // so a drawing problem is reported but does not undo anything.
       try {
@@ -143,6 +161,12 @@ figma.ui.onmessage = async (msg: {
       } catch (e) {
         summary.problems.push(`Color tables were not drawn: ${e instanceof Error ? e.message : String(e)}`);
       }
+      const textTables = await drawTextTables();
+      summary.textTablesPage = textTables.page;
+      summary.problems.push(...textTables.problems);
+      // A missing font is reported by both the text styles and their tables: list each problem once.
+      summary.problems = [...new Set(summary.problems)];
+      figma.root.setPluginData(FILE_INPUTS, JSON.stringify(msg.inputs)); // the variables are written, so keep these settings
     }
 
     figma.ui.postMessage({
@@ -157,9 +181,14 @@ figma.ui.onmessage = async (msg: {
     });
     if (summary) figma.notify(`Variables: ${summary.created} created, ${summary.updated} updated, ${summary.unchanged} unchanged.`);
   } catch (e) {
-    figma.ui.postMessage({ type: "failure", message: e instanceof Error ? e.message : String(e) });
+    sendFailure("run", e);
   }
 };
+
+// Tells the window that an action failed, and which one, so the message appears next to its own buttons.
+function sendFailure(action: "run" | "tables" | "export", e: unknown): void {
+  figma.ui.postMessage({ type: "failure", action, message: e instanceof Error ? e.message : String(e) });
+}
 
 // While the user picks colors, the form asks which ones would make a palette that looks almost the
 // same as another one (similar_palette), which status or custom colors have a hue close to the brand
@@ -198,22 +227,33 @@ function previewNames(inputs: Inputs): void {
   }
 }
 
-// "Update tables only": redraws the color tables from the variables as they are now in the file,
-// including changes made by hand in Figma. Reads variables only; never changes them.
+// Draws the text style tables. What came before them is already done, so a problem here is reported but undoes nothing.
+async function drawTextTables(): Promise<{ page?: string; problems: string[] }> {
+  try {
+    const drawn = await drawTextStyleTables(spec);
+    return { page: drawn?.page, problems: drawn?.problems ?? [] };
+  } catch (e) {
+    return { problems: [`Text style tables were not drawn: ${e instanceof Error ? e.message : String(e)}`] };
+  }
+}
+
+// "Update tables only": redraws the color and text style tables from the file as it is now,
+// including changes made by hand in Figma. Reads variables and text styles only; never changes them.
 async function updateTablesOnly(): Promise<void> {
   try {
     const source = await readLiveVariables();
     const names = source.collections.map((c) => c.name);
     const missing = ["Primitives", "Theme", "Appearance", "ColorScheme"].filter((n) => !names.includes(n as CollectionName));
     if (names.length === 0) {
-      figma.ui.postMessage({ type: "failure", message: "No Primitives, Theme or Appearance collection in this file. Generate tokens first." });
+      sendFailure("tables", new Error("No Primitives, Theme or Appearance collection in this file. Generate tokens first."));
       return;
     }
     const result = await drawColorTables(buildTables(spec, source), buildColorMaps(source));
-    figma.ui.postMessage({ type: "tables-result", page: result.page, tables: result.tables, missing });
-    figma.notify(`Color tables updated on "${result.page}".`);
+    const textTables = await drawTextTables();
+    figma.ui.postMessage({ type: "tables-result", page: result.page, tables: result.tables, missing, textTables: textTables.page, problems: textTables.problems });
+    figma.notify("Tables updated.");
   } catch (e) {
-    figma.ui.postMessage({ type: "failure", message: e instanceof Error ? e.message : String(e) });
+    sendFailure("tables", e);
   }
 }
 
@@ -247,7 +287,7 @@ async function exportTokens(options: ExportChoice): Promise<void> {
     const files = Object.keys(data.themes).length > 0 ? exportFiles(data, split) : [];
     figma.ui.postMessage({ type: "export-result", data, files, problems });
   } catch (e) {
-    figma.ui.postMessage({ type: "failure", message: e instanceof Error ? e.message : String(e) });
+    sendFailure("export", e);
   }
 }
 

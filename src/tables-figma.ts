@@ -15,7 +15,7 @@ const TABLE_TAG = "color-tokens-table"; // marks each table frame this plugin dr
 const TABLE_GAP = 120; // space between the tables on the page
 
 // Design colors (#RRGGBB).
-const C = {
+export const C = {
   black: "#000000",
   white: "#FFFFFF",
   muted: "#6D6D6D", // metadata labels, descriptions, alias lines on Light cells
@@ -36,7 +36,7 @@ const PRIM_ROW_H = 48; // Primitives rows (the swatch fills the full height)
 const TILE = 40; // Theme and Appearance swatch size
 const CHECK = 10; // checkerboard square size behind transparent swatches
 
-type Fonts = Record<"bold" | "medium" | "regular" | "light" | "body", FontName>;
+export type Fonts = Record<"bold" | "medium" | "regular" | "light" | "body", FontName>;
 
 // What the drawing needs from the file's variables.
 type Ctx = {
@@ -112,7 +112,7 @@ async function loadContext(): Promise<Ctx> {
 
 // The tables use IBM Plex Sans. Inter is only a last resort, for when Figma cannot get that font (offline),
 // so the tables can still be drawn.
-async function loadFonts(): Promise<Fonts> {
+export async function loadFonts(): Promise<Fonts> {
   const pick = async (style: string): Promise<FontName> => {
     try {
       await figma.loadFontAsync({ family: "IBM Plex Sans", style });
@@ -495,7 +495,7 @@ function toHex(c: RGBA, withAlpha: boolean): string {
 // ---------- Small builders ----------
 
 // An auto-layout frame that hugs its content, with no fill, attached to its parent at once.
-function stack(
+export function stack(
   parent: BaseNode & ChildrenMixin, dir: "HORIZONTAL" | "VERTICAL",
   o: { name: string; gap: number; pad?: [number, number, number, number] },
 ): FrameNode {
@@ -520,14 +520,14 @@ function stack(
 // Gives an auto-layout frame a fixed width while its height keeps fitting its content.
 // resize() fixes both directions, so the height is switched back to "fit content" afterwards.
 // Sizes are never read while drawing: reading one makes Figma re-measure the whole table so far.
-function fixedWidth(fr: FrameNode, width: number): void {
+export function fixedWidth(fr: FrameNode, width: number): void {
   fr.resize(width, 1);
   fr.layoutSizingHorizontal = "FIXED";
   fr.layoutSizingVertical = "HUG";
 }
 
 // A 1px divider line at 24% opacity: top and bottom (metadata line) or bottom only (rows).
-function divider(fr: FrameNode, topToo: boolean): void {
+export function divider(fr: FrameNode, topToo: boolean): void {
   fr.strokes = [solid(C.divider, 0.24)];
   fr.strokeAlign = "OUTSIDE";
   fr.strokeTopWeight = topToo ? 1 : 0;
@@ -538,7 +538,7 @@ function divider(fr: FrameNode, topToo: boolean): void {
 
 // A text layer attached to its parent. With a width it wraps; without, it grows to fit.
 // lineHeight null means auto.
-function text(
+export function text(
   parent: FrameNode, chars: string, font: FontName, size: number, lineHeight: number | null, color: string, width?: number,
 ): TextNode {
   const t = figma.createText();
@@ -555,7 +555,7 @@ function text(
   return t;
 }
 
-function solid(hex: string, opacity?: number): SolidPaint {
+export function solid(hex: string, opacity?: number): SolidPaint {
   return {
     type: "SOLID",
     color: { r: parseInt(hex.slice(1, 3), 16) / 255, g: parseInt(hex.slice(3, 5), 16) / 255, b: parseInt(hex.slice(5, 7), 16) / 255 },

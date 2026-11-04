@@ -23,7 +23,7 @@ export const CHROMA_MULT: Record<number, number> = {
 // (tokens.json primitives.anchorChromaReference).
 export const ANCHOR_CHROMA_REFERENCE: Record<number, number> = { 800: 0.38, 850: 0.32, 900: 0.28, 950: 0.27 };
 
-const MIN_CHROMA = 0.01;
+export const MIN_CHROMA = 0.01;
 
 // Section 5.5: the highest chroma a generated step may have, for every hue (tokens.json chromaCeiling).
 export const CHROMA_CEILING: Record<number, number> = { 300: 0.14, 400: 0.18 };
@@ -35,7 +35,7 @@ export const SATURATION_FACTORS: Record<number, number> = { 1: 0.28, 2: 0.46, 3:
 export const DEFAULT_SATURATION = 5;
 export const YELLOW_BOOST = { factor: 1.6, zeroBelow: 65, fullFrom: 85, fullTo: 105, zeroAbove: 125 };
 export const SHIFT_NOTICE_DISTANCE = 0.06;
-const MAX_ADJUSTMENTS = 50;
+export const MAX_ADJUSTMENTS = 50;
 
 // Section 5.2 step 3: a brand that moved from 500 to 400 is darker than a normal 400. These steps sit at these
 // fractions of the way from the brand to step 100 (tokens.json primitives.brandAnchor.respaceFrom500To400).
@@ -239,7 +239,7 @@ function calibrate(p: Palette): void {
     if (ratio >= pair.min) continue;
     if (p.adjustments >= MAX_ADJUSTMENTS) {
       p.errors.push({
-        check: "contrast_minimum", step: pair.text, message: "Adjustment cap of 50 reached.",
+        check: "contrast_minimum", step: pair.text, message: `Adjustment cap of ${MAX_ADJUSTMENTS} reached.`,
         expected: `>= ${pair.min}`, actual: r2(ratio),
       });
       return;
