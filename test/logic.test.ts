@@ -346,6 +346,19 @@ assert.deepEqual(liveBrand400.cells.map((c) => c.ref), ["Color/Purple/300", "Col
 const liveA36 = liveTables[1].groups.find((g) => g.name === "color/danger")!.rows.find((r) => r.name === "color/danger/alpha/a36")!;
 assert.equal(liveA36.cells[0].opacityRef, "Opacity/36");
 
+// A canvas edited by hand can skip Theme, or hold a typed color. The column background follows its real color.
+{
+  const canvasName = spec.appearance.contrastCanvas;
+  const withCanvas = (values: any) => ({
+    collections: plan.collections,
+    variables: plan.variables.map((v) => (v.collection === "Appearance" && v.name === canvasName ? { ...v, values } : v)),
+  });
+  const darkCells = (source: any) => buildTables(spec, source).find((t) => t.collection === "Appearance")!.groups[0].rows[0].cells.map((c) => [c.appMode, c.dark]);
+  assert.deepEqual(darkCells(withCanvas({ Light: "#000000", Dark: "#FFFFFF" })), [["Light", true], ["Dark", false]]); // typed colors
+  assert.deepEqual(darkCells(withCanvas({ Light: { alias: "Color/Black" }, Dark: { alias: "Color/White" } })), [["Light", true], ["Dark", false]]); // straight to a Primitive
+  assert.deepEqual(darkCells(plan), [["Light", false], ["Dark", true]]); // as generated
+}
+
 // 8. Theme names (inputs.themeNames): the user's names, defaults for empty entries; invalid or duplicated names stop.
 const planN = buildPlan(spec, { numberOfThemes: 3, themes: [themeA, themeB, themeC], themeNames: ["Acme", "", "Night Shop"] });
 assert.equal(planN.ok, true, JSON.stringify(planN.report.filter((r) => r.severity === "error")));
@@ -426,9 +439,19 @@ assert.ok(appC.indexOf("color/bg/promo/bold") > appC.indexOf("color/bg/warning/s
 assert.ok(appC.indexOf("color/bg/promo/bold") < appC.indexOf("color/text/neutral/bolder"));
 assert.deepEqual(appC.filter((n) => n.startsWith("color/bg/promo/")).map((n) => n.split("/")[3]), ["bold", "soft", "softer", "softest"]);
 // Invalid role names, and a missing color in one theme, stop generation.
-for (const bad of [["Promo"], ["promo", "promo"], ["brand"], ["link"], [""]]) {
+for (const bad of [["Promo"], ["promo", "promo"], ["brand"], ["link"], [""], ["a b"], ["a_b"], ["a/b"], ["a.b"], ["-x"], ["x-"], ["a--b"]]) {
   assert.ok(checksOf({ numberOfThemes: 1, themes: [promoA], customRoles: bad }).includes("missing_input"), JSON.stringify(bad));
 }
+// Role names can use numbers and single hyphens. Every token, check and export name works with them.
+for (const role of ["7", "brand-2", "blue-7"]) {
+  const named = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, custom: { [role]: promoA.custom.promo } }], customRoles: [role] });
+  assert.equal(named.ok, true, `${role}: ${JSON.stringify(named.report.filter((r) => r.severity === "error"))}`);
+  assert.ok(named.variables.some((v) => v.collection === "Theme" && v.name === `color/${role}/500`), role);
+  assert.ok(named.variables.some((v) => v.collection === "Appearance" && v.name === `color/bg/${role}/bold`), role);
+}
+assert.equal(exportName("color/bg/brand-2/bold", { keepColorPrefix: true, naming: "kebab" }), "--color-bg-brand-2-bold");
+assert.equal(exportName("color/bg/brand-2/bold", { keepColorPrefix: false, naming: "camel" }), "bgBrand2Bold");
+assert.equal(exportName("color/bg/7/bold", { keepColorPrefix: false, naming: "pascal" }), "Bg7Bold");
 assert.ok(checksOf({ numberOfThemes: 2, themes: [promoA, themeB], customRoles: ["promo"] }).includes("missing_input"));
 
 // 12. Font weights follow the family's own styles (inputs.fontWeights).

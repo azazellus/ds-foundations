@@ -22,7 +22,7 @@
 
   // spec/tokens.json
   var tokens_default = {
-    version: "1.25.0",
+    version: "1.26.0",
     description: "Source of truth for the design foundations specification (foundations-spec.md). Palette HEX values are user inputs and palette names come from primitives.paletteNaming; this file defines the rules, inputs, Theme mappings, alpha tokens, Appearance mappings, and ColorScheme mappings.",
     collections: {
       Primitives: { modes: ["Default"] },
@@ -392,7 +392,7 @@
         requirement: "optional",
         type: "list of role names",
         default: [],
-        namePattern: "^[a-z]+$",
+        namePattern: "^[a-z0-9]+(-[a-z0-9]+)*$",
         unique: true,
         reservedNames: [
           "neutral",
@@ -1829,9 +1829,9 @@
           "Theme",
           label,
           "Global",
-          "lowercase letters only",
+          "lowercase letters, numbers and single hyphens",
           r,
-          r ? `"${r}" is not a valid color role name. Use lowercase letters only.` : `The ${label} needs a role name.`
+          r ? `"${r}" is not a valid color role name. Use lowercase letters and numbers, with single hyphens between them.` : `The ${label} needs a role name.`
         );
       } else if (cr.reservedNames.includes(r)) {
         add("missing_input", "Theme", label, "Global", `not ${cr.reservedNames.join(", ")}`, r, `"${r}" is already used by the spec.`);
@@ -2441,15 +2441,22 @@
     return items.length <= 1 ? (_a = items[0]) != null ? _a : "" : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
   }
   function isDarkContext(spec, byKey, themeMode, appMode) {
-    const find = (c, name) => byKey.get(`${c}|${name}`);
-    const canvas = find("Appearance", spec.appearance.contrastCanvas);
-    const themeRef = canvas ? aliasOf(canvas, appMode) : void 0;
-    const themeVar = themeRef ? find("Theme", themeRef) : void 0;
-    const primRef = themeVar ? aliasOf(themeVar, themeMode) : void 0;
-    const primVar = primRef ? find("Primitives", primRef) : void 0;
-    const hex = primVar ? Object.values(primVar.values)[0] : void 0;
-    if (typeof hex === "string" && isValidHex(hex)) return relativeLuminance(hex) < 0.18;
+    const hex = canvasHex(spec, byKey, themeMode, appMode);
+    if (hex) return relativeLuminance(hex) < 0.18;
     return appMode === "Dark";
+  }
+  function canvasHex(spec, byKey, themeMode, appMode) {
+    let name = spec.appearance.contrastCanvas;
+    for (let link = 0; link < 8; link++) {
+      const appearance = byKey.get(`Appearance|${name}`);
+      const theme = byKey.get(`Theme|${name}`);
+      const primitive = byKey.get(`Primitives|${name}`);
+      const value = appearance ? appearance.values[appMode] : theme ? theme.values[themeMode] : primitive ? Object.values(primitive.values)[0] : void 0;
+      if (typeof value === "string") return isValidHex(value) ? value : null;
+      if (!value || typeof value !== "object") return null;
+      name = value.alias;
+    }
+    return null;
   }
   function parentPath(name) {
     const parts = name.split("/");

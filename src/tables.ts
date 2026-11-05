@@ -46,15 +46,25 @@ function listOf(items: string[]): string {
 // True when the canvas token of this theme and appearance resolves to a dark color
 // (WCAG relative luminance below 0.18, roughly the middle of the gray scale).
 function isDarkContext(spec: Spec, byKey: Map<string, VariableDef>, themeMode: string, appMode: string): boolean {
-  const find = (c: CollectionName, name: string) => byKey.get(`${c}|${name}`);
-  const canvas = find("Appearance", spec.appearance.contrastCanvas);
-  const themeRef = canvas ? aliasOf(canvas, appMode) : undefined;
-  const themeVar = themeRef ? find("Theme", themeRef) : undefined;
-  const primRef = themeVar ? aliasOf(themeVar, themeMode) : undefined;
-  const primVar = primRef ? find("Primitives", primRef) : undefined;
-  const hex = primVar ? Object.values(primVar.values)[0] : undefined;
-  if (typeof hex === "string" && isValidHex(hex)) return relativeLuminance(hex) < 0.18;
+  const hex = canvasHex(spec, byKey, themeMode, appMode);
+  if (hex) return relativeLuminance(hex) < 0.18;
   return appMode === "Dark"; // canvas not found: fall back to the mode name
+}
+
+// The canvas token's HEX in one theme and appearance. A token edited by hand can skip a collection or hold
+// a typed color, so each link is looked up in every collection until a HEX value is reached.
+function canvasHex(spec: Spec, byKey: Map<string, VariableDef>, themeMode: string, appMode: string): string | null {
+  let name: string = spec.appearance.contrastCanvas;
+  for (let link = 0; link < 8; link++) { // Figma allows no loops; this only stops a wrong file from hanging
+    const appearance = byKey.get(`Appearance|${name}`);
+    const theme = byKey.get(`Theme|${name}`);
+    const primitive = byKey.get(`Primitives|${name}`);
+    const value = appearance ? appearance.values[appMode] : theme ? theme.values[themeMode] : primitive ? Object.values(primitive.values)[0] : undefined;
+    if (typeof value === "string") return isValidHex(value) ? value : null;
+    if (!value || typeof value !== "object") return null;
+    name = value.alias;
+  }
+  return null;
 }
 
 // "Color/Violet/500" -> "Color/Violet"; "Color/Black" -> "Color".

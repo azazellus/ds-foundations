@@ -412,14 +412,14 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
   }
   const inactiveRoles = sr.allowed.filter((r: string) => !statusRoles.includes(r));
 
-  // Custom roles (section 5.1): lowercase letters, unique, not a name the spec already uses.
+  // Custom roles (section 5.1): lowercase letters, numbers and single hyphens, unique, not a name the spec already uses.
   const cr = spec.inputs.customRoles;
   const customRoles: string[] = (inputs.customRoles ?? []).map((r) => String(r ?? "").trim());
   customRoles.forEach((r, i) => {
     const label = `custom color ${i + 1}`;
     if (!new RegExp(cr.namePattern).test(r)) {
-      add("missing_input", "Theme", label, "Global", "lowercase letters only", r,
-        r ? `"${r}" is not a valid color role name. Use lowercase letters only.` : `The ${label} needs a role name.`);
+      add("missing_input", "Theme", label, "Global", "lowercase letters, numbers and single hyphens", r,
+        r ? `"${r}" is not a valid color role name. Use lowercase letters and numbers, with single hyphens between them.` : `The ${label} needs a role name.`);
     } else if (cr.reservedNames.includes(r)) {
       add("missing_input", "Theme", label, "Global", `not ${cr.reservedNames.join(", ")}`, r, `"${r}" is already used by the spec.`);
     } else if (customRoles.indexOf(r) !== i) {

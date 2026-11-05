@@ -364,7 +364,7 @@ size
 
 ### 2.1 Color
 
-Naming: `color/{role}/{step}`, in lowercase, where `{role}` is always a single word. Example: `color/brand/500`.
+Naming: `color/{role}/{step}`, in lowercase, where `{role}` has no slash. Example: `color/brand/500`.
 
 - Values reference Primitives only. Raw HEX values are never stored in this collection.
 - All Theme color tokens have all variable scopes disabled.
@@ -867,7 +867,7 @@ The plugin asks for each input below. Every palette input is a HEX value. The pl
 | Saturation | Per theme | Optional | A level from 1 to 10, for the theme's status and custom palettes. Brand and neutral palettes do not change | 5 |
 | Font families | Per theme | Mandatory | String | None |
 | Font weights | Per theme | Optional | Any of the non-italic styles of the theme's font family, with the font's own names | The styles that match a weight slot (section 2.2) |
-| Custom roles | Global | Optional | Zero or more role names, lowercase letters | None added |
+| Custom roles | Global | Optional | Zero or more role names: lowercase letters and numbers, with single hyphens between them | None added |
 | Custom colors | Per theme | Mandatory for each custom role | HEX, each | None |
 | Dark | Global | Optional | Include or not | Included |
 | Light canvas step | Global | Optional | white or 50 | white |
@@ -885,7 +885,7 @@ Rules for inputs:
 - Per-theme inputs must be supplied for every theme. Each theme needs a brand color, a color for each status role in use, a color for each custom role, and a font family.
 - The first theme is named Main theme unless the user names it. Every other theme the user does not name is named Custom theme, then Custom theme 2, Custom theme 3, and so on, with the lowest number that is free. A theme name uses letters, numbers, and single spaces and is unique. An invalid or duplicated name stops generation as `missing_input`. Only the themes requested exist.
 - Dark is optional. Without it, the Appearance collection has no Dark mode, no Dark value is written, every check in Dark is skipped, and the dark canvas and text fill steps are ignored. Dark-based extra appearances are still allowed: they copy the Dark values of section 3.3.
-- Custom roles add colors beyond brand and the status roles, such as `promo`. A role name is lowercase letters only, unique, and not one of: neutral, brand, success, danger, warning, info, base, disabled, input, selected, focus, inverse, shadow, surface, fixed, link. Each theme supplies its own HEX for every custom role. A custom role generates the same tokens and checks as a status role: a Primitive palette per hue (section 5.3), the Theme tokens `color/{role}/{step}` and `color/{role}/alpha/a{NN}` (section 2.1), the Appearance tokens in section 3.3, and the checks in section 3.4.
+- Custom roles add colors beyond brand and the status roles, such as `promo`. A role name uses lowercase letters and numbers, with single hyphens between them, such as `7` or `brand-2`. It is unique and not one of: neutral, brand, success, danger, warning, info, base, disabled, input, selected, focus, inverse, shadow, surface, fixed, link. Each theme supplies its own HEX for every custom role. A custom role generates the same tokens and checks as a status role: a Primitive palette per hue (section 5.3), the Theme tokens `color/{role}/{step}` and `color/{role}/alpha/a{NN}` (section 2.1), the Appearance tokens in section 3.3, and the checks in section 3.4.
 - Font weights are chosen from the styles that the theme's font family has in Figma. Italic styles are not offered. Every selected style becomes a Primitive `Typography/Font-weight/{Style}`. Each weight slot in section 2.2 uses the selected style whose name matches the slot when spaces and letter case are ignored. A slot that matches in no theme is not created. A slot that matches in some themes but not in others stops generation as `missing_input`; the report names the slot and the font families without a match. A selected style that the family does not have also stops generation as `missing_input`.
 - Extra appearances are named by the user. One the user does not name is named Custom appearance, then Custom appearance 2, Custom appearance 3, and so on, with the lowest number that is free. A name uses letters, numbers, and single spaces, is unique, and is not Light or Dark. An invalid or duplicated name stops generation as `missing_input`.
 - An extra appearance copies the value of every Appearance token from its base. It also has its own canvas step: white or 50 for a Light base (default white), and 950, 900, 850, or black for a Dark base (default 950). The light or dark canvas rule below applies to it with that step. The light and dark canvas step inputs apply to Light and Dark themselves. It has its own text fill step too (default 700 for a Light base and 150 for a Dark base), and the text fill rules below apply to it with that step.

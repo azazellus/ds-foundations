@@ -72,7 +72,7 @@ Open the Generate tab. It runs every check straight away and writes nothing to y
 | Update tokens | The same button, in a file that already has tokens. It updates the variables and text styles, and redraws the color tables, color maps, and text style tables. |
 | Update tables | Redraws the color tables, color maps, and text style tables from what is in the file, including changes made by hand. It appears when the file has tokens. |
 
-The Report card lists every error and warning. Press it to open or close it. If there is an error, the report opens and the buttons are hidden until you fix it in the Edit tab. Nothing is written.
+The Report card lists every error and warning. Press it to open or close it. If there is an error, the report opens and Generate tokens or Update tokens is hidden until you fix it in the Edit tab. Nothing is written. Update tables stays available, because it reads the file and not the form.
 
 ### 4. Export for developers
 
