@@ -52,9 +52,9 @@ export type Inputs = {
   themeKeys?: string[]; // identifies each theme across renames (Figma layer only)
   includeDark?: boolean; // optional; true when omitted
   lightCanvasStep?: number | string; // optional; "white" when omitted. Applies to Light itself.
-  darkCanvasStep?: number | string; // optional; 950 when omitted. Applies to Dark itself.
-  lightTextFillStep?: number | string; // optional; 700 when omitted. Applies to Light itself.
-  darkTextFillStep?: number | string; // optional; 150 when omitted. Applies to Dark itself.
+  darkCanvasStep?: number | string; // optional; the default in tokens.json when omitted. Applies to Dark itself.
+  lightTextFillStep?: number | string; // optional; the default in tokens.json when omitted. Applies to Light itself.
+  darkTextFillStep?: number | string; // optional; the default in tokens.json when omitted. Applies to Dark itself.
   customRoles?: string[]; // optional; extra color roles such as "promo", treated like status roles
   extraAppearances?: AppearanceInput[]; // optional; besides Light and Dark
   statusRoles?: string[]; // optional; which of success, danger, warning, info exist (all four when omitted)
@@ -157,7 +157,7 @@ function textFillValueFor(spec: Spec, name: string, value: string, step: number 
   const rule = spec.appearance.textFill;
   const listed = rule.tokens.includes(name) || customRoles.some((r) => rule.customRoleTokens.some((t: string) => t.replace("{role}", r) === name));
   if (!listed) return value;
-  const family = value.match(/^color\/([^/]+)\/\d+$/)?.[1];
+  const family = value.match(/^color\/([^/]+)\/(\d+|white|black)$/)?.[1];
   if (!family) return value;
   if (typeof step === "number") return `color/${family}/${step}`;
   return family === "neutral" ? `color/neutral/${step}` : `color/${family}/${rule.stepsWithoutColor[step]}`;
@@ -166,8 +166,9 @@ function textFillValueFor(spec: Spec, name: string, value: string, step: number 
 // Section 5.1, appearance.lightCanvas and appearance.darkCanvas in tokens.json: the value of an
 // Appearance token in a Light- or Dark-based mode for that mode's canvas step. Canvas tokens use the
 // step itself. In Dark, following tokens move lighter along primitives.steps by as many steps as the
-// canvas moved from 950 (black is not on that scale, so they stay as at 950). Light has no following
-// tokens, only fixed values per step (valuesByStep).
+// canvas moved from 950 (a canvas of black is not on that scale, so they stay as at 950). Tokens in
+// belowCanvasTokens sit a set number of steps darker than the canvas, and stop at black. Light has no
+// following tokens, only fixed values per step (valuesByStep).
 // Other tokens keep their value.
 // customRoles fills in the {role} following tokens.
 function canvasValueFor(
@@ -175,9 +176,16 @@ function canvasValueFor(
 ): string {
   const rule = base === "Dark" ? spec.appearance.darkCanvas : spec.appearance.lightCanvas;
   if (rule.canvasTokens.includes(name)) return `color/neutral/${step}`;
-  // Fixed values for this canvas step (appearance.lightCanvas.valuesByStep: menu and raised on 50).
+  // Fixed values for this canvas step (appearance.lightCanvas.valuesByStep: the surfaces that move on 50).
   const fixed = rule.valuesByStep?.[String(step)]?.[name];
   if (fixed) return fixed;
+  // Darker than the canvas. Steps run darkest first, so a step past the start of the list is black,
+  // and so is any step below a canvas of black, which is not in the list.
+  const below: number | undefined = rule.belowCanvasTokens?.[name];
+  if (below) {
+    const darker = spec.primitives.steps[spec.primitives.steps.indexOf(Number(step)) - below];
+    return `color/neutral/${darker ?? "black"}`;
+  }
   const following: string[] = [
     ...(rule.followingTokens ?? []),
     ...customRoles.flatMap((r) => (rule.customRoleFollowingTokens ?? []).map((t: string) => t.replace("{role}", r))),
@@ -186,15 +194,17 @@ function canvasValueFor(
   return shiftWithDarkCanvas(spec, value, step);
 }
 
-// A Dark value moved lighter along primitives.steps by as many steps as the dark canvas moved from its
-// default (950). Used by ColorScheme tokens with followsDarkCanvas (section 3.5).
+// A Dark value moved lighter along primitives.steps by as many steps as the dark canvas is from the step
+// the values are written for (appearance.darkCanvas.referenceStep, 950). Also used by ColorScheme tokens
+// with followsDarkCanvas (section 3.5).
 function shiftWithDarkCanvas(spec: Spec, value: string, step: number | string): string {
   const steps: number[] = spec.primitives.steps; // darkest first: 950, 900, 850, ...
-  if (!steps.includes(step as number)) return value; // black: as at the default step (section 5.1)
-  const shift = steps.indexOf(step as number) - steps.indexOf(spec.inputs.darkCanvasStep.default); // toward 50
-  const m = value.match(/^(.*\/)(\d+)$/);
+  if (!steps.includes(step as number)) return value; // a canvas of black: as at 950 (section 5.1)
+  const shift = steps.indexOf(step as number) - steps.indexOf(spec.appearance.darkCanvas.referenceStep); // toward 50
+  const m = value.match(/^(.*\/)(\d+|black)$/);
   if (!m || shift === 0) return value;
-  const moved = steps[steps.indexOf(Number(m[2])) + shift];
+  // Black counts as one step darker than the darkest step of the scale.
+  const moved = steps[(m[2] === "black" ? -1 : steps.indexOf(Number(m[2]))) + shift];
   // Past either end of the scale there is nothing to point to; the alias check then reports it.
   return `${m[1]}${moved ?? "out-of-scale"}`;
 }
@@ -897,14 +907,17 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
 
 // Appearance token names in the order of appearance.order (section 3.3): group (elevation, bg, text,
 // border, icon), then sub-group in order of first appearance in appearance.tokens, then emphasis
-// (bolder ... softest), then tokens without an emphasis in appearance.tokens order. Names that the spec
-// does not know (added by hand in Figma) keep their relative order after the known ones of their sub-group.
+// (bolder ... softest), then tokens without an emphasis in appearance.tokens order. A token nested under
+// another token (canvas/deep under canvas) stays in that token's sub-group, so they are listed together.
+// Names that the spec does not know (added by hand in Figma) keep their relative order after the known
+// ones of their sub-group.
 export function appearanceOrder(spec: Spec, names: string[]): string[] {
   const { categories, emphasis } = spec.appearance.order as { categories: string[]; emphasis: string[] };
   const specNames = Object.keys(spec.appearance.tokens);
   const reference = [...specNames, ...names.filter((n) => !specNames.includes(n))];
   const pos = new Map(reference.map((n, i) => [n, i]));
-  const parentOf = (n: string): string => n.split("/").slice(0, -1).join("/");
+  const up = (n: string): string => n.split("/").slice(0, -1).join("/");
+  const parentOf = (n: string): string => (pos.has(up(n)) ? up(up(n)) : up(n));
   const firstOfParent = new Map<string, number>();
   for (const n of reference) if (!firstOfParent.has(parentOf(n))) firstOfParent.set(parentOf(n), pos.get(n)!);
   const rank = (list: string[], x: string): number => (list.includes(x) ? list.indexOf(x) : list.length);

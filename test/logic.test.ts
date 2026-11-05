@@ -140,7 +140,7 @@ assert.deepEqual(find("Primitives", "Opacity/48").scopes, ["OPACITY"]);
 assert.deepEqual(find("Primitives", "Color/Purple/500").scopes, []);
 assert.deepEqual(find("Appearance", "color/icon/danger").scopes, ["SHAPE_FILL", "TEXT_FILL"]);
 assert.deepEqual(find("Appearance", "color/elevation/shadow/card").scopes, ["EFFECT_COLOR"]);
-assert.deepEqual(find("Appearance", "color/bg/base").values.Dark, { alias: "color/neutral/950" });
+assert.deepEqual(find("Appearance", "color/bg/base").values.Dark, { alias: "color/neutral/900" }); // the default dark canvas
 
 // Manifest: one entry per variable per mode; alpha tokens carry no resolved HEX.
 assert.equal(plan.manifest.length, count("Primitives") + count("Theme") + 2 * count("Appearance") + 2 * count("ColorScheme"));
@@ -176,7 +176,68 @@ for (const step of [950, 900, 850]) {
   for (const s of ["overlay", "menu", "raised"]) assert.equal(dark(`color/elevation/surface/${s}`), `color/neutral/${e[s]}`);
   // Tokens outside the list do not move.
   assert.equal(dark("color/border/inverse"), "color/neutral/950");
-  assert.equal(dark("color/bg/input"), "color/neutral/700");
+  // The containers follow the surfaces they match.
+  assert.equal(dark("color/bg/container"), `color/neutral/${e.overlay}`);
+  for (const t of ["color/bg/input", "color/bg/action"]) assert.equal(dark(t), `color/neutral/${e.menu}`, t);
+}
+// Surfaces around the canvas and the overlay, for every dark canvas step. Black counts as one step darker than 950.
+const expectedDeep: Record<string, string[]> = {
+  950: ["black", "black", "950", "black"],
+  900: ["950", "black", "900", "950"],
+  850: ["900", "950", "850", "900"],
+  black: ["black", "black", "950", "black"],
+};
+for (const [step, want] of Object.entries(expectedDeep)) {
+  const p = buildPlan(spec, { numberOfThemes: 1, themes: [themeA], darkCanvasStep: step === "black" ? "black" : Number(step) });
+  assert.equal(p.ok, true, `canvas ${step}`);
+  const dark = (name: string) => (p.variables.find((v) => v.collection === "Appearance" && v.name === name)!.values.Dark as { alias: string }).alias;
+  const got = ["canvas/deep", "canvas/deeper", "overlay/deep", "overlay/deeper"].map((n) => dark(`color/elevation/surface/${n}`).split("/").pop());
+  assert.deepEqual(got, want, `canvas ${step}`);
+}
+// The shadows do not follow the canvas, and alpha tokens are not contrast-checked.
+{
+  const p = buildPlan(spec, { numberOfThemes: 1, themes: [themeA], darkCanvasStep: 850 });
+  for (const n of ["convex/top", "convex/bottom", "concave/top", "concave/bottom"]) {
+    const name = `color/elevation/shadow/${n}`;
+    const shadow = p.variables.find((v) => v.collection === "Appearance" && v.name === name)!;
+    assert.deepEqual(shadow.values.Dark, { alias: spec.appearance.tokens[name].Dark });
+    assert.deepEqual(shadow.scopes, ["EFFECT_COLOR"]);
+    assert.ok(spec.appearance.alphaDependentTokens.includes(name));
+  }
+}
+// The design file's Appearance collection (Tokenseed UI) is what the default settings generate.
+{
+  const p = buildPlan(spec, { numberOfThemes: 1, themes: [themeA] });
+  const two = (name: string) => { const v = p.variables.find((x) => x.collection === "Appearance" && x.name === name)!.values as any; return [v.Light.alias, v.Dark.alias]; };
+  const a = "color/neutral/alpha/", n = "color/neutral/";
+  const want: Record<string, string[]> = {
+    "color/elevation/shadow/card": [a + "black/a12", a + "white/a00"],
+    "color/elevation/shadow/convex/top": [a + "white/a12", a + "white/a06"],
+    "color/elevation/shadow/convex/bottom": [a + "black/a04", a + "black/a20"],
+    "color/elevation/shadow/concave/top": [a + "black/a04", a + "black/a12"],
+    "color/elevation/shadow/concave/bottom": [a + "white/a48", a + "white/a04"],
+    "color/elevation/surface/canvas": [n + "white", n + "900"],
+    "color/elevation/surface/canvas/deep": [n + "50", n + "950"],
+    "color/elevation/surface/canvas/deeper": [n + "100", n + "black"],
+    "color/elevation/surface/menu": [n + "50", n + "800"],
+    "color/elevation/surface/overlay": [n + "white", n + "850"],
+    "color/elevation/surface/overlay/deep": [n + "50", n + "900"],
+    "color/elevation/surface/overlay/deeper": [n + "100", n + "950"],
+    "color/elevation/surface/raised": [n + "50", n + "800"],
+    "color/elevation/surface/scrim": [a + "black/a48", a + "black/a80"],
+    "color/bg/base": [n + "white", n + "900"],
+    "color/bg/container": [n + "white", n + "850"],
+    "color/bg/input": [n + "white", n + "800"],
+    "color/bg/action": [n + "white", n + "800"],
+  };
+  for (const [name, values] of Object.entries(want)) assert.deepEqual(two(name), values, name);
+  assert.deepEqual(two("color/text/neutral/bolder"), [n + "900", n + "white"]);
+  assert.deepEqual(two("color/icon/neutral/bolder"), [n + "900", n + "white"]);
+  assert.deepEqual(two("color/text/brand/bolder"), ["color/brand/900", "color/brand/50"]);
+  // Nested tokens are listed with the token they belong to.
+  const names = p.variables.filter((v) => v.collection === "Appearance").map((v) => v.name);
+  assert.deepEqual(names.filter((x) => x.includes("/elevation/")), Object.keys(want).filter((x) => x.includes("/elevation/")));
+  assert.deepEqual(names.filter((x) => /^color\/bg\/[a-z]+$/.test(x)), ["color/bg/base", "color/bg/container", "color/bg/disabled", "color/bg/input", "color/bg/action"]);
 }
 assert.ok(checksOf({ numberOfThemes: 1, themes: [themeA], darkCanvasStep: 800 }).includes("missing_input"));
 
@@ -207,9 +268,9 @@ assert.deepEqual(plan3.collections.find((c) => c.name === "Appearance")!.modes, 
 const find3 = (c: string, name: string) => plan3.variables.find((v) => v.collection === c && v.name === name)!;
 assert.deepEqual(find3("Theme", "color/brand/500").values["Custom theme 2"], { alias: "Color/Vermilion/500" });
 assert.deepEqual(find3("Theme", "color/neutral/500").values["Custom theme 2"], { alias: "Color/Gray/500" });
-// Dim = Dark with canvas 850; Dark keeps the default 950; Paper = Light.
+// Dim = Dark with canvas 850; Dark keeps the default 900; Paper = Light.
 assert.deepEqual(find3("Appearance", "color/elevation/surface/canvas").values, {
-  Light: { alias: "color/neutral/white" }, Dark: { alias: "color/neutral/950" },
+  Light: { alias: "color/neutral/white" }, Dark: { alias: "color/neutral/900" },
   Dim: { alias: "color/neutral/850" }, Paper: { alias: "color/neutral/white" },
 });
 assert.deepEqual(find3("Appearance", "color/bg/success/softer").values.Dim, { alias: "color/success/700" });
@@ -287,8 +348,8 @@ assert.deepEqual(tApp.groups.map((g) => g.name), ["color/elevation", "color/bg",
 assert.deepEqual(tApp.columns, ["MAIN THEME LIGHT", "MAIN THEME DARK", "CUSTOM THEME LIGHT", "CUSTOM THEME DARK"]);
 const appBase = tApp.groups.find((g) => g.name === "color/bg")!.rows.find((r) => r.name === "color/bg/base")!;
 assert.deepEqual(appBase.cells.map((c) => [c.themeMode, c.appMode, c.dark, c.ref]), [
-  ["Main theme", "Light", false, "color/neutral/white"], ["Main theme", "Dark", true, "color/neutral/950"],
-  ["Custom theme", "Light", false, "color/neutral/white"], ["Custom theme", "Dark", true, "color/neutral/950"],
+  ["Main theme", "Light", false, "color/neutral/white"], ["Main theme", "Dark", true, "color/neutral/900"],
+  ["Custom theme", "Light", false, "color/neutral/white"], ["Custom theme", "Dark", true, "color/neutral/900"],
 ]);
 assert.ok(tApp.info.startsWith("Four contexts"));
 // One theme: two Appearance columns, one Theme column.
@@ -393,7 +454,9 @@ for (const viaExtra of [false, true]) {
   assert.equal(val("color/elevation/surface/menu"), "color/neutral/white");
   assert.equal(val("color/elevation/surface/raised"), "color/neutral/100");
   // Everything else keeps its Light value from the spec.
-  const changed = [...spec.appearance.lightCanvas.canvasTokens, "color/elevation/surface/menu", "color/elevation/surface/raised"];
+  assert.equal(val("color/elevation/surface/canvas/deep"), "color/neutral/100");
+  assert.equal(val("color/elevation/surface/canvas/deeper"), "color/neutral/150");
+  const changed = [...spec.appearance.lightCanvas.canvasTokens, ...Object.keys(spec.appearance.lightCanvas.valuesByStep["50"])];
   for (const name of Object.keys(spec.appearance.tokens)) {
     if (changed.includes(name)) continue;
     assert.equal(val(name), spec.appearance.tokens[name].Light, name);
@@ -420,7 +483,7 @@ assert.equal(countC("Theme"), count2("Theme") + 13 + 15);
 assert.equal(countC("Appearance"), count2("Appearance") + 8);
 assert.deepEqual(findC("Theme", "color/promo/500")!.values, { "Main theme": { alias: "Color/Cerise/500" }, "Custom theme": { alias: "Color/Persimmon/500" } });
 assert.deepEqual(findC("Theme", "color/promo/alpha/a08")!.values["Custom theme"], { alias: "Color/Persimmon/500", opacityAlias: "Opacity/8" });
-assert.deepEqual(findC("Appearance", "color/bg/promo/softer")!.values, { Light: { alias: "color/promo/100" }, Dark: { alias: "color/promo/850" } });
+assert.deepEqual(findC("Appearance", "color/bg/promo/softer")!.values, { Light: { alias: "color/promo/100" }, Dark: { alias: "color/promo/800" } });
 assert.deepEqual(findC("Appearance", "color/icon/promo")!.scopes, ["SHAPE_FILL", "TEXT_FILL"]);
 // Custom backgrounds follow both canvases.
 const planC2 = buildPlan(spec, { numberOfThemes: 1, themes: [promoA], customRoles: ["promo"], darkCanvasStep: 900, extraAppearances: [{ name: "Paper", base: "Light", canvasStep: 50 }] });
@@ -693,7 +756,9 @@ for (const p of [plan, plan900, plan3]) {
 assert.deepEqual(schemeVar(plan, "primary").values, { Light: { alias: "color/brand/500" }, Dark: { alias: "color/brand/300" } });
 // Own values: inversePrimary swaps primary's steps; surface containers follow the dark canvas step.
 assert.deepEqual(schemeVar(plan, "inversePrimary").values, { Light: { alias: "color/brand/300" }, Dark: { alias: "color/brand/500" } });
-assert.equal((schemeVar(plan, "surfaceContainerLow").values.Dark as { alias: string }).alias, "color/neutral/900");
+const plan950 = buildPlan(spec, { numberOfThemes: 1, themes: [themeA], darkCanvasStep: 950 });
+assert.equal((schemeVar(plan950, "surfaceContainerLow").values.Dark as { alias: string }).alias, "color/neutral/900");
+assert.deepEqual(plan.variables, plan900.variables); // 900 is the default
 assert.equal((schemeVar(plan900, "surfaceContainerLow").values.Dark as { alias: string }).alias, "color/neutral/850");
 assert.equal((schemeVar(plan900, "surfaceContainerLow").values.Light as { alias: string }).alias, "color/neutral/50");
 assert.equal((schemeVar(plan900, "primaryFixed").values.Dark as { alias: string }).alias, "color/brand/100"); // fixed roles never move
@@ -727,9 +792,9 @@ assert.deepEqual(schemeVar(plan, "onSurfaceVariant").values, { Light: { alias: "
 assert.deepEqual(schemeVar(plan, "inverseSurface").values, { Light: { alias: "color/neutral/700" }, Dark: { alias: "color/neutral/100" } });
 // High and Highest differ in Dark at canvas 950 and 900. At 850 the limit of step 600 makes them meet.
 const darkStepOf = (p: Plan, role: string) => (schemeVar(p, role).values.Dark as { alias: string }).alias;
-assert.equal(darkStepOf(plan, "surfaceContainerHigh"), "color/neutral/800");
-assert.equal(darkStepOf(plan, "surfaceContainerHighest"), "color/neutral/700");
-assert.equal(darkStepOf(plan, "surfaceBright"), "color/neutral/700");
+assert.equal(darkStepOf(plan950, "surfaceContainerHigh"), "color/neutral/800");
+assert.equal(darkStepOf(plan950, "surfaceContainerHighest"), "color/neutral/700");
+assert.equal(darkStepOf(plan950, "surfaceBright"), "color/neutral/700");
 assert.equal(darkStepOf(plan900, "surfaceContainerHigh"), "color/neutral/700");
 assert.equal(darkStepOf(plan900, "surfaceContainerHighest"), "color/neutral/600");
 const plan850 = buildPlan(spec, { numberOfThemes: 1, themes: [themeA], darkCanvasStep: 850 });
@@ -789,13 +854,15 @@ assert.ok(!ktHand.files[0].text!.includes("brandGlow"));
 
 // 17. Moved brand anchor (section 5.2 steps 1 and 3, tokens.json primitives.brandAnchor).
 // A brand closest to step 500 but too light for 500 on Gray 100 moves to 400 and keeps its exact HEX.
-for (const hex of ["#127681", "#2E7D32", "#D62828"]) {
+// With the lighter Gray 100, #127681 and #2E7D32 pass at 500, so they stay there.
+for (const hex of ["#127681", "#2E7D32"]) assert.deepEqual(placeAnchor(hex), { closest: 500, anchor: 500 }, hex);
+for (const hex of ["#0E7C86", "#1E8449", "#D62828"]) {
   assert.deepEqual(placeAnchor(hex), { closest: 500, anchor: 400 }, hex);
   const p = buildPalette("x", hex);
   assert.equal(p.anchor, 400);
   assert.equal(p.steps[400].hex, hex, `${hex} stays exact`);
   assert.deepEqual(p.errors, [], `${hex} meets every minimum`);
-  assert.ok(contrast(p.steps[500].hex, "#EAEAEA") >= 4.5);
+  assert.ok(contrast(p.steps[500].hex, GRAY_HEX[100]) >= 4.5);
   assert.deepEqual([...p.respaced!].sort((a, b) => a - b), [150, 200, 300, 500, 600]);
   // Step 500 keeps the usual gap below the brand; 50, 100, 150 and 800 to 950 keep their targets.
   const L = hexToOklch(hex).L;
@@ -822,17 +889,17 @@ for (const hex of ["#CC3333", "#D92B2B", "#C2410C", "#2F6FED", "#0066FF"]) {
 }
 assert.deepEqual(RESPACE_FROM_500_TO_400, Object.fromEntries(Object.entries(spec.primitives.brandAnchor.respaceFrom500To400.fractions).map(([k, v]) => [Number(k), v])));
 // A brand moved from 500 to 400: 150, 200 and 300 sit at their fractions, with no jump between 150 and 200.
-assert.equal(buildPalette("x", "#CC3333").steps[150].hex, "#FFC4BD");
-assert.equal(buildPalette("x", "#CC3333").steps[200].hex, "#FF9A90");
+assert.equal(buildPalette("x", "#D62828").steps[150].hex, "#FFCDC7");
+assert.equal(buildPalette("x", "#D62828").steps[200].hex, "#FFA398");
 // A dark brand that moved to 600 keeps its even spacing: step 150 is not re-spaced.
 assert.equal(buildPalette("x", "#770000").anchor, 600);
 assert.ok(!buildPalette("x", "#770000").respaced!.includes(150));
 // Re-spaced steps have no ceiling: a saturated brand's 300 follows the curve.
-assert.equal(buildPalette("x", "#CC3333").steps[300].hex, "#F26E65");
+assert.equal(buildPalette("x", "#D62828").steps[300].hex, "#FA685C");
 assert.ok(buildPalette("x", "#E30426").steps[300].lch.C > CHROMA_CEILING[300]);
 // Re-spaced steps report only their minimums: no target warning, and no error while the minimum holds.
 {
-  const p = buildPalette("x", "#CC3333");
+  const p = buildPalette("x", "#D62828");
   assert.ok(p.respaced!.includes(150) && p.respaced!.includes(300));
   assert.equal(p.warnings.filter((w) => w.check === "contrast_target" && p.respaced!.includes(w.step!)).length, 0);
   assert.ok(contrast(p.steps[150].hex, GRAY_HEX[700]) >= 7 && contrast(p.steps[300].hex, GRAY_HEX[700]) >= 4.5);
@@ -945,14 +1012,20 @@ assert.ok(twoCustom.variables.filter((v) => v.collection === "Appearance").every
   };
   // The defaults are the values in appearance.tokens.
   const plain = planOf({});
-  assert.equal(value(plain, "color/text/neutral/bolder", "Light"), "color/neutral/700");
-  assert.equal(value(plain, "color/text/neutral/bolder", "Dark"), "color/neutral/150");
+  assert.equal(value(plain, "color/text/neutral/bolder", "Light"), "color/neutral/900");
+  assert.equal(value(plain, "color/text/neutral/bolder", "Dark"), "color/neutral/white");
+  assert.equal(value(plain, "color/text/brand/bolder", "Dark"), "color/brand/50");
   // Another step moves every bolder text and icon token, in its own family, in that mode only.
-  const p900 = planOf({ lightTextFillStep: 900 });
+  // Dark's stored neutral value is white, which is not a number: the rule must still move it.
+  const p150 = planOf({ darkTextFillStep: 150 });
+  assert.equal(value(p150, "color/text/neutral/bolder", "Dark"), "color/neutral/150");
+  assert.equal(value(p150, "color/icon/neutral/bolder", "Dark"), "color/neutral/150");
+  assert.equal(value(p150, "color/text/brand/bolder", "Dark"), "color/brand/150");
+  const p900 = planOf({ lightTextFillStep: 700 });
   assert.equal(p900.ok, true);
   for (const [name, family] of [["color/text/neutral/bolder", "neutral"], ["color/text/brand/bolder", "brand"], ["color/text/selected/bolder", "brand"],
     ["color/text/danger/bolder", "danger"], ["color/icon/neutral/bolder", "neutral"], ["color/icon/brand/bolder", "brand"]]) {
-    assert.equal(value(p900, name, "Light"), `color/${family}/900`, name);
+    assert.equal(value(p900, name, "Light"), `color/${family}/700`, name);
     assert.equal(value(p900, name, "Dark"), value(plain, name, "Dark"), name);
   }
   // Nothing else changes: not the bold tokens, and not the bolder background.
@@ -976,7 +1049,7 @@ assert.ok(twoCustom.variables.filter((v) => v.collection === "Appearance").every
   assert.equal(extra.ok, true, JSON.stringify(extra.report.filter((r) => r.severity === "error")));
   assert.equal(value(extra, "color/text/neutral/bolder", "Oled"), "color/neutral/white");
   assert.equal(value(extra, "color/text/promo/bolder", "Oled"), "color/promo/50");
-  assert.equal(value(extra, "color/text/neutral/bolder", "Dim"), "color/neutral/150");
+  assert.equal(value(extra, "color/text/neutral/bolder", "Dim"), "color/neutral/white"); // the default
   assert.equal(value(extra, "color/text/promo/bolder", "Paper"), "color/promo/850");
   // A step from the other list, or an unknown one, stops generation.
   for (const bad of [{ lightTextFillStep: 150 }, { lightTextFillStep: "white" }, { darkTextFillStep: 700 }, { darkTextFillStep: "black" },
@@ -998,15 +1071,16 @@ assert.ok(twoCustom.variables.filter((v) => v.collection === "Appearance").every
 
   // 22. Black dark canvas (section 5.1): the canvas is black, and everything above it stays as at 950.
   const black = planOf({ darkCanvasStep: "black" });
+  const at950 = planOf({ darkCanvasStep: 950 });
   assert.equal(black.ok, true);
   assert.equal(value(black, "color/elevation/surface/canvas", "Dark"), "color/neutral/black");
   assert.equal(value(black, "color/bg/base", "Dark"), "color/neutral/black");
   assert.equal(value(black, "surface", "Dark"), "color/neutral/black");
   const canvasTokens = new Set(spec.appearance.darkCanvas.canvasTokens);
   for (const v of black.variables.filter((x) => x.collection === "Appearance" && !canvasTokens.has(x.name))) {
-    assert.deepEqual(v.values, plain.variables.find((x) => x.collection === "Appearance" && x.name === v.name)!.values, v.name);
+    assert.deepEqual(v.values, at950.variables.find((x) => x.collection === "Appearance" && x.name === v.name)!.values, v.name);
   }
-  assert.equal(value(black, "surfaceContainer", "Dark"), value(plain, "surfaceContainer", "Dark"));
+  assert.equal(value(black, "surfaceContainer", "Dark"), value(at950, "surfaceContainer", "Dark"));
   assert.ok(checksOf({ numberOfThemes: 1, themes: [themeA], lightCanvasStep: "black" }).includes("missing_input"));
   assert.ok(checksOf({ numberOfThemes: 1, themes: [themeA], extraAppearances: [{ name: "Paper", base: "Light", canvasStep: "black" }] }).includes("missing_input"));
   assert.equal(buildTables(spec, black).length > 0, true);
@@ -1030,8 +1104,8 @@ assert.ok(twoCustom.variables.filter((v) => v.collection === "Appearance").every
   assert.equal(light.softNeutral, neutral[50]);
   assert.equal(light.softBrand, brand[50]);
   assert.equal(light.border, "#0000003D");
-  assert.equal(dark.canvas, neutral[950]);
-  assert.equal(dark.text, neutral[150]);
+  assert.equal(dark.canvas, neutral[900]); // the default dark canvas
+  assert.equal(dark.text, "#FFFFFF"); // the default text fill
   assert.equal(dark.border, "#FFFFFF29");
   assert.equal(oled.canvas, "#000000");
   assert.equal(oled.text, "#FFFFFF");
@@ -1047,10 +1121,13 @@ assert.ok(twoCustom.variables.filter((v) => v.collection === "Appearance").every
 // more color in steps 50 to 200 than the neutrals, whose lightness stays on Color/Gray.
 assert.deepEqual(TARGET_L, spec.primitives.targetL);
 assert.deepEqual(CHROMA_MULT, spec.primitives.chromaMultiplier);
-// The window takes the first step of each list as its default.
-for (const rule of [spec.inputs.lightCanvasStep, spec.inputs.darkCanvasStep, spec.inputs.lightTextFillStep, spec.inputs.darkTextFillStep,
-  ...Object.values(spec.inputs.extraAppearances.canvasStep), ...Object.values(spec.inputs.extraAppearances.textFillStep)] as { allowed: unknown[]; default: unknown }[]) {
-  assert.equal(rule.allowed[0], rule.default);
+// The window takes the first step of the light canvas list as its default. The plugin sends the other defaults.
+for (const rule of [spec.inputs.lightCanvasStep, spec.inputs.extraAppearances.canvasStep.Light]) assert.equal(rule.allowed[0], rule.default);
+for (const [rule, value] of [[spec.inputs.darkCanvasStep, 900], [spec.inputs.extraAppearances.canvasStep.Dark, 900],
+  [spec.inputs.lightTextFillStep, 900], [spec.inputs.extraAppearances.textFillStep.Light, 900],
+  [spec.inputs.darkTextFillStep, "white"], [spec.inputs.extraAppearances.textFillStep.Dark, "white"]] as [{ allowed: unknown[]; default: unknown }, unknown][]) {
+  assert.equal(rule.default, value);
+  assert.ok(rule.allowed.includes(rule.default));
 }
 // The brand keeps its exact HEX: colors that a conversion would round by a digit (section 5.2 step 5).
 for (const hex of ["#EE560C", "#553ADF", "#127681"]) {
@@ -1068,7 +1145,7 @@ for (const hex of ["#EE560C", "#553ADF", "#127681"]) {
       assert.ok(b.steps[100].lch.L < b.steps[50].lch.L, hex);
     }
   }
-  assert.ok(buildPalette("Brand", "#CD006C").steps[100].lch.L > TARGET_L[100]);
+  assert.ok(buildPalette("Brand", "#CC3333").steps[100].lch.L > TARGET_L[100]);
   // Gaps between the light steps keep rising from the light end, and the multipliers keep rising to 400.
   const lightGaps = [[50, 100], [100, 150], [150, 200], [200, 300]].map(([a, b]) => TARGET_L[a] - TARGET_L[b]);
   for (let i = 1; i < lightGaps.length; i++) assert.ok(lightGaps[i] > lightGaps[i - 1], `gap ${i}`);
@@ -1077,7 +1154,7 @@ for (const hex of ["#EE560C", "#553ADF", "#127681"]) {
   const n = buildNeutralPalette("n", "#DBE1E5");
   for (const s of STEPS) assert.ok(Math.abs(n.steps[s].lch.L - hexToOklch(GRAY_HEX[s]).L) < 0.006, `neutral ${s}`);
   // Example from the option the user chose: violet's step 50 at the gamut limit of its new lightness.
-  assert.equal(buildPalette("Violet", "#553ADF").steps[50].hex, "#EFF1FF");
+  assert.equal(buildPalette("Violet", "#553ADF").steps[50].hex, "#F5F6FF");
 }
 
 // 25. Default names (section 5.1): Main theme first, then numbered custom themes and appearances.

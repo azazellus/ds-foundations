@@ -125,9 +125,9 @@ Each step has a target lightness (OKLCH L). The brand palette keeps the brand co
 | 400 | 0.638 |
 | 300 | 0.754 |
 | 200 | 0.852 |
-| 150 | 0.892 |
-| 100 | 0.928 |
-| 50 | 0.96 |
+| 150 | 0.915 |
+| 100 | 0.95 |
+| 50 | 0.976 |
 
 #### 1.1.5 Contrast requirements
 
@@ -161,9 +161,9 @@ Color/Gray is the default neutral palette of every theme. Its values are fixed a
 | Color/Gray/400 | #8C8C8C | 0.64 |
 | Color/Gray/300 | #B1B1B1 | 0.76 |
 | Color/Gray/200 | #C7C7C7 | 0.83 |
-| Color/Gray/150 | #DBDBDB | 0.89 |
-| Color/Gray/100 | #EAEAEA | 0.94 |
-| Color/Gray/50 | #F4F4F4 | 0.97 |
+| Color/Gray/150 | #E3E3E3 | 0.92 |
+| Color/Gray/100 | #F1F1F1 | 0.96 |
+| Color/Gray/50 | #F9F9F9 | 0.98 |
 
 #### 1.1.7 Further reading
 
@@ -549,24 +549,24 @@ Some tokens have no emphasis suffix. These are the only permitted exceptions:
 
 | Category | Permitted no-emphasis variants |
 |---|---|
-| bg | base, input, disabled |
+| bg | base, container, input, action, disabled |
 | text | disabled, inverse, link, fixed/dark, fixed/light |
 | border | brand/heavy, brand/light, neutral/heavy, neutral/light, danger, disabled, focus, info, inverse, selected, success, warning |
 | icon | danger, disabled, inverse, info, success, warning |
-| elevation/surface | canvas, menu, overlay, raised, scrim |
-| elevation/shadow | card |
+| elevation/surface | canvas, canvas/deep, canvas/deeper, menu, overlay, overlay/deep, overlay/deeper, raised, scrim |
+| elevation/shadow | card, convex/top, convex/bottom, concave/top, concave/bottom |
 
 Do not create additional no-emphasis variants. Do not mix emphasis systems within a category. `bg`, `text`, and `icon` use `softest` through `bolder`. `border` uses `light` and `heavy` where a strength distinction is needed. `accent` is reserved for selected graphic emphasis and for the brand accent tokens.
 
 ### 3.3 Appearance tokens
 
-Each row references one Theme token per appearance. Alpha tokens are referenced by their Theme name. The values are for the default canvas and text fill steps; the rules for the other steps are in section 5.1.
+Each row references one Theme token per appearance. Alpha tokens are referenced by their Theme name. The Light values are for the default canvas and text fill steps. The Dark values are for the default text fill step and for canvas step 950, the step the rules in section 5.1 count from. The default Dark canvas is 900, so by default the following tokens use their values in the 900 row of section 5.1.
 
 The table is sorted alphabetically for reading. In Figma, and in the color tables, Appearance tokens follow this order (`appearance.order` in `tokens.json`):
 
 - Groups, from top to bottom: elevation, bg, text, border, icon.
 - Inside a group, sub-groups (such as brand, danger, or neutral) keep the order in which they first appear in this table.
-- Inside a sub-group, tokens follow the emphasis hierarchy, from top to bottom: bolder, bold, accent, soft, softer, softest. Tokens without an emphasis (such as base, disabled, heavy, or light) come after them, in table order.
+- Inside a sub-group, tokens follow the emphasis hierarchy, from top to bottom: bolder, bold, accent, soft, softer, softest. A token nested under another token, such as `canvas/deep`, belongs to that token's sub-group. Tokens without an emphasis (such as base, disabled, heavy, or light) come after them, in table order.
 
 > Note: Figma lists variables in the order they were created, and plugins cannot reorder existing variables. The order applies when the plugin creates the variables.
 
@@ -578,7 +578,7 @@ The table is sorted alphabetically for reading. In Figma, and in the color table
 | color/bg/{role}/soft | color/{role}/150 | color/{role}/800 |
 | color/bg/{role}/softer | color/{role}/100 | color/{role}/850 |
 | color/bg/{role}/softest | color/{role}/50 | color/{role}/900 |
-| color/text/{role}/bolder | color/{role}/700 | color/{role}/150 |
+| color/text/{role}/bolder | color/{role}/900 | color/{role}/50 |
 | color/text/{role}/bold | color/{role}/500 | color/{role}/300 |
 | color/border/{role} | color/{role}/300 | color/{role}/500 |
 | color/icon/{role} | color/{role}/500 | color/{role}/300 |
@@ -587,6 +587,7 @@ Their `softest`, `softer`, and `soft` backgrounds follow the dark canvas like th
 
 | Token name | Light value | Dark value |
 |---|---|---|
+| color/bg/action | color/neutral/white | color/neutral/850 |
 | color/bg/base | color/neutral/white | color/neutral/950 |
 | color/bg/brand/accent | color/brand/400 | color/brand/400 |
 | color/bg/brand/bold | color/brand/500 | color/brand/300 |
@@ -597,12 +598,13 @@ Their `softest`, `softer`, and `soft` backgrounds follow the dark canvas like th
 | color/bg/danger/soft | color/danger/150 | color/danger/800 |
 | color/bg/danger/softer | color/danger/100 | color/danger/850 |
 | color/bg/danger/softest | color/danger/50 | color/danger/900 |
+| color/bg/container | color/neutral/white | color/neutral/900 |
 | color/bg/disabled | color/neutral/alpha/black/a12 | color/neutral/alpha/white/a16 |
 | color/bg/info/bold | color/info/500 | color/info/300 |
 | color/bg/info/soft | color/info/150 | color/info/800 |
 | color/bg/info/softer | color/info/100 | color/info/850 |
 | color/bg/info/softest | color/info/50 | color/info/900 |
-| color/bg/input | color/neutral/white | color/neutral/700 |
+| color/bg/input | color/neutral/white | color/neutral/850 |
 | color/bg/neutral/bolder | color/neutral/700 | color/neutral/150 |
 | color/bg/neutral/soft | color/neutral/150 | color/neutral/800 |
 | color/bg/neutral/softer | color/neutral/100 | color/neutral/850 |
@@ -633,41 +635,49 @@ Their `softest`, `softer`, and `soft` backgrounds follow the dark canvas like th
 | color/border/success | color/success/300 | color/success/500 |
 | color/border/warning | color/warning/300 | color/warning/500 |
 | color/elevation/shadow/card | color/neutral/alpha/black/a12 | color/neutral/alpha/white/a00 |
+| color/elevation/shadow/concave/bottom | color/neutral/alpha/white/a48 | color/neutral/alpha/white/a04 |
+| color/elevation/shadow/concave/top | color/neutral/alpha/black/a04 | color/neutral/alpha/black/a12 |
+| color/elevation/shadow/convex/bottom | color/neutral/alpha/black/a04 | color/neutral/alpha/black/a20 |
+| color/elevation/shadow/convex/top | color/neutral/alpha/white/a12 | color/neutral/alpha/white/a06 |
 | color/elevation/surface/canvas | color/neutral/white | color/neutral/950 |
+| color/elevation/surface/canvas/deep | color/neutral/50 | color/neutral/black |
+| color/elevation/surface/canvas/deeper | color/neutral/100 | color/neutral/black |
 | color/elevation/surface/menu | color/neutral/50 | color/neutral/850 |
 | color/elevation/surface/overlay | color/neutral/white | color/neutral/900 |
+| color/elevation/surface/overlay/deep | color/neutral/50 | color/neutral/950 |
+| color/elevation/surface/overlay/deeper | color/neutral/100 | color/neutral/black |
 | color/elevation/surface/raised | color/neutral/50 | color/neutral/850 |
 | color/elevation/surface/scrim | color/neutral/alpha/black/a48 | color/neutral/alpha/black/a80 |
 | color/icon/brand/accent | color/brand/400 | color/brand/400 |
 | color/icon/brand/bold | color/brand/500 | color/brand/300 |
-| color/icon/brand/bolder | color/brand/700 | color/brand/150 |
+| color/icon/brand/bolder | color/brand/900 | color/brand/50 |
 | color/icon/danger | color/danger/500 | color/danger/300 |
 | color/icon/disabled | color/neutral/alpha/black/a24 | color/neutral/alpha/white/a16 |
 | color/icon/info | color/info/500 | color/info/300 |
 | color/icon/inverse | color/neutral/white | color/neutral/950 |
 | color/icon/neutral/bold | color/neutral/500 | color/neutral/300 |
-| color/icon/neutral/bolder | color/neutral/700 | color/neutral/150 |
+| color/icon/neutral/bolder | color/neutral/900 | color/neutral/white |
 | color/icon/success | color/success/500 | color/success/300 |
 | color/icon/warning | color/warning/500 | color/warning/300 |
 | color/text/brand/bold | color/brand/500 | color/brand/300 |
-| color/text/brand/bolder | color/brand/700 | color/brand/150 |
+| color/text/brand/bolder | color/brand/900 | color/brand/50 |
 | color/text/danger/bold | color/danger/500 | color/danger/300 |
-| color/text/danger/bolder | color/danger/700 | color/danger/150 |
+| color/text/danger/bolder | color/danger/900 | color/danger/50 |
 | color/text/disabled | color/neutral/alpha/black/a24 | color/neutral/alpha/white/a16 |
 | color/text/fixed/dark | color/neutral/700 | color/neutral/700 |
 | color/text/fixed/light | color/neutral/white | color/neutral/50 |
 | color/text/info/bold | color/info/500 | color/info/300 |
-| color/text/info/bolder | color/info/700 | color/info/150 |
+| color/text/info/bolder | color/info/900 | color/info/50 |
 | color/text/inverse | color/neutral/white | color/neutral/900 |
 | color/text/link | color/brand/500 | color/brand/300 |
 | color/text/neutral/bold | color/neutral/500 | color/neutral/300 |
-| color/text/neutral/bolder | color/neutral/700 | color/neutral/150 |
+| color/text/neutral/bolder | color/neutral/900 | color/neutral/white |
 | color/text/selected/bold | color/brand/500 | color/brand/300 |
-| color/text/selected/bolder | color/brand/700 | color/brand/150 |
+| color/text/selected/bolder | color/brand/900 | color/brand/50 |
 | color/text/success/bold | color/success/500 | color/success/300 |
-| color/text/success/bolder | color/success/700 | color/success/150 |
+| color/text/success/bolder | color/success/900 | color/success/50 |
 | color/text/warning/bold | color/warning/500 | color/warning/300 |
-| color/text/warning/bolder | color/warning/700 | color/warning/150 |
+| color/text/warning/bolder | color/warning/900 | color/warning/50 |
 
 > Note: `color/elevation/shadow/card` is fully transparent in Dark (`a00`) on purpose.
 
@@ -675,7 +685,7 @@ Their `softest`, `softer`, and `soft` backgrounds follow the dark canvas like th
 
 Validate the following pairings in every theme and every appearance (Light, Dark, and each extra appearance). Contrast is calculated on the fully resolved, opaque HEX values (section 5.7).
 
-Alpha-based tokens are excluded. Any Appearance token that references an alpha Theme token is excluded, and it is not resolved, composited, or reported. This includes `color/bg/disabled`, `color/border/brand/light`, `color/border/disabled`, `color/border/neutral/light`, `color/elevation/shadow/card`, `color/elevation/surface/scrim`, `color/icon/disabled`, and `color/text/disabled`.
+Alpha-based tokens are excluded. Any Appearance token that references an alpha Theme token is excluded, and it is not resolved, composited, or reported. This includes `color/bg/disabled`, `color/border/brand/light`, `color/border/disabled`, `color/border/neutral/light`, `color/elevation/shadow/card`, `color/elevation/shadow/concave/bottom`, `color/elevation/shadow/concave/top`, `color/elevation/shadow/convex/bottom`, `color/elevation/shadow/convex/top`, `color/elevation/surface/scrim`, `color/icon/disabled`, and `color/text/disabled`.
 
 | Foreground token | Background token | Minimum contrast |
 |---|---|---|
@@ -871,9 +881,9 @@ The plugin asks for each input below. Every palette input is a HEX value. The pl
 | Custom colors | Per theme | Mandatory for each custom role | HEX, each | None |
 | Dark | Global | Optional | Include or not | Included |
 | Light canvas step | Global | Optional | white or 50 | white |
-| Dark canvas step | Global | Optional | 950, 900, 850, or black | 950 |
-| Light text fill step | Global | Optional | 700, 800, 850, 900, 950, or black | 700 |
-| Dark text fill step | Global | Optional | 150, 100, 50, or white | 150 |
+| Dark canvas step | Global | Optional | 950, 900, 850, or black | 900 |
+| Light text fill step | Global | Optional | 700, 800, 850, 900, 950, or black | 900 |
+| Dark text fill step | Global | Optional | 150, 100, 50, or white | white |
 | Extra appearances | Global | Optional | Zero or more: name, base (Light or Dark), a canvas step (white or 50 for a Light base; 950, 900, 850, or black for a Dark base), and a text fill step (the Light or Dark list above, by base) | None added |
 
 Rules for inputs:
@@ -888,35 +898,44 @@ Rules for inputs:
 - Custom roles add colors beyond brand and the status roles, such as `promo`. A role name uses lowercase letters and numbers, with single hyphens between them, such as `7` or `brand-2`. It is unique and not one of: neutral, brand, success, danger, warning, info, base, disabled, input, selected, focus, inverse, shadow, surface, fixed, link. Each theme supplies its own HEX for every custom role. A custom role generates the same tokens and checks as a status role: a Primitive palette per hue (section 5.3), the Theme tokens `color/{role}/{step}` and `color/{role}/alpha/a{NN}` (section 2.1), the Appearance tokens in section 3.3, and the checks in section 3.4.
 - Font weights are chosen from the styles that the theme's font family has in Figma. Italic styles are not offered. Every selected style becomes a Primitive `Typography/Font-weight/{Style}`. Each weight slot in section 2.2 uses the selected style whose name matches the slot when spaces and letter case are ignored. A slot that matches in no theme is not created. A slot that matches in some themes but not in others stops generation as `missing_input`; the report names the slot and the font families without a match. A selected style that the family does not have also stops generation as `missing_input`.
 - Extra appearances are named by the user. One the user does not name is named Custom appearance, then Custom appearance 2, Custom appearance 3, and so on, with the lowest number that is free. A name uses letters, numbers, and single spaces, is unique, and is not Light or Dark. An invalid or duplicated name stops generation as `missing_input`.
-- An extra appearance copies the value of every Appearance token from its base. It also has its own canvas step: white or 50 for a Light base (default white), and 950, 900, 850, or black for a Dark base (default 950). The light or dark canvas rule below applies to it with that step. The light and dark canvas step inputs apply to Light and Dark themselves. It has its own text fill step too (default 700 for a Light base and 150 for a Dark base), and the text fill rules below apply to it with that step.
-- The dark canvas step changes `color/bg/base` (Dark) and `color/elevation/surface/canvas` (Dark). Both use the chosen step instead of 950. With black, both use `color/neutral/black`.
-- The Dark backgrounds and surfaces above the canvas follow it, so they always stay lighter than the canvas. The Dark values in section 3.3 are for the default step, 950. With another step, each following token moves its Dark step lighter by the same number of steps along the shade scale (section 1.1.3) as the canvas moved from 950. With black, which is not on the shade scale, they keep the values they have at 950. The following tokens are `color/bg/{role}/softest`, `color/bg/{role}/softer`, and `color/bg/{role}/soft` for brand, danger, info, neutral, selected, success, warning, and every custom role, plus `color/elevation/surface/overlay`, `color/elevation/surface/menu`, and `color/elevation/surface/raised`. The full list is in `tokens.json`, under `appearance.darkCanvas`.
+- An extra appearance copies the value of every Appearance token from its base. It also has its own canvas step: white or 50 for a Light base (default white), and 950, 900, 850, or black for a Dark base (default 900). The light or dark canvas rule below applies to it with that step. The light and dark canvas step inputs apply to Light and Dark themselves. It has its own text fill step too (default 700 for a Light base and 150 for a Dark base), and the text fill rules below apply to it with that step.
+- The dark canvas step changes `color/bg/base` (Dark) and `color/elevation/surface/canvas` (Dark). Both use the chosen step. With black, both use `color/neutral/black`.
+- The Dark backgrounds and surfaces above the canvas follow it, so they always stay lighter than the canvas. The Dark values in section 3.3 are for step 950. With another step, each following token moves its Dark step lighter by the same number of steps along the shade scale (section 1.1.3) as the canvas moved from 950. With black, which is not on the shade scale, they keep the values they have at 950. The following tokens are `color/bg/{role}/softest`, `color/bg/{role}/softer`, and `color/bg/{role}/soft` for brand, danger, info, neutral, selected, success, warning, and every custom role, plus `color/elevation/surface/overlay`, `color/elevation/surface/menu`, and `color/elevation/surface/raised`. The full list is in `tokens.json`, under `appearance.darkCanvas`.
 
 Dark values of the following tokens for each dark canvas step:
 
-| Dark canvas step | softest | softer | soft | overlay | menu, raised |
-|---|---|---|---|---|---|
-| 950 | 900 | 850 | 800 | 900 | 850 |
-| 900 | 850 | 800 | 700 | 850 | 800 |
-| 850 | 800 | 700 | 600 | 800 | 700 |
-| black | 900 | 850 | 800 | 900 | 850 |
+| Dark canvas step | softest | softer | soft | overlay, bg/container | menu, raised, bg/input, bg/action | overlay/deep | overlay/deeper |
+|---|---|---|---|---|---|---|---|
+| 950 | 900 | 850 | 800 | 900 | 850 | 950 | black |
+| 900 | 850 | 800 | 700 | 850 | 800 | 900 | 950 |
+| 850 | 800 | 700 | 600 | 800 | 700 | 850 | 900 |
+| black | 900 | 850 | 800 | 900 | 850 | 950 | black |
+
+The surfaces below the canvas are set from the canvas itself: `color/elevation/surface/canvas/deep` is one step darker and `color/elevation/surface/canvas/deeper` is two steps darker, counting black as one step darker than 950, and stopping at black. The lists are in `tokens.json`, under `appearance.darkCanvas`.
+
+| Dark canvas step | canvas/deep | canvas/deeper |
+|---|---|---|
+| 950 | black | black |
+| 900 | 950 | black |
+| 850 | 900 | 950 |
+| black | black | black |
 
 Light canvas rules:
 
 - The light canvas step changes `color/bg/base` (Light) and `color/elevation/surface/canvas` (Light). With 50, both use `color/neutral/50` instead of `color/neutral/white`.
-- With 50, the elevated surfaces change too, so they stand out from the canvas: `color/elevation/surface/menu` uses `color/neutral/white` and `color/elevation/surface/raised` uses `color/neutral/100` (Light). The list is in `tokens.json`, under `appearance.lightCanvas.valuesByStep`.
+- With 50, the elevated surfaces change too, so they stand out from the canvas: `color/elevation/surface/menu` uses `color/neutral/white` and `color/elevation/surface/raised` uses `color/neutral/100` (Light). The surfaces below the canvas also move, so they stay darker than it: `color/elevation/surface/canvas/deep` uses `color/neutral/100` and `color/elevation/surface/canvas/deeper` uses `color/neutral/150`. The list is in `tokens.json`, under `appearance.lightCanvas.valuesByStep`.
 - No other token follows the light canvas. All other Light values stay as in section 3.3, and the contrast checks in section 3.4 are unchanged.
 
 Light values for each light canvas step:
 
-| Light canvas step | canvas, bg/base | menu | raised | other tokens |
-|---|---|---|---|---|
-| white | white | 50 | 50 | as in section 3.3 |
-| 50 | 50 | white | 100 | as in section 3.3 |
+| Light canvas step | canvas, bg/base | canvas/deep | canvas/deeper | menu | raised | other tokens |
+|---|---|---|---|---|---|---|
+| white | white | 50 | 100 | 50 | 50 | as in section 3.3 |
+| 50 | 50 | 100 | 150 | white | 100 | as in section 3.3 |
 
 Text fill rules:
 
-- The text fill step sets how strong the bolder text and icons are in an appearance. Each appearance has its own step. The values in section 3.3 are for the default steps, 700 in Light and 150 in Dark.
+- The text fill step sets how strong the bolder text and icons are in an appearance. Each appearance has its own step. The values in section 3.3 are for the default steps, 900 in Light and white in Dark.
 - With another step, these tokens use it in that mode, in their own color family: `color/text/{role}/bolder` for brand, danger, info, neutral, selected, success, warning, and every custom role, plus `color/icon/neutral/bolder` and `color/icon/brand/bolder`. The list is in `tokens.json`, under `appearance.textFill`.
 - Only neutral has black and white. Where neutral uses black, the other families use step 950. Where neutral uses white, they use step 50.
 - Bold tokens and `color/bg/neutral/bolder` do not change. ColorScheme tokens that are the same as a bolder token follow it (section 3.5). The contrast checks in section 3.4 run on the chosen values.
@@ -925,18 +944,17 @@ Values for each text fill step:
 
 | Text fill step | color/text/neutral/bolder | Other families |
 |---|---|---|
-| 700 (Light default) | color/neutral/700 | color/{role}/700 |
-| 800, 850, 900, or 950 | color/neutral/{step} | color/{role}/{step} |
+| 900 (Light default) | color/neutral/900 | color/{role}/900 |
+| 700, 800, 850, or 950 | color/neutral/{step} | color/{role}/{step} |
 | black | color/neutral/black | color/{role}/950 |
-| 150 (Dark default) | color/neutral/150 | color/{role}/150 |
-| 100 or 50 | color/neutral/{step} | color/{role}/{step} |
-| white | color/neutral/white | color/{role}/50 |
+| white (Dark default) | color/neutral/white | color/{role}/50 |
+| 150, 100, or 50 | color/neutral/{step} | color/{role}/{step} |
 
 ### 5.2 Brand palette
 
 1. **Choose the anchor.** Convert the brand color to OKLCH. The anchor is the step whose target L (section 1.1.4) is closest to the brand color's L. The closest step is usually 300, 400, 500, or 600, but any of the 13 steps is allowed. If two steps are equally close, choose the darker one.
 
-   **Moved anchor.** Lightness and contrast do not match perfectly across hues, so a brand color can be closest to a step and still fail that step's contrast minimum against the theme's neutral (section 1.1.5). For example, `#127681` (L 0.519) is closest to step 500 but measures 4.44:1 against Color/Gray/100, below 4.5:1. The brand color is then never changed. Instead, it moves one step away from that pairing's background, to a step that has no pairing of its own:
+   **Moved anchor.** Lightness and contrast do not match perfectly across hues, so a brand color can be closest to a step and still fail that step's contrast minimum against the theme's neutral (section 1.1.5). For example, `#0E7C86` (L 0.536) is closest to step 500 but measures 4.38:1 against Color/Gray/100, below 4.5:1. The brand color is then never changed. Instead, it moves one step away from that pairing's background, to a step that has no pairing of its own:
 
    | Closest step | Pairing it fails | Anchor moves to |
    |---|---|---|
@@ -960,7 +978,7 @@ Values for each text fill step:
    - A brand color that moved from 500 to 400 follows a different rule on the lighter side. Steps 300, 200, and 150 sit at fixed fractions of the way from the brand color's L to the target L of step 100, which stays fixed: 0.325, 0.619, and 0.845. This keeps the lightest steps free of a jump in lightness.
    - Each re-spaced step takes its chroma from the curve in section 5.5 at its new L, with no chroma ceiling, so a gamut clamp at its target L is not carried over.
 
-   Example: `#127681` anchored at 400 (L 0.519). Step 500 keeps the usual gap of 0.119 (L 0.400), step 600 goes halfway to step 700, and steps 300, 200, and 150 sit at their fractions of the way to step 100. The re-spaced steps still meet every contrast minimum, but do not chase targets (section 5.4 step 5). The rule is in `tokens.json`, under `primitives.brandAnchor`.
+   Example: `#0E7C86` anchored at 400 (L 0.536). Step 500 keeps the usual gap of 0.119 (L 0.417), step 600 goes halfway to step 700, and steps 300, 200, and 150 sit at their fractions of the way to step 100. The re-spaced steps still meet every contrast minimum, but do not chase targets (section 5.4 step 5). The rule is in `tokens.json`, under `primitives.brandAnchor`.
 
 4. **Name the palette.** Use the name from section 1.1.8. Example: a brand color of `#78449F` (HSL hue 274°) is named `Purple` and becomes `Color/Purple/500` at its anchor.
 

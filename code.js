@@ -22,7 +22,7 @@
 
   // spec/tokens.json
   var tokens_default = {
-    version: "1.26.0",
+    version: "1.30.0",
     description: "Source of truth for the design foundations specification (foundations-spec.md). Palette HEX values are user inputs and palette names come from primitives.paletteNaming; this file defines the rules, inputs, Theme mappings, alpha tokens, Appearance mappings, and ColorScheme mappings.",
     collections: {
       Primitives: { modes: ["Default"] },
@@ -60,9 +60,9 @@
         "400": 0.638,
         "300": 0.754,
         "200": 0.852,
-        "150": 0.892,
-        "100": 0.928,
-        "50": 0.96
+        "150": 0.915,
+        "100": 0.95,
+        "50": 0.976
       },
       chromaMultiplier: {
         "50": 0.3,
@@ -190,9 +190,9 @@
           "400": "#8C8C8C",
           "300": "#B1B1B1",
           "200": "#C7C7C7",
-          "150": "#DBDBDB",
-          "100": "#EAEAEA",
-          "50": "#F4F4F4"
+          "150": "#E3E3E3",
+          "100": "#F1F1F1",
+          "50": "#F9F9F9"
         }
       },
       paletteNaming: {
@@ -364,7 +364,7 @@
         scope: "global",
         requirement: "optional",
         allowed: [950, 900, 850, "black"],
-        default: 950
+        default: 900
       },
       lightCanvasStep: {
         scope: "global",
@@ -377,14 +377,14 @@
         scope: "global",
         requirement: "optional",
         allowed: [700, 800, 850, 900, 950, "black"],
-        default: 700,
+        default: 900,
         rule: "Applies to Light. See appearance.textFill."
       },
       darkTextFillStep: {
         scope: "global",
         requirement: "optional",
         allowed: [150, 100, 50, "white"],
-        default: 150,
+        default: "white",
         rule: "Applies to Dark. See appearance.textFill."
       },
       customRoles: {
@@ -432,11 +432,11 @@
         bases: ["Light", "Dark"],
         canvasStep: {
           Light: { allowed: ["white", 50], default: "white" },
-          Dark: { allowed: [950, 900, 850, "black"], default: 950 }
+          Dark: { allowed: [950, 900, 850, "black"], default: 900 }
         },
         textFillStep: {
-          Light: { allowed: [700, 800, 850, 900, 950, "black"], default: 700 },
-          Dark: { allowed: [150, 100, 50, "white"], default: 150 }
+          Light: { allowed: [700, 800, 850, 900, 950, "black"], default: 900 },
+          Dark: { allowed: [150, 100, 50, "white"], default: "white" }
         },
         rule: "An empty or missing name uses defaultName, numbered like theme names: Custom appearance, Custom appearance 2, Custom appearance 3, ... An extra appearance copies the Light or Dark value of every Appearance token. A Light-based one applies appearance.lightCanvas and a Dark-based one applies appearance.darkCanvas, each with its own canvasStep. Each one also applies appearance.textFill with its own textFillStep. Renaming follows collections.modeRules.rename."
       },
@@ -643,12 +643,14 @@
       },
       contrastCanvas: "color/elevation/surface/canvas",
       order: {
-        description: "Order in which Appearance variables are created (and so listed in Figma) and drawn in the tables. Groups follow categories. Inside a group, sub-groups keep their order of first appearance in appearance.tokens; inside a sub-group, tokens follow emphasis, and tokens without an emphasis come after them in their appearance.tokens order.",
+        description: "Order in which Appearance variables are created (and so listed in Figma) and drawn in the tables. Groups follow categories. Inside a group, sub-groups keep their order of first appearance in appearance.tokens; inside a sub-group, tokens follow emphasis, and tokens without an emphasis come after them in their appearance.tokens order. A token nested under another token, such as color/elevation/surface/canvas/deep, belongs to that token's sub-group.",
         categories: ["elevation", "bg", "text", "border", "icon"],
         emphasis: ["bolder", "bold", "accent", "soft", "softer", "softest"]
       },
       darkCanvas: {
-        description: "The Dark mode values in appearance.tokens are for the default canvas step (inputs.darkCanvasStep.default). When the user picks another step, canvasTokens use color/neutral/{step} in Dark, and every followingToken moves its Dark step lighter by the same number of steps along primitives.steps. The step black is not on that scale: with it, the following tokens keep the values they have at 950.",
+        description: "The Dark mode values in appearance.tokens are for referenceStep, not for the default canvas step (inputs.darkCanvasStep.default). canvasTokens use color/neutral/{step} in Dark, and every followingToken moves its Dark step lighter by as many steps along primitives.steps as the canvas step is from referenceStep, with black counted as one step darker than 950. With the canvas step black, the following tokens keep the values they have at 950. Each token in belowCanvasTokens is that many steps darker than the canvas, and stops at black.",
+        referenceStep: 950,
+        belowCanvasTokens: { "color/elevation/surface/canvas/deep": 1, "color/elevation/surface/canvas/deeper": 2 },
         canvasTokens: ["color/bg/base", "color/elevation/surface/canvas"],
         followingTokens: [
           "color/bg/brand/softest",
@@ -674,7 +676,12 @@
           "color/bg/warning/soft",
           "color/elevation/surface/overlay",
           "color/elevation/surface/menu",
-          "color/elevation/surface/raised"
+          "color/elevation/surface/raised",
+          "color/elevation/surface/overlay/deep",
+          "color/elevation/surface/overlay/deeper",
+          "color/bg/container",
+          "color/bg/input",
+          "color/bg/action"
         ],
         customRoleFollowingTokens: ["color/bg/{role}/softest", "color/bg/{role}/softer", "color/bg/{role}/soft"]
       },
@@ -701,7 +708,9 @@
         valuesByStep: {
           "50": {
             "color/elevation/surface/menu": "color/neutral/white",
-            "color/elevation/surface/raised": "color/neutral/100"
+            "color/elevation/surface/raised": "color/neutral/100",
+            "color/elevation/surface/canvas/deep": "color/neutral/100",
+            "color/elevation/surface/canvas/deeper": "color/neutral/150"
           }
         }
       },
@@ -712,7 +721,7 @@
           "color/bg/{role}/soft": { Light: "color/{role}/150", Dark: "color/{role}/800" },
           "color/bg/{role}/softer": { Light: "color/{role}/100", Dark: "color/{role}/850" },
           "color/bg/{role}/softest": { Light: "color/{role}/50", Dark: "color/{role}/900" },
-          "color/text/{role}/bolder": { Light: "color/{role}/700", Dark: "color/{role}/150" },
+          "color/text/{role}/bolder": { Light: "color/{role}/900", Dark: "color/{role}/50" },
           "color/text/{role}/bold": { Light: "color/{role}/500", Dark: "color/{role}/300" },
           "color/border/{role}": { Light: "color/{role}/300", Dark: "color/{role}/500" },
           "color/icon/{role}": { Light: "color/{role}/500", Dark: "color/{role}/300" }
@@ -730,12 +739,17 @@
         "color/border/disabled",
         "color/border/neutral/light",
         "color/elevation/shadow/card",
+        "color/elevation/shadow/concave/bottom",
+        "color/elevation/shadow/concave/top",
+        "color/elevation/shadow/convex/bottom",
+        "color/elevation/shadow/convex/top",
         "color/elevation/surface/scrim",
         "color/icon/disabled",
         "color/text/disabled"
       ],
       tokens: {
         "color/bg/base": { Light: "color/neutral/white", Dark: "color/neutral/950" },
+        "color/bg/container": { Light: "color/neutral/white", Dark: "color/neutral/900" },
         "color/bg/brand/accent": { Light: "color/brand/400", Dark: "color/brand/400" },
         "color/bg/brand/bold": { Light: "color/brand/500", Dark: "color/brand/300" },
         "color/bg/brand/soft": { Light: "color/brand/150", Dark: "color/brand/800" },
@@ -750,7 +764,8 @@
         "color/bg/info/soft": { Light: "color/info/150", Dark: "color/info/800" },
         "color/bg/info/softer": { Light: "color/info/100", Dark: "color/info/850" },
         "color/bg/info/softest": { Light: "color/info/50", Dark: "color/info/900" },
-        "color/bg/input": { Light: "color/neutral/white", Dark: "color/neutral/700" },
+        "color/bg/input": { Light: "color/neutral/white", Dark: "color/neutral/850" },
+        "color/bg/action": { Light: "color/neutral/white", Dark: "color/neutral/850" },
         "color/bg/neutral/bolder": { Light: "color/neutral/700", Dark: "color/neutral/150" },
         "color/bg/neutral/soft": { Light: "color/neutral/150", Dark: "color/neutral/800" },
         "color/bg/neutral/softer": { Light: "color/neutral/100", Dark: "color/neutral/850" },
@@ -781,41 +796,49 @@
         "color/border/success": { Light: "color/success/300", Dark: "color/success/500" },
         "color/border/warning": { Light: "color/warning/300", Dark: "color/warning/500" },
         "color/elevation/shadow/card": { Light: "color/neutral/alpha/black/a12", Dark: "color/neutral/alpha/white/a00" },
+        "color/elevation/shadow/convex/top": { Light: "color/neutral/alpha/white/a12", Dark: "color/neutral/alpha/white/a06" },
+        "color/elevation/shadow/convex/bottom": { Light: "color/neutral/alpha/black/a04", Dark: "color/neutral/alpha/black/a20" },
+        "color/elevation/shadow/concave/top": { Light: "color/neutral/alpha/black/a04", Dark: "color/neutral/alpha/black/a12" },
+        "color/elevation/shadow/concave/bottom": { Light: "color/neutral/alpha/white/a48", Dark: "color/neutral/alpha/white/a04" },
         "color/elevation/surface/canvas": { Light: "color/neutral/white", Dark: "color/neutral/950" },
+        "color/elevation/surface/canvas/deep": { Light: "color/neutral/50", Dark: "color/neutral/black" },
+        "color/elevation/surface/canvas/deeper": { Light: "color/neutral/100", Dark: "color/neutral/black" },
         "color/elevation/surface/menu": { Light: "color/neutral/50", Dark: "color/neutral/850" },
         "color/elevation/surface/overlay": { Light: "color/neutral/white", Dark: "color/neutral/900" },
+        "color/elevation/surface/overlay/deep": { Light: "color/neutral/50", Dark: "color/neutral/950" },
+        "color/elevation/surface/overlay/deeper": { Light: "color/neutral/100", Dark: "color/neutral/black" },
         "color/elevation/surface/raised": { Light: "color/neutral/50", Dark: "color/neutral/850" },
         "color/elevation/surface/scrim": { Light: "color/neutral/alpha/black/a48", Dark: "color/neutral/alpha/black/a80" },
         "color/icon/brand/accent": { Light: "color/brand/400", Dark: "color/brand/400" },
         "color/icon/brand/bold": { Light: "color/brand/500", Dark: "color/brand/300" },
-        "color/icon/brand/bolder": { Light: "color/brand/700", Dark: "color/brand/150" },
+        "color/icon/brand/bolder": { Light: "color/brand/900", Dark: "color/brand/50" },
         "color/icon/danger": { Light: "color/danger/500", Dark: "color/danger/300" },
         "color/icon/disabled": { Light: "color/neutral/alpha/black/a24", Dark: "color/neutral/alpha/white/a16" },
         "color/icon/info": { Light: "color/info/500", Dark: "color/info/300" },
         "color/icon/inverse": { Light: "color/neutral/white", Dark: "color/neutral/950" },
         "color/icon/neutral/bold": { Light: "color/neutral/500", Dark: "color/neutral/300" },
-        "color/icon/neutral/bolder": { Light: "color/neutral/700", Dark: "color/neutral/150" },
+        "color/icon/neutral/bolder": { Light: "color/neutral/900", Dark: "color/neutral/white" },
         "color/icon/success": { Light: "color/success/500", Dark: "color/success/300" },
         "color/icon/warning": { Light: "color/warning/500", Dark: "color/warning/300" },
         "color/text/brand/bold": { Light: "color/brand/500", Dark: "color/brand/300" },
-        "color/text/brand/bolder": { Light: "color/brand/700", Dark: "color/brand/150" },
+        "color/text/brand/bolder": { Light: "color/brand/900", Dark: "color/brand/50" },
         "color/text/danger/bold": { Light: "color/danger/500", Dark: "color/danger/300" },
-        "color/text/danger/bolder": { Light: "color/danger/700", Dark: "color/danger/150" },
+        "color/text/danger/bolder": { Light: "color/danger/900", Dark: "color/danger/50" },
         "color/text/disabled": { Light: "color/neutral/alpha/black/a24", Dark: "color/neutral/alpha/white/a16" },
         "color/text/fixed/dark": { Light: "color/neutral/700", Dark: "color/neutral/700" },
         "color/text/fixed/light": { Light: "color/neutral/white", Dark: "color/neutral/50" },
         "color/text/info/bold": { Light: "color/info/500", Dark: "color/info/300" },
-        "color/text/info/bolder": { Light: "color/info/700", Dark: "color/info/150" },
+        "color/text/info/bolder": { Light: "color/info/900", Dark: "color/info/50" },
         "color/text/inverse": { Light: "color/neutral/white", Dark: "color/neutral/900" },
         "color/text/link": { Light: "color/brand/500", Dark: "color/brand/300" },
         "color/text/neutral/bold": { Light: "color/neutral/500", Dark: "color/neutral/300" },
-        "color/text/neutral/bolder": { Light: "color/neutral/700", Dark: "color/neutral/150" },
+        "color/text/neutral/bolder": { Light: "color/neutral/900", Dark: "color/neutral/white" },
         "color/text/selected/bold": { Light: "color/brand/500", Dark: "color/brand/300" },
-        "color/text/selected/bolder": { Light: "color/brand/700", Dark: "color/brand/150" },
+        "color/text/selected/bolder": { Light: "color/brand/900", Dark: "color/brand/50" },
         "color/text/success/bold": { Light: "color/success/500", Dark: "color/success/300" },
-        "color/text/success/bolder": { Light: "color/success/700", Dark: "color/success/150" },
+        "color/text/success/bolder": { Light: "color/success/900", Dark: "color/success/50" },
         "color/text/warning/bold": { Light: "color/warning/500", Dark: "color/warning/300" },
-        "color/text/warning/bolder": { Light: "color/warning/700", Dark: "color/warning/150" }
+        "color/text/warning/bolder": { Light: "color/warning/900", Dark: "color/warning/50" }
       },
       contrastRequired: [
         { text: "color/text/neutral/bold", background: "color/elevation/surface/canvas", minimum: 4.5 },
@@ -857,7 +880,7 @@
         "{tertiary}": 1
       },
       sameAsRule: "A token with sameAs takes, in every mode, the Theme token that this Appearance token has in that mode, after the canvas and text fill rules (appearance.lightCanvas, appearance.darkCanvas, appearance.textFill). So it always matches the Appearance token. When the Appearance token is not generated (a status role turned off), the ColorScheme token is not generated either.",
-      ownRule: "A token with Light and Dark lists its own Theme tokens. Every mode uses the value of its base (Light or Dark). With followsDarkCanvas, the Dark value moves lighter by as many steps as the dark canvas step moved from its default, like appearance.darkCanvas.followingTokens, but never lighter than followsDarkCanvasLimit. With the step black they keep the values they have at the default.",
+      ownRule: "A token with Light and Dark lists its own Theme tokens. Every mode uses the value of its base (Light or Dark). With followsDarkCanvas, the Dark value moves lighter by as many steps as the dark canvas step is from appearance.darkCanvas.referenceStep, like appearance.darkCanvas.followingTokens, but never lighter than followsDarkCanvasLimit. With the step black they keep the values they have at the default.",
       followsDarkCanvasLimit: 600,
       roleRule: "role names the input role a token belongs to. The token is generated only when that role exists: brand always, danger when it is a status role in use, {secondary} and {tertiary} when that custom role exists. A token without role is always generated.",
       descriptionRule: "Each token's description says what the role is for, in this project's words, based on the Compose ColorScheme documentation. The plugin writes it as the Figma variable's description.",
@@ -1156,9 +1179,9 @@
     400: 0.638,
     300: 0.754,
     200: 0.852,
-    150: 0.892,
-    100: 0.928,
-    50: 0.96
+    150: 0.915,
+    100: 0.95,
+    50: 0.976
   };
   var CHROMA_MULT = {
     50: 0.3,
@@ -1198,9 +1221,9 @@
     400: "#8C8C8C",
     300: "#B1B1B1",
     200: "#C7C7C7",
-    150: "#DBDBDB",
-    100: "#EAEAEA",
-    50: "#F4F4F4"
+    150: "#E3E3E3",
+    100: "#F1F1F1",
+    50: "#F9F9F9"
   };
   var NEUTRAL_CHROMA = 0.015;
   var NEUTRAL_FADE = { 50: 0.55, 100: 0.75, 150: 0.9, 850: 0.9, 900: 0.75, 950: 0.55 };
@@ -1587,19 +1610,24 @@
     const rule = spec.appearance.textFill;
     const listed = rule.tokens.includes(name) || customRoles.some((r) => rule.customRoleTokens.some((t) => t.replace("{role}", r) === name));
     if (!listed) return value;
-    const family = (_a = value.match(/^color\/([^/]+)\/\d+$/)) == null ? void 0 : _a[1];
+    const family = (_a = value.match(/^color\/([^/]+)\/(\d+|white|black)$/)) == null ? void 0 : _a[1];
     if (!family) return value;
     if (typeof step === "number") return `color/${family}/${step}`;
     return family === "neutral" ? `color/neutral/${step}` : `color/${family}/${rule.stepsWithoutColor[step]}`;
   }
   function canvasValueFor(spec, name, value, base, step, customRoles) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const rule = base === "Dark" ? spec.appearance.darkCanvas : spec.appearance.lightCanvas;
     if (rule.canvasTokens.includes(name)) return `color/neutral/${step}`;
     const fixed = (_b = (_a = rule.valuesByStep) == null ? void 0 : _a[String(step)]) == null ? void 0 : _b[name];
     if (fixed) return fixed;
+    const below = (_c = rule.belowCanvasTokens) == null ? void 0 : _c[name];
+    if (below) {
+      const darker = spec.primitives.steps[spec.primitives.steps.indexOf(Number(step)) - below];
+      return `color/neutral/${darker != null ? darker : "black"}`;
+    }
     const following = [
-      ...(_c = rule.followingTokens) != null ? _c : [],
+      ...(_d = rule.followingTokens) != null ? _d : [],
       ...customRoles.flatMap((r) => {
         var _a2;
         return ((_a2 = rule.customRoleFollowingTokens) != null ? _a2 : []).map((t) => t.replace("{role}", r));
@@ -1611,10 +1639,10 @@
   function shiftWithDarkCanvas(spec, value, step) {
     const steps = spec.primitives.steps;
     if (!steps.includes(step)) return value;
-    const shift = steps.indexOf(step) - steps.indexOf(spec.inputs.darkCanvasStep.default);
-    const m = value.match(/^(.*\/)(\d+)$/);
+    const shift = steps.indexOf(step) - steps.indexOf(spec.appearance.darkCanvas.referenceStep);
+    const m = value.match(/^(.*\/)(\d+|black)$/);
     if (!m || shift === 0) return value;
-    const moved = steps[steps.indexOf(Number(m[2])) + shift];
+    const moved = steps[(m[2] === "black" ? -1 : steps.indexOf(Number(m[2]))) + shift];
     return `${m[1]}${moved != null ? moved : "out-of-scale"}`;
   }
   function limitDarkShift(value, limit) {
@@ -2318,7 +2346,8 @@
     const specNames = Object.keys(spec.appearance.tokens);
     const reference = [...specNames, ...names.filter((n) => !specNames.includes(n))];
     const pos = new Map(reference.map((n, i) => [n, i]));
-    const parentOf = (n) => n.split("/").slice(0, -1).join("/");
+    const up = (n) => n.split("/").slice(0, -1).join("/");
+    const parentOf = (n) => pos.has(up(n)) ? up(up(n)) : up(n);
     const firstOfParent = /* @__PURE__ */ new Map();
     for (const n of reference) if (!firstOfParent.has(parentOf(n))) firstOfParent.set(parentOf(n), pos.get(n));
     const rank = (list, x) => list.includes(x) ? list.indexOf(x) : list.length;
@@ -3815,8 +3844,11 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
       // weight styles ticked by default
       lightSteps: tokens_default.inputs.lightCanvasStep.allowed,
       darkSteps: tokens_default.inputs.darkCanvasStep.allowed,
+      darkDefault: tokens_default.inputs.darkCanvasStep.default,
       lightFillSteps: tokens_default.inputs.lightTextFillStep.allowed,
       darkFillSteps: tokens_default.inputs.darkTextFillStep.allowed,
+      lightFillDefault: tokens_default.inputs.lightTextFillStep.default,
+      darkFillDefault: tokens_default.inputs.darkTextFillStep.default,
       steps: [...tokens_default.primitives.steps].sort((a, b) => a - b),
       // palette steps, lightest first
       maxThemes: tokens_default.inputs.numberOfThemes.maximum,

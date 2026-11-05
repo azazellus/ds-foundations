@@ -9,7 +9,7 @@ export const STEPS = [950, 900, 850, 800, 700, 600, 500, 400, 300, 200, 150, 100
 // Section 1.1.4: a smooth ease-in-out curve (tokens.json primitives.targetL)
 export const TARGET_L: Record<number, number> = {
   950: 0.16, 900: 0.189, 850: 0.22, 800: 0.251, 700: 0.323, 600: 0.412,
-  500: 0.519, 400: 0.638, 300: 0.754, 200: 0.852, 150: 0.892, 100: 0.928, 50: 0.96,
+  500: 0.519, 400: 0.638, 300: 0.754, 200: 0.852, 150: 0.915, 100: 0.95, 50: 0.976,
 };
 
 // Section 5.5 step 3: a smooth bell that peaks at 400 (tokens.json primitives.chromaMultiplier)
@@ -49,7 +49,7 @@ const SEARCH_STEP = 0.001;
 export const GRAY_HEX: Record<number, string> = {
   950: "#0D0D0D", 900: "#141414", 850: "#1D1D1D", 800: "#242424", 700: "#303030",
   600: "#4D4D4D", 500: "#696969", 400: "#8C8C8C", 300: "#B1B1B1", 200: "#C7C7C7",
-  150: "#DBDBDB", 100: "#EAEAEA", 50: "#F4F4F4",
+  150: "#E3E3E3", 100: "#F1F1F1", 50: "#F9F9F9",
 };
 
 // Section 1.1.9: a tinted neutral keeps Gray's lightness and gets this chroma at the neutral color's hue,

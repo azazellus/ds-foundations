@@ -752,8 +752,11 @@
   let SLOTS = []; // weight slots: light, regular, medium, semibold, bold
   let LIGHT_STEPS = ["white", 50];
   let DARK_STEPS = [950, 900, 850, "black"];
-  let LIGHT_FILL_STEPS = [700, 800, 850, 900, 950, "black"]; // text fill steps; the first is the default
+  let DARK_DEFAULT = 900;
+  let LIGHT_FILL_STEPS = [700, 800, 850, 900, 950, "black"]; // text fill steps
   let DARK_FILL_STEPS = [150, 100, 50, "white"];
+  let LIGHT_FILL_DEFAULT = 900;
+  let DARK_FILL_DEFAULT = "white";
   // Default names, used when the user types no name (section 5.1).
   let MAX_THEMES = 26;
   let FIRST_THEME_NAME = "Main theme";
@@ -1205,10 +1208,11 @@
     // The text fill list depends on the base, so an extra appearance that changes base gets the other list.
     let base = saved?.base || (kind === "Dark" ? "Dark" : "Light");
     panel.textFill = stepPicker("Text fill");
-    panel.textFill.setOptions(fillOptions(base), String(saved?.textFillStep));
+    const fillDefault = (b) => (b === "Dark" ? DARK_FILL_DEFAULT : LIGHT_FILL_DEFAULT);
+    panel.textFill.setOptions(fillOptions(base), String(saved?.textFillStep ?? fillDefault(base)));
     panel.canvas = stepPicker("Canvas color", () => {
       const picked = panel.canvas.get().base;
-      if (picked !== base) { base = picked; panel.textFill.setOptions(fillOptions(base)); }
+      if (picked !== base) { base = picked; panel.textFill.setOptions(fillOptions(base), String(fillDefault(base))); }
       panel.classList.toggle("dark", base === "Dark"); panel.classList.toggle("light", base !== "Dark");
     });
     panel.canvas.setOptions(kind === "Light" ? light : kind === "Dark" ? dark : [...light, ...dark], saved ? `${saved.base}:${saved.canvasStep}` : undefined);
@@ -1251,7 +1255,7 @@
   function refreshAddDark() {
     document.getElementById("addDark").classList.toggle("hidden", !!darkPanel());
   }
-  document.getElementById("addDark").onclick = () => addAppearance("Dark", { base: "Dark", canvasStep: DARK_STEPS[0] });
+  document.getElementById("addDark").onclick = () => addAppearance("Dark", { base: "Dark", canvasStep: DARK_DEFAULT });
   // A card's colors depend on its steps, so a change there asks the plugin again, like a change of color.
   appearancesBox.addEventListener("change", askNames);
   new MutationObserver(askNames).observe(appearancesBox, { childList: true }); // an appearance added or removed
@@ -1320,10 +1324,9 @@
     }
     applyStatusRoles();
     addAppearance("Light", { base: "Light", canvasStep: inputs.lightCanvasStep ?? LIGHT_STEPS[0], textFillStep: inputs.lightTextFillStep });
-    if (inputs.includeDark !== false) addAppearance("Dark", { base: "Dark", canvasStep: inputs.darkCanvasStep ?? DARK_STEPS[0], textFillStep: inputs.darkTextFillStep });
+    if (inputs.includeDark !== false) addAppearance("Dark", { base: "Dark", canvasStep: inputs.darkCanvasStep ?? DARK_DEFAULT, textFillStep: inputs.darkTextFillStep });
     for (const a of inputs.extraAppearances || []) {
-      const steps = a.base === "Light" ? LIGHT_STEPS : DARK_STEPS;
-      addAppearance("extra", { ...a, canvasStep: a.canvasStep ?? steps[0] });
+      addAppearance("extra", { ...a, canvasStep: a.canvasStep ?? (a.base === "Light" ? LIGHT_STEPS[0] : DARK_DEFAULT) });
     }
     refreshAddDark();
   }
@@ -1531,8 +1534,11 @@
       SLOTS = msg.ui?.slots || [];
       LIGHT_STEPS = msg.ui?.lightSteps || LIGHT_STEPS;
       DARK_STEPS = msg.ui?.darkSteps || DARK_STEPS;
+      DARK_DEFAULT = msg.ui?.darkDefault ?? DARK_DEFAULT;
       LIGHT_FILL_STEPS = msg.ui?.lightFillSteps || LIGHT_FILL_STEPS;
       DARK_FILL_STEPS = msg.ui?.darkFillSteps || DARK_FILL_STEPS;
+      LIGHT_FILL_DEFAULT = msg.ui?.lightFillDefault ?? LIGHT_FILL_DEFAULT;
+      DARK_FILL_DEFAULT = msg.ui?.darkFillDefault ?? DARK_FILL_DEFAULT;
       STEPS = msg.ui?.steps || STEPS;
       MAX_THEMES = msg.ui?.maxThemes || MAX_THEMES;
       FIRST_THEME_NAME = msg.ui?.firstThemeName || FIRST_THEME_NAME;

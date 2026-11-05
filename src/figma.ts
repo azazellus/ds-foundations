@@ -81,8 +81,11 @@ async function settingsForThisFile(): Promise<{ inputs: Inputs | null; hasTokens
       .map((src) => src.split(".")[1]), // weight styles ticked by default
     lightSteps: spec.inputs.lightCanvasStep.allowed,
     darkSteps: spec.inputs.darkCanvasStep.allowed,
+    darkDefault: spec.inputs.darkCanvasStep.default,
     lightFillSteps: spec.inputs.lightTextFillStep.allowed,
     darkFillSteps: spec.inputs.darkTextFillStep.allowed,
+    lightFillDefault: spec.inputs.lightTextFillStep.default,
+    darkFillDefault: spec.inputs.darkTextFillStep.default,
     steps: [...spec.primitives.steps].sort((a, b) => a - b), // palette steps, lightest first
     maxThemes: spec.inputs.numberOfThemes.maximum,
     firstThemeName: spec.collections.Theme.firstModeName, // default names
