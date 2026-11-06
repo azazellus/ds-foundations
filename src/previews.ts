@@ -44,12 +44,12 @@ export function appearancePreviews(
     return {
       canvas: color("color/bg/base"),
       input: color("color/bg/input"),
-      border: color("color/border/neutral/light"),
-      icon: color("color/icon/neutral/bolder"),
-      text: color("color/text/neutral/bolder"),
-      textBold: color("color/text/neutral/bold"),
-      brandBolder: color("color/text/brand/bolder"),
-      brandBold: color("color/text/brand/bold"),
+      border: color("color/border/default"),
+      icon: color("color/icon/default"),
+      text: color("color/text/default"),
+      textBold: color("color/text/subtle"),
+      brandBolder: color("color/text/brand/strong"),
+      brandBold: color("color/text/brand/default"),
       softNeutral: color("color/bg/neutral/softest"),
       softBrand: color("color/bg/brand/softest"),
     };

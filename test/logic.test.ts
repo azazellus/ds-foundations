@@ -7,7 +7,7 @@ import { ANCHOR_CHROMA_REFERENCE, MAX_ADJUSTMENTS, MIN_CHROMA, CHROMA_MULT, buil
 import { validateHex } from "../src/validate.ts";
 import { assignPaletteNames, hslHue, hueDistance, paletteRenames } from "../src/naming.ts";
 import { readFileSync } from "node:fs";
-import { buildPlan, namePalettes, themeModeNames, weightSlotOf } from "../src/foundations.ts";
+import { appearanceRenames, buildPlan, namePalettes, themeModeNames, weightSlotOf } from "../src/foundations.ts";
 import type { Inputs, Plan, ThemeInput } from "../src/foundations.ts";
 import { buildTables } from "../src/tables.ts";
 import { buildTextStyles, buildTextStyleTables, findOrphanTextStyles, shortNumber } from "../src/text-styles.ts";
@@ -15,6 +15,7 @@ import { appearancePreviews } from "../src/previews.ts";
 import { fileHasTokens, inputsToShow, readSavedInputs } from "../src/saved-inputs.ts";
 import { clampWindowSize, WINDOW_SIZE } from "../src/window-size.ts";
 import { buildColorMaps, MAP_BLOCKS, MAP_HEIGHT, MAP_WIDTH } from "../src/color-maps.ts";
+import { chosenPlatforms, skippedCollections, tableSourceAfterWrite } from "../src/selection.ts";
 import { buildAppearanceExport, buildColorSchemeExport, exportFiles, exportName, kotlinFiles } from "../src/export.ts";
 
 // 1. Color math round trip: HEX -> OKLCH -> HEX must return the same value.
@@ -100,7 +101,7 @@ assert.equal(failed.variables.length, 0, "a failed plan must contain no variable
 // 5b. A contrast failure in Appearance stops generation. TEST-ONLY copy of the spec with a
 // requirement no palette can meet; spec/tokens.json is not changed.
 const strict = structuredClone(spec);
-strict.appearance.statusPairings["text/bold"] = 21;
+strict.appearance.statusPairings["text"] = 21;
 const stopped = buildPlan(strict, { numberOfThemes: 1, themes: [themeA] });
 assert.equal(stopped.ok, false);
 assert.ok(stopped.report.some((r) => r.check === "status_pairing" && r.severity === "error"));
@@ -151,7 +152,7 @@ assert.equal(plan.manifest.find((e) => e.name === "color/bg/base" && e.mode === 
 const plan900 = buildPlan(spec, { numberOfThemes: 1, themes: [themeA], darkCanvasStep: 900 });
 const find900 = (name: string) => plan900.variables.find((v) => v.name === name)!;
 assert.deepEqual(find900("color/bg/base").values.Dark, { alias: "color/neutral/900" });
-assert.deepEqual(find900("color/elevation/surface/canvas").values.Dark, { alias: "color/neutral/900" });
+assert.deepEqual(find900("color/elevation/surface/canvas/default").values.Dark, { alias: "color/neutral/900" });
 assert.deepEqual(find900("color/border/inverse").values.Dark, { alias: "color/neutral/950" });
 
 // 5d2. Dark backgrounds and surfaces follow the canvas (section 5.1 table, appearance.darkCanvas).
@@ -165,7 +166,7 @@ for (const step of [950, 900, 850]) {
   assert.equal(p.ok, true, `canvas ${step}: ${JSON.stringify(p.report.filter((r) => r.severity === "error"))}`);
   const dark = (name: string) => (p.variables.find((v) => v.collection === "Appearance" && v.name === name)!.values.Dark as { alias: string }).alias;
   const e = expectedDark[step];
-  assert.equal(dark("color/elevation/surface/canvas"), `color/neutral/${step}`);
+  assert.equal(dark("color/elevation/surface/canvas/default"), `color/neutral/${step}`);
   assert.equal(dark("color/bg/base"), `color/neutral/${step}`);
   for (const [roleToken, role] of [["brand", "brand"], ["danger", "danger"], ["info", "info"], ["neutral", "neutral"],
     ["selected", "brand"], ["success", "success"], ["warning", "warning"]]) {
@@ -173,7 +174,7 @@ for (const step of [950, 900, 850]) {
       assert.equal(dark(`color/bg/${roleToken}/${emph}`), `color/${role}/${e[emph]}`, `canvas ${step} ${roleToken}/${emph}`);
     }
   }
-  for (const s of ["overlay", "menu", "raised"]) assert.equal(dark(`color/elevation/surface/${s}`), `color/neutral/${e[s]}`);
+  for (const s of ["overlay", "menu", "raised"]) assert.equal(dark(`color/elevation/surface/${s === "overlay" ? "overlay/default" : s}`), `color/neutral/${e[s]}`);
   // Tokens outside the list do not move.
   assert.equal(dark("color/border/inverse"), "color/neutral/950");
   // The containers follow the surfaces they match.
@@ -216,11 +217,11 @@ for (const [step, want] of Object.entries(expectedDeep)) {
     "color/elevation/shadow/convex/bottom": [a + "black/a04", a + "black/a20"],
     "color/elevation/shadow/concave/top": [a + "black/a04", a + "black/a12"],
     "color/elevation/shadow/concave/bottom": [a + "white/a48", a + "white/a04"],
-    "color/elevation/surface/canvas": [n + "white", n + "900"],
+    "color/elevation/surface/canvas/default": [n + "white", n + "900"],
     "color/elevation/surface/canvas/deep": [n + "50", n + "950"],
     "color/elevation/surface/canvas/deeper": [n + "100", n + "black"],
     "color/elevation/surface/menu": [n + "50", n + "800"],
-    "color/elevation/surface/overlay": [n + "white", n + "850"],
+    "color/elevation/surface/overlay/default": [n + "white", n + "850"],
     "color/elevation/surface/overlay/deep": [n + "50", n + "900"],
     "color/elevation/surface/overlay/deeper": [n + "100", n + "950"],
     "color/elevation/surface/raised": [n + "50", n + "800"],
@@ -231,12 +232,17 @@ for (const [step, want] of Object.entries(expectedDeep)) {
     "color/bg/action": [n + "white", n + "800"],
   };
   for (const [name, values] of Object.entries(want)) assert.deepEqual(two(name), values, name);
-  assert.deepEqual(two("color/text/neutral/bolder"), [n + "900", n + "white"]);
-  assert.deepEqual(two("color/icon/neutral/bolder"), [n + "900", n + "white"]);
-  assert.deepEqual(two("color/text/brand/bolder"), ["color/brand/900", "color/brand/50"]);
-  // Nested tokens are listed with the token they belong to.
+  assert.deepEqual(two("color/text/default"), [n + "900", n + "white"]);
+  assert.deepEqual(two("color/icon/default"), [n + "900", n + "white"]);
+  assert.deepEqual(two("color/text/brand/strong"), ["color/brand/900", "color/brand/50"]);
+  // Tokens in the same Figma group are listed together: canvas, the surfaces, then overlay.
   const names = p.variables.filter((v) => v.collection === "Appearance").map((v) => v.name);
-  assert.deepEqual(names.filter((x) => x.includes("/elevation/")), Object.keys(want).filter((x) => x.includes("/elevation/")));
+  const e = "color/elevation/";
+  assert.deepEqual(names.filter((x) => x.includes("/elevation/")), [
+    "shadow/card", "shadow/convex/top", "shadow/convex/bottom", "shadow/concave/top", "shadow/concave/bottom",
+    "surface/canvas/default", "surface/canvas/deep", "surface/canvas/deeper", "surface/menu", "surface/raised", "surface/scrim",
+    "surface/overlay/default", "surface/overlay/deep", "surface/overlay/deeper",
+  ].map((x) => e + x));
   assert.deepEqual(names.filter((x) => /^color\/bg\/[a-z]+$/.test(x)), ["color/bg/base", "color/bg/container", "color/bg/disabled", "color/bg/input", "color/bg/action"]);
 }
 assert.ok(checksOf({ numberOfThemes: 1, themes: [themeA], darkCanvasStep: 800 }).includes("missing_input"));
@@ -269,7 +275,7 @@ const find3 = (c: string, name: string) => plan3.variables.find((v) => v.collect
 assert.deepEqual(find3("Theme", "color/brand/500").values["Custom theme 2"], { alias: "Color/Vermilion/500" });
 assert.deepEqual(find3("Theme", "color/neutral/500").values["Custom theme 2"], { alias: "Color/Gray/500" });
 // Dim = Dark with canvas 850; Dark keeps the default 900; Paper = Light.
-assert.deepEqual(find3("Appearance", "color/elevation/surface/canvas").values, {
+assert.deepEqual(find3("Appearance", "color/elevation/surface/canvas/default").values, {
   Light: { alias: "color/neutral/white" }, Dark: { alias: "color/neutral/900" },
   Dim: { alias: "color/neutral/850" }, Paper: { alias: "color/neutral/white" },
 });
@@ -363,7 +369,7 @@ assert.deepEqual(tTheme3.columns, ["MAIN THEME", "CUSTOM THEME", "CUSTOM THEME 2
 assert.ok(tTheme3.info.includes("Main theme, Custom theme and Custom theme 2"));
 assert.equal(tApp3.columns.length, 12);
 assert.ok(tApp3.info.startsWith("Twelve contexts"));
-const canvasRow = tApp3.groups.find((g) => g.name === "color/elevation")!.rows.find((r) => r.name === "color/elevation/surface/canvas")!;
+const canvasRow = tApp3.groups.find((g) => g.name === "color/elevation")!.rows.find((r) => r.name === "color/elevation/surface/canvas/default")!;
 const darkByMode = Object.fromEntries(canvasRow.cells.filter((c) => c.themeMode === "Custom theme 2").map((c) => [c.appMode, c.dark]));
 assert.deepEqual(darkByMode, { Light: false, Dark: true, Dim: true, Paper: false });
 
@@ -374,9 +380,59 @@ assert.deepEqual(groupsInOrder, ["elevation", "bg", "text", "border", "icon"]);
 const sub = (prefix: string) => appNames.filter((n) => n.startsWith(prefix)).map((n) => n.slice(prefix.length));
 assert.deepEqual(sub("color/bg/brand/"), ["bold", "accent", "soft", "softer", "softest"]);
 assert.deepEqual(sub("color/bg/neutral/"), ["bolder", "soft", "softer", "softest"]);
-assert.deepEqual(sub("color/text/brand/"), ["bolder", "bold"]);
-assert.deepEqual(sub("color/icon/brand/"), ["bolder", "bold", "accent"]);
-assert.deepEqual(sub("color/border/brand/"), ["heavy", "light"]); // no emphasis: kept as they are
+assert.deepEqual(sub("color/icon/brand/"), ["default", "strong", "accent"]);
+// Each group starts with its default and its variant; a role's strong variant follows the role.
+for (const [group, first] of [["text", ["color/text/default", "color/text/subtle"]], ["icon", ["color/icon/default", "color/icon/subtle"]], ["border", ["color/border/default", "color/border/strong"]]] as [string, string[]][]) {
+  assert.deepEqual(appNames.filter((n) => n.split("/")[1] === group).slice(0, 2), first, group);
+}
+assert.equal(appNames.indexOf("color/text/brand/strong"), appNames.indexOf("color/text/brand/default") + 1);
+assert.equal(appNames.indexOf("color/border/brand/strong"), appNames.indexOf("color/border/brand/default") + 1);
+// Roles: neutral, brand, selected, success, danger, warning, info, in every group.
+{
+  const rolesIn = (prefix: string) => [...new Set(appNames.filter((n) => n.startsWith(prefix)).map((n) => n.slice(prefix.length).split("/")[0]))];
+  assert.deepEqual(rolesIn("color/bg/"), ["base", "container", "disabled", "input", "action", "neutral", "brand", "selected", "success", "danger", "warning", "info"]);
+  // The neutral default and its variant come first: color/text/default and color/text/subtle, and so on.
+  assert.deepEqual(rolesIn("color/text/"), ["default", "subtle", "disabled", "inverse", "link", "fixed", "brand", "selected", "success", "danger", "warning", "info"]);
+  assert.deepEqual(rolesIn("color/border/"), ["default", "strong", "disabled", "focus", "inverse", "brand", "selected", "success", "danger", "warning", "info"]);
+  assert.deepEqual(rolesIn("color/icon/"), ["default", "subtle", "disabled", "inverse", "brand", "success", "danger", "warning", "info"]);
+}
+// Renamed tokens (section 3.2, appearance.renamedTokens): every new name exists, no old name does, and a file
+// that has an old name gets it renamed in place, unless the new name is already there.
+{
+  const rule = spec.appearance.renamedTokens;
+  for (const [from, to] of Object.entries(rule.tokens) as [string, string][]) {
+    assert.ok(to in spec.appearance.tokens, to);
+    assert.ok(!(from in spec.appearance.tokens), from);
+  }
+  assert.deepEqual(appearanceRenames(spec, [], ["color/text/neutral/bolder", "color/text/brand/bold", "color/bg/base"]),
+    { "color/text/neutral/bolder": "color/text/default", "color/text/brand/bold": "color/text/brand/default" });
+  // Both names in the file: nothing is renamed (Figma would refuse a duplicate name). The old one is reported as an orphan.
+  assert.deepEqual(appearanceRenames(spec, [], ["color/border/neutral/light", "color/border/default"]), {});
+  // Custom roles are renamed too.
+  assert.deepEqual(appearanceRenames(spec, ["promo"], ["color/text/promo/bold", "color/text/promo/bolder"]),
+    { "color/text/promo/bold": "color/text/promo/default", "color/text/promo/bolder": "color/text/promo/strong" });
+  assert.deepEqual(appearanceRenames(spec, [], []), {});
+  // Canvas and overlay moved into their own groups, next to deep and deeper.
+  assert.deepEqual(appearanceRenames(spec, [], ["color/elevation/surface/canvas", "color/elevation/surface/canvas/deep", "color/elevation/surface/overlay"]), {
+    "color/elevation/surface/canvas": "color/elevation/surface/canvas/default", "color/elevation/surface/overlay": "color/elevation/surface/overlay/default",
+  });
+}
+// Theme: neutral runs from black to white, roles keep their order, and alpha runs from a96 to a00 for every color.
+{
+  const p = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, custom: { promo: { hex: "#D6336C" } } }], customRoles: ["promo"] });
+  const themeNames = p.variables.filter((v) => v.collection === "Theme").map((v) => v.name);
+  const stepsOf = (role: string) => themeNames.filter((n) => n.startsWith(`color/${role}/`) && !n.includes("/alpha/")).map((n) => n.split("/")[2]);
+  const scale = ["950", "900", "850", "800", "700", "600", "500", "400", "300", "200", "150", "100", "50"];
+  assert.deepEqual(stepsOf("neutral"), ["black", ...scale, "white"]);
+  assert.deepEqual(stepsOf("brand"), scale);
+  assert.deepEqual([...new Set(themeNames.filter((n) => /^color\/[^/]+\/\d+$/.test(n)).map((n) => n.split("/")[1]))], ["neutral", "brand", "success", "danger", "warning", "info", "promo"]);
+  const down = ["96", "88", "80", "64", "48", "40", "36", "24", "20", "16", "12", "08", "06", "04", "00"].map((o) => `a${o}`);
+  for (const group of ["neutral/alpha/black", "neutral/alpha/white", "brand/alpha", "success/alpha", "danger/alpha", "warning/alpha", "info/alpha", "promo/alpha"]) {
+    assert.deepEqual(themeNames.filter((n) => n.startsWith(`color/${group}/`)).map((n) => n.split("/").pop()), down, group);
+  }
+  // Primitives keep their own order.
+  assert.deepEqual(p.variables.filter((v) => v.collection === "Primitives" && v.name.startsWith("Opacity/")).map((v) => v.name).slice(0, 3), ["Opacity/0", "Opacity/4", "Opacity/6"]);
+}
 // The tables use the same order even when the file's variables come in another order (shuffled here).
 const shuffled = { collections: plan.collections, variables: [...plan.variables].reverse() };
 const [, , tAppShuffled] = buildTables(spec, shuffled);
@@ -449,7 +505,7 @@ for (const viaExtra of [false, true]) {
   assert.equal(p.ok, true, JSON.stringify(p.report.filter((r) => r.severity === "error")));
   const mode = viaExtra ? "Paper" : "Light";
   const val = (name: string) => (p.variables.find((v) => v.collection === "Appearance" && v.name === name)!.values[mode] as { alias: string }).alias;
-  assert.equal(val("color/elevation/surface/canvas"), "color/neutral/50");
+  assert.equal(val("color/elevation/surface/canvas/default"), "color/neutral/50");
   assert.equal(val("color/bg/base"), "color/neutral/50");
   assert.equal(val("color/elevation/surface/menu"), "color/neutral/white");
   assert.equal(val("color/elevation/surface/raised"), "color/neutral/100");
@@ -493,13 +549,13 @@ assert.deepEqual(planC2.variables.find((v) => v.name === "color/bg/promo/soft")!
 const planC3 = buildPlan(spec, { numberOfThemes: 1, themes: [promoA], customRoles: ["promo"], darkCanvasStep: 900 });
 assert.deepEqual(planC3.variables.find((v) => v.name === "color/bg/promo/soft")!.values, { Light: { alias: "color/promo/150" }, Dark: { alias: "color/promo/700" } });
 // Checks: canvas contrast and status pairings ran for promo.
-const promoChecks = planC.manifest.filter((e) => e.name === "color/text/promo/bold" && e.mode === "Light")[0].contrast!;
-assert.ok(promoChecks.some((c) => c.against === "color/elevation/surface/canvas"));
+const promoChecks = planC.manifest.filter((e) => e.name === "color/text/promo/default" && e.mode === "Light")[0].contrast!;
+assert.ok(promoChecks.some((c) => c.against === "color/elevation/surface/canvas/default"));
 assert.ok(promoChecks.some((c) => c.against === "color/bg/promo/softer"));
 // Ordered after the built-in tokens of each group.
 const appC = planC.variables.filter((v) => v.collection === "Appearance").map((v) => v.name);
-assert.ok(appC.indexOf("color/bg/promo/bold") > appC.indexOf("color/bg/warning/softest"));
-assert.ok(appC.indexOf("color/bg/promo/bold") < appC.indexOf("color/text/neutral/bolder"));
+assert.ok(appC.indexOf("color/bg/promo/bold") > appC.indexOf("color/bg/info/softest"));
+assert.ok(appC.indexOf("color/bg/promo/bold") < appC.indexOf("color/text/default"));
 assert.deepEqual(appC.filter((n) => n.startsWith("color/bg/promo/")).map((n) => n.split("/")[3]), ["bold", "soft", "softer", "softest"]);
 // Invalid role names, and a missing color in one theme, stop generation.
 for (const bad of [["Promo"], ["promo", "promo"], ["brand"], ["link"], [""], ["a b"], ["a_b"], ["a/b"], ["a.b"], ["-x"], ["x-"], ["a--b"]]) {
@@ -561,7 +617,7 @@ assert.deepEqual(Object.keys(exLight), [...Object.keys(exLight)].sort((a, b) => 
 const resolved = (name: string, mode: string, t: string) =>
   (plan2.manifest.find((e) => e.name === name && e.mode === mode)!.resolved_hex as Record<string, string>)[t];
 assert.equal(exLight["bg.brand.bold"], resolved("color/bg/brand/bold", "Light", "Main theme"));
-assert.equal(ex.data.themes["Custom theme"].appearances.Dark["text.brand.bold"], resolved("color/text/brand/bold", "Dark", "Custom theme"));
+assert.equal(ex.data.themes["Custom theme"].appearances.Dark["text.brand.default"], resolved("color/text/brand/default", "Dark", "Custom theme"));
 assert.notEqual(ex.data.themes["Main theme"].appearances.Light["bg.brand.bold"], ex.data.themes["Custom theme"].appearances.Light["bg.brand.bold"]);
 // Alpha-based tokens become 8-digit HEX: the color source plus its opacity.
 const disabledTarget = (plan2.variables.find((v) => v.name === "color/bg/disabled")!.values.Light as { alias: string }).alias;
@@ -739,7 +795,7 @@ const twoCustom = buildPlan(spec, {
 });
 assert.equal(twoCustom.ok, true, JSON.stringify(twoCustom.report.filter((r) => r.severity === "error")));
 assert.equal(scheme(twoCustom).length, csSpec.length);
-assert.deepEqual(schemeVar(twoCustom, "onTertiaryContainer").values, appVar(twoCustom, "color/text/sea/bolder").values);
+assert.deepEqual(schemeVar(twoCustom, "onTertiaryContainer").values, appVar(twoCustom, "color/text/sea/strong").values);
 assert.equal((schemeVar(twoCustom, "tertiaryFixedDim").values.Dark as { alias: string }).alias, "color/sea/200");
 // Same modes as Appearance, and aliases to Theme tokens.
 for (const p of [plan, plan3]) {
@@ -809,7 +865,7 @@ assert.ok(onPrimaryLight.contrast!.some((c) => c.against === "primary" && c.pass
 // TEST-ONLY copy of the spec with the old onSurfaceVariant (Gray 500 on Gray 150 in Light): generation stops.
 const oldVariant = structuredClone(spec);
 const ov = oldVariant.colorScheme.tokens.find((t: any) => t.name === "onSurfaceVariant");
-delete ov.Light; delete ov.Dark; ov.sameAs = "color/text/neutral/bold";
+delete ov.Light; delete ov.Dark; ov.sameAs = "color/text/subtle";
 const failing = buildPlan(oldVariant, { numberOfThemes: 1, themes: [themeA] });
 assert.equal(failing.ok, false);
 assert.ok(failing.report.some((r) => r.check === "contrast_minimum" && r.severity === "error" && r.collection === "ColorScheme"
@@ -1012,34 +1068,47 @@ assert.ok(twoCustom.variables.filter((v) => v.collection === "Appearance").every
   };
   // The defaults are the values in appearance.tokens.
   const plain = planOf({});
-  assert.equal(value(plain, "color/text/neutral/bolder", "Light"), "color/neutral/900");
-  assert.equal(value(plain, "color/text/neutral/bolder", "Dark"), "color/neutral/white");
-  assert.equal(value(plain, "color/text/brand/bolder", "Dark"), "color/brand/50");
+  assert.equal(value(plain, "color/text/default", "Light"), "color/neutral/900");
+  assert.equal(value(plain, "color/text/default", "Dark"), "color/neutral/white");
+  assert.equal(value(plain, "color/text/brand/strong", "Dark"), "color/brand/50");
   // Another step moves every bolder text and icon token, in its own family, in that mode only.
   // Dark's stored neutral value is white, which is not a number: the rule must still move it.
   const p150 = planOf({ darkTextFillStep: 150 });
-  assert.equal(value(p150, "color/text/neutral/bolder", "Dark"), "color/neutral/150");
-  assert.equal(value(p150, "color/icon/neutral/bolder", "Dark"), "color/neutral/150");
-  assert.equal(value(p150, "color/text/brand/bolder", "Dark"), "color/brand/150");
-  const p900 = planOf({ lightTextFillStep: 700 });
-  assert.equal(p900.ok, true);
-  for (const [name, family] of [["color/text/neutral/bolder", "neutral"], ["color/text/brand/bolder", "brand"], ["color/text/selected/bolder", "brand"],
-    ["color/text/danger/bolder", "danger"], ["color/icon/neutral/bolder", "neutral"], ["color/icon/brand/bolder", "brand"]]) {
-    assert.equal(value(p900, name, "Light"), `color/${family}/700`, name);
-    assert.equal(value(p900, name, "Dark"), value(plain, name, "Dark"), name);
+  assert.equal(value(p150, "color/text/default", "Dark"), "color/neutral/150");
+  assert.equal(value(p150, "color/icon/default", "Dark"), "color/neutral/150");
+  assert.equal(value(p150, "color/text/brand/strong", "Dark"), "color/brand/150");
+  const p700 = planOf({ lightTextFillStep: 700 });
+  assert.equal(p700.ok, true);
+  for (const [name, family] of [["color/text/default", "neutral"], ["color/text/brand/strong", "brand"], ["color/text/selected/strong", "brand"],
+    ["color/text/danger/strong", "danger"], ["color/icon/default", "neutral"], ["color/icon/brand/strong", "brand"]]) {
+    assert.equal(value(p700, name, "Light"), `color/${family}/700`, name);
+    assert.equal(value(p700, name, "Dark"), value(plain, name, "Dark"), name);
   }
-  // Nothing else changes: not the bold tokens, and not the bolder background.
-  const moved = new Set([...spec.appearance.textFill.tokens]);
-  for (const v of p900.variables.filter((x) => x.collection === "Appearance" && !moved.has(x.name))) {
+  // Nothing else changes: not the bold tokens, and not the bolder background. Fixed dark text follows Light's step.
+  const moved = new Set([...spec.appearance.textFill.tokens, "color/text/fixed/dark"]);
+  for (const v of p700.variables.filter((x) => x.collection === "Appearance" && !moved.has(x.name))) {
     assert.deepEqual(v.values, plain.variables.find((x) => x.collection === "Appearance" && x.name === v.name)!.values, v.name);
+  }
+  // The fixed text tokens are the bolder neutral of one base, at that base's step, in every mode.
+  for (const [inputs, dark, light] of [[{}, "900", "white"], [{ lightTextFillStep: 800, darkTextFillStep: 100 }, "800", "100"],
+    [{ lightTextFillStep: "black", darkTextFillStep: 50, extraAppearances: [{ name: "Dim", base: "Dark", canvasStep: 850, textFillStep: 150 }, { name: "Paper", base: "Light", textFillStep: 700 }] }, "black", "50"],
+    [{ includeDark: false, darkTextFillStep: 150 }, "900", "150"]] as [Partial<Inputs>, string, string][]) {
+    const p = planOf(inputs);
+    const modes = p.collections.find((c) => c.name === "Appearance")!.modes;
+    for (const m of modes) {
+      assert.equal(value(p, "color/text/fixed/dark", m), `color/neutral/${dark}`, `${JSON.stringify(inputs)} ${m}`);
+      assert.equal(value(p, "color/text/fixed/light", m), `color/neutral/${light}`, `${JSON.stringify(inputs)} ${m}`);
+    }
+    assert.equal(value(p, "color/text/fixed/dark", "Light"), value(p, "color/text/default", "Light"));
+    if (modes.includes("Dark")) assert.equal(value(p, "color/text/fixed/light", "Dark"), value(p, "color/text/default", "Dark"));
   }
   // Black and white exist only in neutral.
   const ends = planOf({ lightTextFillStep: "black", darkTextFillStep: "white" });
   assert.equal(ends.ok, true);
-  assert.equal(value(ends, "color/text/neutral/bolder", "Light"), "color/neutral/black");
-  assert.equal(value(ends, "color/text/brand/bolder", "Light"), "color/brand/950");
-  assert.equal(value(ends, "color/text/neutral/bolder", "Dark"), "color/neutral/white");
-  assert.equal(value(ends, "color/text/brand/bolder", "Dark"), "color/brand/50");
+  assert.equal(value(ends, "color/text/default", "Light"), "color/neutral/black");
+  assert.equal(value(ends, "color/text/brand/strong", "Light"), "color/brand/950");
+  assert.equal(value(ends, "color/text/default", "Dark"), "color/neutral/white");
+  assert.equal(value(ends, "color/text/brand/strong", "Dark"), "color/brand/50");
   // ColorScheme tokens that are the same as a bolder token follow it.
   assert.equal(value(ends, "onSurface", "Light"), "color/neutral/black");
   assert.equal(value(ends, "onPrimaryContainer", "Dark"), "color/brand/50");
@@ -1047,10 +1116,10 @@ assert.ok(twoCustom.variables.filter((v) => v.collection === "Appearance").every
   const extra = buildPlan(spec, { numberOfThemes: 1, themes: [{ ...themeA, custom: { promo: { hex: "#127681" } } }], customRoles: ["promo"],
     extraAppearances: [{ name: "Oled", base: "Dark", canvasStep: "black", textFillStep: "white" }, { name: "Dim", base: "Dark" }, { name: "Paper", base: "Light", textFillStep: "850" }] });
   assert.equal(extra.ok, true, JSON.stringify(extra.report.filter((r) => r.severity === "error")));
-  assert.equal(value(extra, "color/text/neutral/bolder", "Oled"), "color/neutral/white");
-  assert.equal(value(extra, "color/text/promo/bolder", "Oled"), "color/promo/50");
-  assert.equal(value(extra, "color/text/neutral/bolder", "Dim"), "color/neutral/white"); // the default
-  assert.equal(value(extra, "color/text/promo/bolder", "Paper"), "color/promo/850");
+  assert.equal(value(extra, "color/text/default", "Oled"), "color/neutral/white");
+  assert.equal(value(extra, "color/text/promo/strong", "Oled"), "color/promo/50");
+  assert.equal(value(extra, "color/text/default", "Dim"), "color/neutral/white"); // the default
+  assert.equal(value(extra, "color/text/promo/strong", "Paper"), "color/promo/850");
   // A step from the other list, or an unknown one, stops generation.
   for (const bad of [{ lightTextFillStep: 150 }, { lightTextFillStep: "white" }, { darkTextFillStep: 700 }, { darkTextFillStep: "black" },
     { extraAppearances: [{ name: "Oled", base: "Dark", textFillStep: 700 }] }, { extraAppearances: [{ name: "Paper", base: "Light", textFillStep: 150 }] }]) {
@@ -1073,7 +1142,7 @@ assert.ok(twoCustom.variables.filter((v) => v.collection === "Appearance").every
   const black = planOf({ darkCanvasStep: "black" });
   const at950 = planOf({ darkCanvasStep: 950 });
   assert.equal(black.ok, true);
-  assert.equal(value(black, "color/elevation/surface/canvas", "Dark"), "color/neutral/black");
+  assert.equal(value(black, "color/elevation/surface/canvas/default", "Dark"), "color/neutral/black");
   assert.equal(value(black, "color/bg/base", "Dark"), "color/neutral/black");
   assert.equal(value(black, "surface", "Dark"), "color/neutral/black");
   const canvasTokens = new Set(spec.appearance.darkCanvas.canvasTokens);
@@ -1114,7 +1183,7 @@ assert.ok(twoCustom.variables.filter((v) => v.collection === "Appearance").every
   // The card shows exactly what the plan writes.
   const planned = buildPlan(spec, inputs);
   assert.equal(value(planned, "color/bg/neutral/softest", "Oled"), "color/neutral/900");
-  assert.equal(value(planned, "color/text/brand/bolder", "Light"), "color/brand/950");
+  assert.equal(value(planned, "color/text/brand/strong", "Light"), "color/brand/950");
 }
 
 // 24. Light steps (sections 1.1.4 and 5.5): the code and tokens.json hold the same curves. Colored palettes get
@@ -1415,6 +1484,72 @@ assert.deepEqual([CHROMA_MULT[800], CHROMA_MULT[850], CHROMA_MULT[900], CHROMA_M
 {
   const dark = [700, 800, 850, 900, 950].map((s) => CHROMA_MULT[s]);
   dark.slice(1).forEach((m, i) => assert.ok(m < dark[i], "the multipliers fall toward 950"));
+}
+
+// Section 5.1: choosing what Generate tokens writes (inputs.collections and inputs.textStylePlatforms).
+{
+  const base: Inputs = { numberOfThemes: 1, themes: [themeA] };
+  const names = (p: Plan, c: string) => p.variables.filter((v) => v.collection === c).map((v) => JSON.stringify(v));
+  const collectionsOf = (p: Plan) => p.collections.map((c) => c.name);
+
+  // Nothing chosen means everything, as before.
+  assert.deepEqual(skippedCollections(spec, base), []);
+  assert.deepEqual(chosenPlatforms(spec, base), ["android", "ios", "web"]);
+  assert.deepEqual(spec.inputs.textStylePlatforms.allowed, Object.keys(spec.textStyles.groups), "one platform per text style group");
+  assert.deepEqual(skippedCollections(spec, { ...base, collections: ["ColorScheme"] }), ["Appearance"]);
+  assert.deepEqual(chosenPlatforms(spec, { ...base, textStylePlatforms: ["web", "ios"] }), ["ios", "web"], "in the spec's order");
+
+  // Unticked collections are left out of the plan. What is written is the same as with everything ticked.
+  const full = buildPlan(spec, base);
+  const onlyScheme = buildPlan(spec, { ...base, collections: ["ColorScheme"] });
+  assert.ok(onlyScheme.ok);
+  assert.deepEqual(collectionsOf(onlyScheme), ["Primitives", "Theme", "ColorScheme"]);
+  assert.equal(names(onlyScheme, "Appearance").length, 0);
+  assert.ok(onlyScheme.manifest.every((e) => e.collection !== "Appearance"));
+  for (const c of ["Primitives", "Theme", "ColorScheme"]) assert.deepEqual(names(onlyScheme, c), names(full, c), `${c} unchanged`);
+  const none = buildPlan(spec, { ...base, collections: [] });
+  assert.deepEqual(collectionsOf(none), ["Primitives", "Theme"]);
+  for (const c of ["Primitives", "Theme"]) assert.deepEqual(names(none, c), names(full, c), `${c} unchanged`);
+  assert.deepEqual(collectionsOf(buildPlan(spec, { ...base, collections: ["Appearance"] })), ["Primitives", "Theme", "Appearance"]);
+
+  // An unticked collection is not checked, so it cannot stop generation (TEST-ONLY strict copies of the spec).
+  const strictApp = structuredClone(spec);
+  strictApp.appearance.statusPairings["text"] = 21;
+  assert.equal(buildPlan(strictApp, base).ok, false);
+  const skipApp = buildPlan(strictApp, { ...base, collections: ["ColorScheme"] });
+  assert.ok(skipApp.ok, "Appearance problems do not count when Appearance is not written");
+  assert.ok(skipApp.report.every((r) => r.collection !== "Appearance"));
+  const strictScheme = structuredClone(spec);
+  for (const pair of strictScheme.colorScheme.contrastRequired) pair.minimum = 21;
+  assert.equal(buildPlan(strictScheme, base).ok, false);
+  assert.ok(buildPlan(strictScheme, { ...base, collections: ["Appearance"] }).ok);
+  // Input checks still count: the inputs shape the collections that are written too.
+  assert.ok(checksOf({ ...base, collections: [], darkCanvasStep: 800 }).includes("missing_input"));
+  // Only the names in tokens.json can be chosen.
+  assert.ok(checksOf({ ...base, collections: ["Primitives"] }).includes("missing_input"));
+  assert.ok(checksOf({ ...base, textStylePlatforms: ["desktop"] }).includes("missing_input"));
+
+  // Text styles: only the chosen platforms, and their warnings only.
+  const allStyles = buildTextStyles(spec, full).styles;
+  const iosOnly = buildTextStyles(spec, full, ["ios"]);
+  assert.deepEqual(iosOnly.styles, allStyles.filter((st) => st.name.startsWith("ios/")));
+  assert.deepEqual(buildTextStyles(spec, full, []), { styles: [], report: [] }, "no platform: no style and no warning");
+
+  // Tables after a write: the plan for what it wrote, the file for the unticked collections.
+  const fromFile = { collections: full.collections, variables: full.variables };
+  const merged = tableSourceAfterWrite(onlyScheme, fromFile, ["Appearance"]);
+  assert.deepEqual(merged.collections.map((c) => c.name).sort(), ["Appearance", "ColorScheme", "Primitives", "Theme"]);
+  assert.equal(merged.variables.length, full.variables.length);
+  assert.deepEqual(buildTables(spec, merged).map((t) => t.collection), ["Primitives", "Theme", "Appearance", "ColorScheme"]);
+  const emptyFile = { collections: [], variables: [] };
+  assert.deepEqual(buildTables(spec, tableSourceAfterWrite(onlyScheme, emptyFile, ["Appearance"])).map((t) => t.collection),
+    ["Primitives", "Theme", "ColorScheme"], "a file without the unticked collection has no table for it");
+
+  // The window's checkboxes use the names in tokens.json.
+  const page = readFileSync(new URL("../ui.html", import.meta.url), "utf8");
+  const values = (cls: string) => [...page.matchAll(new RegExp(`class="cb ${cls}" value="([^"]+)"`, "g"))].map((m) => m[1]);
+  assert.deepEqual(values("choose-collection"), spec.inputs.collections.allowed);
+  assert.deepEqual(values("choose-platform"), spec.inputs.textStylePlatforms.allowed);
 }
 
 console.log("All logic tests passed.");

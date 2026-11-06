@@ -3,9 +3,10 @@
 // Implements foundations-spec.md sections 5.8 and 6.3. It never deletes variables or modes.
 
 import spec from "../spec/tokens.json";
-import { buildPlan, hueOnlyShifts, namePalettes } from "./foundations.ts";
+import { buildPlan, hueOnlyShifts, namePalettes, appearanceRenames } from "./foundations.ts";
 import type { CollectionName, Inputs, Plan, ReportEntry, Value, VariableDef } from "./foundations.ts";
 import { appearancePreviews } from "./previews.ts";
+import { chosenPlatforms, skippedCollections, tableSourceAfterWrite } from "./selection.ts";
 import { fileHasTokens, inputsToShow, readSavedInputs } from "./saved-inputs.ts";
 import { clampWindowSize, WINDOW_SIZE } from "./window-size.ts";
 import { buildTables } from "./tables.ts";
@@ -129,15 +130,26 @@ figma.ui.onmessage = async (msg: {
     let modes: ModeMatch[] = [];
     // Palettes whose name changed are renamed in place (section 1.1.8), so they are not orphans.
     let renames: Record<string, string> = {};
-    // The text styles this plan asks for (section 6.1.3). Nothing is written yet.
-    const textStyles = plan.ok ? buildTextStyles(spec, plan) : { styles: [], report: [] };
+    // Appearance tokens with a new name in this version are renamed in place too (section 3.2).
+    let tokenRenames: Record<string, string> = {};
+    // Collections the user did not choose (section 5.1): not written, and what the file holds in them is left alone,
+    // so their variables and modes are not orphans and their tokens are not renamed.
+    const skipped: string[] = skippedCollections(spec, inputs);
+    const inChosenCollection = (r: ReportEntry): boolean => !skipped.includes(r.collection);
+    // The text styles this plan asks for, for the chosen platforms only (section 6.1.3). Nothing is written yet.
+    const textStyles = plan.ok ? buildTextStyles(spec, plan, chosenPlatforms(spec, inputs)) : { styles: [], report: [] };
     if (plan.ok) {
       modes = matchModes(plan, inputs, collections);
       renames = plannedPaletteRenames(plan, existing, collections);
+      if (!skipped.includes("Appearance")) {
+        tokenRenames = appearanceRenames(spec, inputs.customRoles ?? [], appearanceVariables(existing, collections).map((v) => v.name));
+      }
       const renamed = (name: string) => Object.keys(renames).some((old) => name.startsWith(`Color/${old}/`));
       report.push(
-        ...findOrphans(plan, existing, collections).filter((r) => !(r.collection === "Primitives" && renamed(r.token))),
-        ...findOrphanModes(modes, collections),
+        ...findOrphans(plan, existing, collections).filter((r) => inChosenCollection(r)
+          && !(r.collection === "Primitives" && renamed(r.token))
+          && !(r.collection === "Appearance" && r.token in tokenRenames)),
+        ...findOrphanModes(modes, collections).filter(inChosenCollection),
         ...textStyles.report,
         ...findOrphanTextStyles(spec, (await figma.getLocalTextStylesAsync()).map((s) => s.name)),
       );
@@ -147,8 +159,9 @@ figma.ui.onmessage = async (msg: {
     if (plan.ok && msg.write) {
       checkRenames(modes, collections); // stops before anything is written
       const renamedPalettes = renamePalettes(renames, existing, collections);
+      const renamedTokens = renameAppearanceTokens(tokenRenames, existing, collections);
       summary = writePlan(plan, existing, collections, modes);
-      summary.renamed = renamedPalettes;
+      summary.renamed = [...renamedPalettes, ...renamedTokens];
       await storePaletteSources(plan);
       // The variables are already written, so a problem with a text style is reported but does not undo anything.
       try {
@@ -157,10 +170,12 @@ figma.ui.onmessage = async (msg: {
       } catch (e) {
         summary.problems.push(`Text styles were not written: ${e instanceof Error ? e.message : String(e)}`);
       }
-      // Redraw the color tables on the "Color tokens" page. The variables are already written,
+      // Redraw the color tables on the "Color tokens" page. A collection that was not chosen is read from the file,
+      // so its table shows it as the file holds it. The variables are already written,
       // so a drawing problem is reported but does not undo anything.
       try {
-        summary.tablesPage = (await drawColorTables(buildTables(spec, plan), buildColorMaps(plan))).page;
+        const source = skipped.length ? tableSourceAfterWrite(plan, await readLiveVariables(), skipped) : plan;
+        summary.tablesPage = (await drawColorTables(buildTables(spec, source), buildColorMaps(source))).page;
       } catch (e) {
         summary.problems.push(`Color tables were not drawn: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -338,6 +353,25 @@ async function readLiveVariables(keepAlpha = false): Promise<TableSource> {
 function rgbaToHex(c: RGBA, keepAlpha = false): string {
   const channels = keepAlpha && c.a !== undefined && c.a < 1 ? [c.r, c.g, c.b, c.a] : [c.r, c.g, c.b];
   return "#" + channels.map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+// The variables of the Appearance collection.
+function appearanceVariables(existing: Variable[], collections: VariableCollection[]): Variable[] {
+  const id = collections.find((c) => c.name === "Appearance")?.id;
+  return existing.filter((v) => v.variableCollectionId === id);
+}
+
+// Renames Appearance variables in place (old name -> new name), so layers that use them keep working.
+// Returns one line per renamed variable.
+function renameAppearanceTokens(renames: Record<string, string>, existing: Variable[], collections: VariableCollection[]): string[] {
+  const done: string[] = [];
+  for (const v of appearanceVariables(existing, collections)) {
+    const to = renames[v.name];
+    if (!to) continue;
+    done.push(`Appearance token ${v.name} was renamed to ${to}.`);
+    v.name = to;
+  }
+  return done;
 }
 
 // Every local variable that is not in the plan is reported, and left alone.

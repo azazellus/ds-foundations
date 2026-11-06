@@ -22,7 +22,7 @@
 
   // spec/tokens.json
   var tokens_default = {
-    version: "1.30.0",
+    version: "1.35.0",
     description: "Source of truth for the design foundations specification (foundations-spec.md). Palette HEX values are user inputs and palette names come from primitives.paletteNaming; this file defines the rules, inputs, Theme mappings, alpha tokens, Appearance mappings, and ColorScheme mappings.",
     collections: {
       Primitives: { modes: ["Default"] },
@@ -440,6 +440,23 @@
         },
         rule: "An empty or missing name uses defaultName, numbered like theme names: Custom appearance, Custom appearance 2, Custom appearance 3, ... An extra appearance copies the Light or Dark value of every Appearance token. A Light-based one applies appearance.lightCanvas and a Dark-based one applies appearance.darkCanvas, each with its own canvasStep. Each one also applies appearance.textFill with its own textFillStep. Renaming follows collections.modeRules.rename."
       },
+      collections: {
+        scope: "global",
+        requirement: "optional",
+        type: "list",
+        allowed: ["Appearance", "ColorScheme"],
+        default: ["Appearance", "ColorScheme"],
+        alwaysWritten: ["Primitives", "Theme"],
+        rule: "Which collections Generate tokens writes, besides Primitives and Theme, which are always written because the other collections link to them. A collection that is not listed is not written and its checks are skipped. Its variables and modes already in the file are left as they are, and are not reported as orphan_variable or orphan_mode. ColorScheme does not need Appearance: it links to Theme. Its color table is drawn from the file, as the file holds it."
+      },
+      textStylePlatforms: {
+        scope: "global",
+        requirement: "optional",
+        type: "list",
+        allowed: ["android", "ios", "web"],
+        default: ["android", "ios", "web"],
+        rule: "Which text style groups (textStyles.groups) Generate tokens writes. A group that is not listed is not written and its warnings are skipped. Its text styles already in the file are left as they are. With an empty list, no text style is written."
+      },
       reservedHueNames: ["Gray", "Black", "White"]
     },
     theme: {
@@ -459,8 +476,8 @@
         otherRoleCount: 13
       },
       alpha: {
-        opacities: [0, 4, 6, 8, 12, 16, 20, 24, 36, 40, 48, 64, 80, 88, 96],
-        coloredRoles: ["brand", "danger", "success", "warning", "info"],
+        opacities: [96, 88, 80, 64, 48, 40, 36, 24, 20, 16, 12, 8, 6, 4, 0],
+        coloredRoles: ["brand", "success", "danger", "warning", "info"],
         coloredSourceStep: 500,
         coloredNamePattern: "color/{role}/alpha/a{NN}",
         neutralNamePattern: "color/neutral/alpha/{black|white}/a{NN}",
@@ -468,111 +485,111 @@
         neutralSource: { black: "Color/Black", white: "Color/White" },
         counts: { perColoredRolePerTheme: 15, neutral: 30, coloredTotalPerTheme: 75 },
         tokens: [
-          { name: "color/neutral/alpha/black/a00", colorSource: "Color/Black", opacity: 0 },
-          { name: "color/neutral/alpha/black/a04", colorSource: "Color/Black", opacity: 4 },
-          { name: "color/neutral/alpha/black/a06", colorSource: "Color/Black", opacity: 6 },
-          { name: "color/neutral/alpha/black/a08", colorSource: "Color/Black", opacity: 8 },
-          { name: "color/neutral/alpha/black/a12", colorSource: "Color/Black", opacity: 12 },
-          { name: "color/neutral/alpha/black/a16", colorSource: "Color/Black", opacity: 16 },
-          { name: "color/neutral/alpha/black/a20", colorSource: "Color/Black", opacity: 20 },
-          { name: "color/neutral/alpha/black/a24", colorSource: "Color/Black", opacity: 24 },
-          { name: "color/neutral/alpha/black/a36", colorSource: "Color/Black", opacity: 36 },
-          { name: "color/neutral/alpha/black/a40", colorSource: "Color/Black", opacity: 40 },
-          { name: "color/neutral/alpha/black/a48", colorSource: "Color/Black", opacity: 48 },
-          { name: "color/neutral/alpha/black/a64", colorSource: "Color/Black", opacity: 64 },
-          { name: "color/neutral/alpha/black/a80", colorSource: "Color/Black", opacity: 80 },
-          { name: "color/neutral/alpha/black/a88", colorSource: "Color/Black", opacity: 88 },
           { name: "color/neutral/alpha/black/a96", colorSource: "Color/Black", opacity: 96 },
-          { name: "color/neutral/alpha/white/a00", colorSource: "Color/White", opacity: 0 },
-          { name: "color/neutral/alpha/white/a04", colorSource: "Color/White", opacity: 4 },
-          { name: "color/neutral/alpha/white/a06", colorSource: "Color/White", opacity: 6 },
-          { name: "color/neutral/alpha/white/a08", colorSource: "Color/White", opacity: 8 },
-          { name: "color/neutral/alpha/white/a12", colorSource: "Color/White", opacity: 12 },
-          { name: "color/neutral/alpha/white/a16", colorSource: "Color/White", opacity: 16 },
-          { name: "color/neutral/alpha/white/a20", colorSource: "Color/White", opacity: 20 },
-          { name: "color/neutral/alpha/white/a24", colorSource: "Color/White", opacity: 24 },
-          { name: "color/neutral/alpha/white/a36", colorSource: "Color/White", opacity: 36 },
-          { name: "color/neutral/alpha/white/a40", colorSource: "Color/White", opacity: 40 },
-          { name: "color/neutral/alpha/white/a48", colorSource: "Color/White", opacity: 48 },
-          { name: "color/neutral/alpha/white/a64", colorSource: "Color/White", opacity: 64 },
-          { name: "color/neutral/alpha/white/a80", colorSource: "Color/White", opacity: 80 },
-          { name: "color/neutral/alpha/white/a88", colorSource: "Color/White", opacity: 88 },
+          { name: "color/neutral/alpha/black/a88", colorSource: "Color/Black", opacity: 88 },
+          { name: "color/neutral/alpha/black/a80", colorSource: "Color/Black", opacity: 80 },
+          { name: "color/neutral/alpha/black/a64", colorSource: "Color/Black", opacity: 64 },
+          { name: "color/neutral/alpha/black/a48", colorSource: "Color/Black", opacity: 48 },
+          { name: "color/neutral/alpha/black/a40", colorSource: "Color/Black", opacity: 40 },
+          { name: "color/neutral/alpha/black/a36", colorSource: "Color/Black", opacity: 36 },
+          { name: "color/neutral/alpha/black/a24", colorSource: "Color/Black", opacity: 24 },
+          { name: "color/neutral/alpha/black/a20", colorSource: "Color/Black", opacity: 20 },
+          { name: "color/neutral/alpha/black/a16", colorSource: "Color/Black", opacity: 16 },
+          { name: "color/neutral/alpha/black/a12", colorSource: "Color/Black", opacity: 12 },
+          { name: "color/neutral/alpha/black/a08", colorSource: "Color/Black", opacity: 8 },
+          { name: "color/neutral/alpha/black/a06", colorSource: "Color/Black", opacity: 6 },
+          { name: "color/neutral/alpha/black/a04", colorSource: "Color/Black", opacity: 4 },
+          { name: "color/neutral/alpha/black/a00", colorSource: "Color/Black", opacity: 0 },
           { name: "color/neutral/alpha/white/a96", colorSource: "Color/White", opacity: 96 },
-          { name: "color/brand/alpha/a00", role: "brand", opacity: 0 },
-          { name: "color/brand/alpha/a04", role: "brand", opacity: 4 },
-          { name: "color/brand/alpha/a06", role: "brand", opacity: 6 },
-          { name: "color/brand/alpha/a08", role: "brand", opacity: 8 },
-          { name: "color/brand/alpha/a12", role: "brand", opacity: 12 },
-          { name: "color/brand/alpha/a16", role: "brand", opacity: 16 },
-          { name: "color/brand/alpha/a20", role: "brand", opacity: 20 },
-          { name: "color/brand/alpha/a24", role: "brand", opacity: 24 },
-          { name: "color/brand/alpha/a36", role: "brand", opacity: 36 },
-          { name: "color/brand/alpha/a40", role: "brand", opacity: 40 },
-          { name: "color/brand/alpha/a48", role: "brand", opacity: 48 },
-          { name: "color/brand/alpha/a64", role: "brand", opacity: 64 },
-          { name: "color/brand/alpha/a80", role: "brand", opacity: 80 },
-          { name: "color/brand/alpha/a88", role: "brand", opacity: 88 },
+          { name: "color/neutral/alpha/white/a88", colorSource: "Color/White", opacity: 88 },
+          { name: "color/neutral/alpha/white/a80", colorSource: "Color/White", opacity: 80 },
+          { name: "color/neutral/alpha/white/a64", colorSource: "Color/White", opacity: 64 },
+          { name: "color/neutral/alpha/white/a48", colorSource: "Color/White", opacity: 48 },
+          { name: "color/neutral/alpha/white/a40", colorSource: "Color/White", opacity: 40 },
+          { name: "color/neutral/alpha/white/a36", colorSource: "Color/White", opacity: 36 },
+          { name: "color/neutral/alpha/white/a24", colorSource: "Color/White", opacity: 24 },
+          { name: "color/neutral/alpha/white/a20", colorSource: "Color/White", opacity: 20 },
+          { name: "color/neutral/alpha/white/a16", colorSource: "Color/White", opacity: 16 },
+          { name: "color/neutral/alpha/white/a12", colorSource: "Color/White", opacity: 12 },
+          { name: "color/neutral/alpha/white/a08", colorSource: "Color/White", opacity: 8 },
+          { name: "color/neutral/alpha/white/a06", colorSource: "Color/White", opacity: 6 },
+          { name: "color/neutral/alpha/white/a04", colorSource: "Color/White", opacity: 4 },
+          { name: "color/neutral/alpha/white/a00", colorSource: "Color/White", opacity: 0 },
           { name: "color/brand/alpha/a96", role: "brand", opacity: 96 },
-          { name: "color/danger/alpha/a00", role: "danger", opacity: 0 },
-          { name: "color/danger/alpha/a04", role: "danger", opacity: 4 },
-          { name: "color/danger/alpha/a06", role: "danger", opacity: 6 },
-          { name: "color/danger/alpha/a08", role: "danger", opacity: 8 },
-          { name: "color/danger/alpha/a12", role: "danger", opacity: 12 },
-          { name: "color/danger/alpha/a16", role: "danger", opacity: 16 },
-          { name: "color/danger/alpha/a20", role: "danger", opacity: 20 },
-          { name: "color/danger/alpha/a24", role: "danger", opacity: 24 },
-          { name: "color/danger/alpha/a36", role: "danger", opacity: 36 },
-          { name: "color/danger/alpha/a40", role: "danger", opacity: 40 },
-          { name: "color/danger/alpha/a48", role: "danger", opacity: 48 },
-          { name: "color/danger/alpha/a64", role: "danger", opacity: 64 },
-          { name: "color/danger/alpha/a80", role: "danger", opacity: 80 },
-          { name: "color/danger/alpha/a88", role: "danger", opacity: 88 },
-          { name: "color/danger/alpha/a96", role: "danger", opacity: 96 },
-          { name: "color/success/alpha/a00", role: "success", opacity: 0 },
-          { name: "color/success/alpha/a04", role: "success", opacity: 4 },
-          { name: "color/success/alpha/a06", role: "success", opacity: 6 },
-          { name: "color/success/alpha/a08", role: "success", opacity: 8 },
-          { name: "color/success/alpha/a12", role: "success", opacity: 12 },
-          { name: "color/success/alpha/a16", role: "success", opacity: 16 },
-          { name: "color/success/alpha/a20", role: "success", opacity: 20 },
-          { name: "color/success/alpha/a24", role: "success", opacity: 24 },
-          { name: "color/success/alpha/a36", role: "success", opacity: 36 },
-          { name: "color/success/alpha/a40", role: "success", opacity: 40 },
-          { name: "color/success/alpha/a48", role: "success", opacity: 48 },
-          { name: "color/success/alpha/a64", role: "success", opacity: 64 },
-          { name: "color/success/alpha/a80", role: "success", opacity: 80 },
-          { name: "color/success/alpha/a88", role: "success", opacity: 88 },
+          { name: "color/brand/alpha/a88", role: "brand", opacity: 88 },
+          { name: "color/brand/alpha/a80", role: "brand", opacity: 80 },
+          { name: "color/brand/alpha/a64", role: "brand", opacity: 64 },
+          { name: "color/brand/alpha/a48", role: "brand", opacity: 48 },
+          { name: "color/brand/alpha/a40", role: "brand", opacity: 40 },
+          { name: "color/brand/alpha/a36", role: "brand", opacity: 36 },
+          { name: "color/brand/alpha/a24", role: "brand", opacity: 24 },
+          { name: "color/brand/alpha/a20", role: "brand", opacity: 20 },
+          { name: "color/brand/alpha/a16", role: "brand", opacity: 16 },
+          { name: "color/brand/alpha/a12", role: "brand", opacity: 12 },
+          { name: "color/brand/alpha/a08", role: "brand", opacity: 8 },
+          { name: "color/brand/alpha/a06", role: "brand", opacity: 6 },
+          { name: "color/brand/alpha/a04", role: "brand", opacity: 4 },
+          { name: "color/brand/alpha/a00", role: "brand", opacity: 0 },
           { name: "color/success/alpha/a96", role: "success", opacity: 96 },
-          { name: "color/warning/alpha/a00", role: "warning", opacity: 0 },
-          { name: "color/warning/alpha/a04", role: "warning", opacity: 4 },
-          { name: "color/warning/alpha/a06", role: "warning", opacity: 6 },
-          { name: "color/warning/alpha/a08", role: "warning", opacity: 8 },
-          { name: "color/warning/alpha/a12", role: "warning", opacity: 12 },
-          { name: "color/warning/alpha/a16", role: "warning", opacity: 16 },
-          { name: "color/warning/alpha/a20", role: "warning", opacity: 20 },
-          { name: "color/warning/alpha/a24", role: "warning", opacity: 24 },
-          { name: "color/warning/alpha/a36", role: "warning", opacity: 36 },
-          { name: "color/warning/alpha/a40", role: "warning", opacity: 40 },
-          { name: "color/warning/alpha/a48", role: "warning", opacity: 48 },
-          { name: "color/warning/alpha/a64", role: "warning", opacity: 64 },
-          { name: "color/warning/alpha/a80", role: "warning", opacity: 80 },
-          { name: "color/warning/alpha/a88", role: "warning", opacity: 88 },
+          { name: "color/success/alpha/a88", role: "success", opacity: 88 },
+          { name: "color/success/alpha/a80", role: "success", opacity: 80 },
+          { name: "color/success/alpha/a64", role: "success", opacity: 64 },
+          { name: "color/success/alpha/a48", role: "success", opacity: 48 },
+          { name: "color/success/alpha/a40", role: "success", opacity: 40 },
+          { name: "color/success/alpha/a36", role: "success", opacity: 36 },
+          { name: "color/success/alpha/a24", role: "success", opacity: 24 },
+          { name: "color/success/alpha/a20", role: "success", opacity: 20 },
+          { name: "color/success/alpha/a16", role: "success", opacity: 16 },
+          { name: "color/success/alpha/a12", role: "success", opacity: 12 },
+          { name: "color/success/alpha/a08", role: "success", opacity: 8 },
+          { name: "color/success/alpha/a06", role: "success", opacity: 6 },
+          { name: "color/success/alpha/a04", role: "success", opacity: 4 },
+          { name: "color/success/alpha/a00", role: "success", opacity: 0 },
+          { name: "color/danger/alpha/a96", role: "danger", opacity: 96 },
+          { name: "color/danger/alpha/a88", role: "danger", opacity: 88 },
+          { name: "color/danger/alpha/a80", role: "danger", opacity: 80 },
+          { name: "color/danger/alpha/a64", role: "danger", opacity: 64 },
+          { name: "color/danger/alpha/a48", role: "danger", opacity: 48 },
+          { name: "color/danger/alpha/a40", role: "danger", opacity: 40 },
+          { name: "color/danger/alpha/a36", role: "danger", opacity: 36 },
+          { name: "color/danger/alpha/a24", role: "danger", opacity: 24 },
+          { name: "color/danger/alpha/a20", role: "danger", opacity: 20 },
+          { name: "color/danger/alpha/a16", role: "danger", opacity: 16 },
+          { name: "color/danger/alpha/a12", role: "danger", opacity: 12 },
+          { name: "color/danger/alpha/a08", role: "danger", opacity: 8 },
+          { name: "color/danger/alpha/a06", role: "danger", opacity: 6 },
+          { name: "color/danger/alpha/a04", role: "danger", opacity: 4 },
+          { name: "color/danger/alpha/a00", role: "danger", opacity: 0 },
           { name: "color/warning/alpha/a96", role: "warning", opacity: 96 },
-          { name: "color/info/alpha/a00", role: "info", opacity: 0 },
-          { name: "color/info/alpha/a04", role: "info", opacity: 4 },
-          { name: "color/info/alpha/a06", role: "info", opacity: 6 },
-          { name: "color/info/alpha/a08", role: "info", opacity: 8 },
-          { name: "color/info/alpha/a12", role: "info", opacity: 12 },
-          { name: "color/info/alpha/a16", role: "info", opacity: 16 },
-          { name: "color/info/alpha/a20", role: "info", opacity: 20 },
-          { name: "color/info/alpha/a24", role: "info", opacity: 24 },
-          { name: "color/info/alpha/a36", role: "info", opacity: 36 },
-          { name: "color/info/alpha/a40", role: "info", opacity: 40 },
-          { name: "color/info/alpha/a48", role: "info", opacity: 48 },
-          { name: "color/info/alpha/a64", role: "info", opacity: 64 },
-          { name: "color/info/alpha/a80", role: "info", opacity: 80 },
+          { name: "color/warning/alpha/a88", role: "warning", opacity: 88 },
+          { name: "color/warning/alpha/a80", role: "warning", opacity: 80 },
+          { name: "color/warning/alpha/a64", role: "warning", opacity: 64 },
+          { name: "color/warning/alpha/a48", role: "warning", opacity: 48 },
+          { name: "color/warning/alpha/a40", role: "warning", opacity: 40 },
+          { name: "color/warning/alpha/a36", role: "warning", opacity: 36 },
+          { name: "color/warning/alpha/a24", role: "warning", opacity: 24 },
+          { name: "color/warning/alpha/a20", role: "warning", opacity: 20 },
+          { name: "color/warning/alpha/a16", role: "warning", opacity: 16 },
+          { name: "color/warning/alpha/a12", role: "warning", opacity: 12 },
+          { name: "color/warning/alpha/a08", role: "warning", opacity: 8 },
+          { name: "color/warning/alpha/a06", role: "warning", opacity: 6 },
+          { name: "color/warning/alpha/a04", role: "warning", opacity: 4 },
+          { name: "color/warning/alpha/a00", role: "warning", opacity: 0 },
+          { name: "color/info/alpha/a96", role: "info", opacity: 96 },
           { name: "color/info/alpha/a88", role: "info", opacity: 88 },
-          { name: "color/info/alpha/a96", role: "info", opacity: 96 }
+          { name: "color/info/alpha/a80", role: "info", opacity: 80 },
+          { name: "color/info/alpha/a64", role: "info", opacity: 64 },
+          { name: "color/info/alpha/a48", role: "info", opacity: 48 },
+          { name: "color/info/alpha/a40", role: "info", opacity: 40 },
+          { name: "color/info/alpha/a36", role: "info", opacity: 36 },
+          { name: "color/info/alpha/a24", role: "info", opacity: 24 },
+          { name: "color/info/alpha/a20", role: "info", opacity: 20 },
+          { name: "color/info/alpha/a16", role: "info", opacity: 16 },
+          { name: "color/info/alpha/a12", role: "info", opacity: 12 },
+          { name: "color/info/alpha/a08", role: "info", opacity: 8 },
+          { name: "color/info/alpha/a06", role: "info", opacity: 6 },
+          { name: "color/info/alpha/a04", role: "info", opacity: 4 },
+          { name: "color/info/alpha/a00", role: "info", opacity: 0 }
         ]
       },
       typography: {
@@ -641,17 +658,17 @@
         border: ["STROKE_COLOR"],
         icon: ["SHAPE_FILL", "TEXT_FILL"]
       },
-      contrastCanvas: "color/elevation/surface/canvas",
+      contrastCanvas: "color/elevation/surface/canvas/default",
       order: {
-        description: "Order in which Appearance variables are created (and so listed in Figma) and drawn in the tables. Groups follow categories. Inside a group, sub-groups keep their order of first appearance in appearance.tokens; inside a sub-group, tokens follow emphasis, and tokens without an emphasis come after them in their appearance.tokens order. A token nested under another token, such as color/elevation/surface/canvas/deep, belongs to that token's sub-group.",
+        description: "Order in which Appearance variables are created (and so listed in Figma) and drawn in the tables. Groups follow categories. Inside a group, sub-groups keep their order of first appearance in appearance.tokens, so appearance.tokens lists them in the order to generate: the group's default (color/text/default, color/icon/default, color/border/default, with its subtle or strong variant), then the tokens that name no role, then neutral, brand, selected, success, danger, warning, info. A token directly under its group, such as color/border/danger, counts as a sub-group of its own. The others belong to their Figma group, so color/text/default is listed with color/text/subtle. A token nested under another token belongs to that token's sub-group. Inside a sub-group, tokens follow emphasis, and tokens without an emphasis come after them in their appearance.tokens order.",
         categories: ["elevation", "bg", "text", "border", "icon"],
-        emphasis: ["bolder", "bold", "accent", "soft", "softer", "softest"]
+        emphasis: ["default", "strong", "subtle", "bolder", "bold", "accent", "soft", "softer", "softest"]
       },
       darkCanvas: {
         description: "The Dark mode values in appearance.tokens are for referenceStep, not for the default canvas step (inputs.darkCanvasStep.default). canvasTokens use color/neutral/{step} in Dark, and every followingToken moves its Dark step lighter by as many steps along primitives.steps as the canvas step is from referenceStep, with black counted as one step darker than 950. With the canvas step black, the following tokens keep the values they have at 950. Each token in belowCanvasTokens is that many steps darker than the canvas, and stops at black.",
         referenceStep: 950,
         belowCanvasTokens: { "color/elevation/surface/canvas/deep": 1, "color/elevation/surface/canvas/deeper": 2 },
-        canvasTokens: ["color/bg/base", "color/elevation/surface/canvas"],
+        canvasTokens: ["color/bg/base", "color/elevation/surface/canvas/default"],
         followingTokens: [
           "color/bg/brand/softest",
           "color/bg/brand/softer",
@@ -674,7 +691,7 @@
           "color/bg/warning/softest",
           "color/bg/warning/softer",
           "color/bg/warning/soft",
-          "color/elevation/surface/overlay",
+          "color/elevation/surface/overlay/default",
           "color/elevation/surface/menu",
           "color/elevation/surface/raised",
           "color/elevation/surface/overlay/deep",
@@ -686,25 +703,27 @@
         customRoleFollowingTokens: ["color/bg/{role}/softest", "color/bg/{role}/softer", "color/bg/{role}/soft"]
       },
       textFill: {
-        description: "The bolder text and icon step of an appearance. The values in appearance.tokens are for the default steps (inputs.lightTextFillStep.default and inputs.darkTextFillStep.default). With another step, every token below uses that step in that mode, in its own color family. Only neutral has black and white: every other family uses the step in stepsWithoutColor. Bold tokens and color/bg/neutral/bolder do not change. ColorScheme tokens with sameAs follow these tokens as usual.",
+        description: "The step of the strongest text and icons of an appearance: color/text/default, color/icon/default, and the strong text of every color role. The values in appearance.tokens are for the default steps (inputs.lightTextFillStep.default and inputs.darkTextFillStep.default). With another step, every token below uses that step in that mode, in its own color family. Only neutral has black and white: every other family uses the step in stepsWithoutColor. The other text and icon tokens (color/text/subtle, color/text/{role}/default) and color/bg/neutral/bolder do not change. ColorScheme tokens with sameAs follow these tokens as usual.",
         tokens: [
-          "color/icon/brand/bolder",
-          "color/icon/neutral/bolder",
-          "color/text/brand/bolder",
-          "color/text/danger/bolder",
-          "color/text/info/bolder",
-          "color/text/neutral/bolder",
-          "color/text/selected/bolder",
-          "color/text/success/bolder",
-          "color/text/warning/bolder"
+          "color/icon/brand/strong",
+          "color/icon/default",
+          "color/text/brand/strong",
+          "color/text/danger/strong",
+          "color/text/info/strong",
+          "color/text/default",
+          "color/text/selected/strong",
+          "color/text/success/strong",
+          "color/text/warning/strong"
         ],
-        customRoleTokens: ["color/text/{role}/bolder"],
+        customRoleTokens: ["color/text/{role}/strong"],
+        fixedTokens: { "color/text/fixed/dark": "Light", "color/text/fixed/light": "Dark" },
+        fixedTokensRule: "Each fixed token is the same Theme token as color/text/default in the named base mode, and keeps it in every mode: it uses the text fill step of that base (inputs.lightTextFillStep or inputs.darkTextFillStep), not the step of the mode it is in.",
         stepsWithoutColor: { black: 950, white: 50 }
       },
       lightCanvas: {
         description: "The Light mode values in appearance.tokens are for the default canvas (inputs.lightCanvasStep.default, white). With canvas 50, canvasTokens use color/neutral/50 in Light, and the tokens in valuesByStep.50 take the listed values. No other token changes, and the contrast checks are unchanged.",
         canvasSteps: ["white", 50],
-        canvasTokens: ["color/bg/base", "color/elevation/surface/canvas"],
+        canvasTokens: ["color/bg/base", "color/elevation/surface/canvas/default"],
         valuesByStep: {
           "50": {
             "color/elevation/surface/menu": "color/neutral/white",
@@ -721,23 +740,53 @@
           "color/bg/{role}/soft": { Light: "color/{role}/150", Dark: "color/{role}/800" },
           "color/bg/{role}/softer": { Light: "color/{role}/100", Dark: "color/{role}/850" },
           "color/bg/{role}/softest": { Light: "color/{role}/50", Dark: "color/{role}/900" },
-          "color/text/{role}/bolder": { Light: "color/{role}/900", Dark: "color/{role}/50" },
-          "color/text/{role}/bold": { Light: "color/{role}/500", Dark: "color/{role}/300" },
+          "color/text/{role}/strong": { Light: "color/{role}/900", Dark: "color/{role}/50" },
+          "color/text/{role}/default": { Light: "color/{role}/500", Dark: "color/{role}/300" },
           "color/border/{role}": { Light: "color/{role}/300", Dark: "color/{role}/500" },
           "color/icon/{role}": { Light: "color/{role}/500", Dark: "color/{role}/300" }
         },
         contrastRequired: [
-          { text: "color/text/{role}/bold", background: "color/elevation/surface/canvas", minimum: 4.5 },
-          { text: "color/text/{role}/bolder", background: "color/elevation/surface/canvas", minimum: 7 },
-          { text: "color/icon/{role}", background: "color/elevation/surface/canvas", minimum: 3 }
+          { text: "color/text/{role}/default", background: "color/elevation/surface/canvas/default", minimum: 4.5 },
+          { text: "color/text/{role}/strong", background: "color/elevation/surface/canvas/default", minimum: 7 },
+          { text: "color/icon/{role}", background: "color/elevation/surface/canvas/default", minimum: 3 }
         ],
         statusPairings: true
       },
+      renamedTokens: {
+        description: "Appearance tokens that had another name in earlier versions: old name -> new name. In a file that has the old name and not the new one, the plugin renames the variable in place, so layers that use it keep working. customRoleTokens does the same for every custom role.",
+        tokens: {
+          "color/text/neutral/bolder": "color/text/default",
+          "color/text/neutral/bold": "color/text/subtle",
+          "color/text/brand/bold": "color/text/brand/default",
+          "color/text/selected/bold": "color/text/selected/default",
+          "color/text/success/bold": "color/text/success/default",
+          "color/text/danger/bold": "color/text/danger/default",
+          "color/text/warning/bold": "color/text/warning/default",
+          "color/text/info/bold": "color/text/info/default",
+          "color/text/brand/bolder": "color/text/brand/strong",
+          "color/text/selected/bolder": "color/text/selected/strong",
+          "color/text/success/bolder": "color/text/success/strong",
+          "color/text/danger/bolder": "color/text/danger/strong",
+          "color/text/warning/bolder": "color/text/warning/strong",
+          "color/text/info/bolder": "color/text/info/strong",
+          "color/icon/neutral/bolder": "color/icon/default",
+          "color/icon/neutral/bold": "color/icon/subtle",
+          "color/icon/brand/bold": "color/icon/brand/default",
+          "color/icon/brand/bolder": "color/icon/brand/strong",
+          "color/border/neutral/light": "color/border/default",
+          "color/border/neutral/heavy": "color/border/strong",
+          "color/border/brand/light": "color/border/brand/default",
+          "color/border/brand/heavy": "color/border/brand/strong",
+          "color/elevation/surface/canvas": "color/elevation/surface/canvas/default",
+          "color/elevation/surface/overlay": "color/elevation/surface/overlay/default"
+        },
+        customRoleTokens: { "color/text/{role}/bold": "color/text/{role}/default", "color/text/{role}/bolder": "color/text/{role}/strong" }
+      },
       alphaDependentTokens: [
         "color/bg/disabled",
-        "color/border/brand/light",
+        "color/border/brand/default",
         "color/border/disabled",
-        "color/border/neutral/light",
+        "color/border/default",
         "color/elevation/shadow/card",
         "color/elevation/shadow/concave/bottom",
         "color/elevation/shadow/concave/top",
@@ -748,28 +797,34 @@
         "color/text/disabled"
       ],
       tokens: {
+        "color/elevation/shadow/card": { Light: "color/neutral/alpha/black/a12", Dark: "color/neutral/alpha/white/a00" },
+        "color/elevation/shadow/convex/top": { Light: "color/neutral/alpha/white/a12", Dark: "color/neutral/alpha/white/a06" },
+        "color/elevation/shadow/convex/bottom": { Light: "color/neutral/alpha/black/a04", Dark: "color/neutral/alpha/black/a20" },
+        "color/elevation/shadow/concave/top": { Light: "color/neutral/alpha/black/a04", Dark: "color/neutral/alpha/black/a12" },
+        "color/elevation/shadow/concave/bottom": { Light: "color/neutral/alpha/white/a48", Dark: "color/neutral/alpha/white/a04" },
+        "color/elevation/surface/canvas/default": { Light: "color/neutral/white", Dark: "color/neutral/950" },
+        "color/elevation/surface/canvas/deep": { Light: "color/neutral/50", Dark: "color/neutral/black" },
+        "color/elevation/surface/canvas/deeper": { Light: "color/neutral/100", Dark: "color/neutral/black" },
+        "color/elevation/surface/menu": { Light: "color/neutral/50", Dark: "color/neutral/850" },
+        "color/elevation/surface/overlay/default": { Light: "color/neutral/white", Dark: "color/neutral/900" },
+        "color/elevation/surface/overlay/deep": { Light: "color/neutral/50", Dark: "color/neutral/950" },
+        "color/elevation/surface/overlay/deeper": { Light: "color/neutral/100", Dark: "color/neutral/black" },
+        "color/elevation/surface/raised": { Light: "color/neutral/50", Dark: "color/neutral/850" },
+        "color/elevation/surface/scrim": { Light: "color/neutral/alpha/black/a48", Dark: "color/neutral/alpha/black/a80" },
         "color/bg/base": { Light: "color/neutral/white", Dark: "color/neutral/950" },
         "color/bg/container": { Light: "color/neutral/white", Dark: "color/neutral/900" },
-        "color/bg/brand/accent": { Light: "color/brand/400", Dark: "color/brand/400" },
-        "color/bg/brand/bold": { Light: "color/brand/500", Dark: "color/brand/300" },
-        "color/bg/brand/soft": { Light: "color/brand/150", Dark: "color/brand/800" },
-        "color/bg/brand/softer": { Light: "color/brand/100", Dark: "color/brand/850" },
-        "color/bg/brand/softest": { Light: "color/brand/50", Dark: "color/brand/900" },
-        "color/bg/danger/bold": { Light: "color/danger/500", Dark: "color/danger/300" },
-        "color/bg/danger/soft": { Light: "color/danger/150", Dark: "color/danger/800" },
-        "color/bg/danger/softer": { Light: "color/danger/100", Dark: "color/danger/850" },
-        "color/bg/danger/softest": { Light: "color/danger/50", Dark: "color/danger/900" },
         "color/bg/disabled": { Light: "color/neutral/alpha/black/a12", Dark: "color/neutral/alpha/white/a16" },
-        "color/bg/info/bold": { Light: "color/info/500", Dark: "color/info/300" },
-        "color/bg/info/soft": { Light: "color/info/150", Dark: "color/info/800" },
-        "color/bg/info/softer": { Light: "color/info/100", Dark: "color/info/850" },
-        "color/bg/info/softest": { Light: "color/info/50", Dark: "color/info/900" },
         "color/bg/input": { Light: "color/neutral/white", Dark: "color/neutral/850" },
         "color/bg/action": { Light: "color/neutral/white", Dark: "color/neutral/850" },
         "color/bg/neutral/bolder": { Light: "color/neutral/700", Dark: "color/neutral/150" },
         "color/bg/neutral/soft": { Light: "color/neutral/150", Dark: "color/neutral/800" },
         "color/bg/neutral/softer": { Light: "color/neutral/100", Dark: "color/neutral/850" },
         "color/bg/neutral/softest": { Light: "color/neutral/50", Dark: "color/neutral/900" },
+        "color/bg/brand/accent": { Light: "color/brand/400", Dark: "color/brand/400" },
+        "color/bg/brand/bold": { Light: "color/brand/500", Dark: "color/brand/300" },
+        "color/bg/brand/soft": { Light: "color/brand/150", Dark: "color/brand/800" },
+        "color/bg/brand/softer": { Light: "color/brand/100", Dark: "color/brand/850" },
+        "color/bg/brand/softest": { Light: "color/brand/50", Dark: "color/brand/900" },
         "color/bg/selected/accent": { Light: "color/brand/200", Dark: "color/brand/600" },
         "color/bg/selected/bold": { Light: "color/brand/500", Dark: "color/brand/300" },
         "color/bg/selected/soft": { Light: "color/brand/150", Dark: "color/brand/800" },
@@ -779,95 +834,89 @@
         "color/bg/success/soft": { Light: "color/success/150", Dark: "color/success/800" },
         "color/bg/success/softer": { Light: "color/success/100", Dark: "color/success/850" },
         "color/bg/success/softest": { Light: "color/success/50", Dark: "color/success/900" },
+        "color/bg/danger/bold": { Light: "color/danger/500", Dark: "color/danger/300" },
+        "color/bg/danger/soft": { Light: "color/danger/150", Dark: "color/danger/800" },
+        "color/bg/danger/softer": { Light: "color/danger/100", Dark: "color/danger/850" },
+        "color/bg/danger/softest": { Light: "color/danger/50", Dark: "color/danger/900" },
         "color/bg/warning/bold": { Light: "color/warning/500", Dark: "color/warning/300" },
         "color/bg/warning/soft": { Light: "color/warning/150", Dark: "color/warning/800" },
         "color/bg/warning/softer": { Light: "color/warning/100", Dark: "color/warning/850" },
         "color/bg/warning/softest": { Light: "color/warning/50", Dark: "color/warning/900" },
-        "color/border/brand/heavy": { Light: "color/brand/400", Dark: "color/brand/400" },
-        "color/border/brand/light": { Light: "color/brand/alpha/a36", Dark: "color/brand/alpha/a36" },
-        "color/border/danger": { Light: "color/danger/300", Dark: "color/danger/500" },
-        "color/border/disabled": { Light: "color/neutral/alpha/black/a12", Dark: "color/neutral/alpha/white/a08" },
-        "color/border/focus": { Light: "color/brand/500", Dark: "color/brand/400" },
-        "color/border/info": { Light: "color/info/300", Dark: "color/info/500" },
-        "color/border/inverse": { Light: "color/neutral/white", Dark: "color/neutral/950" },
-        "color/border/neutral/heavy": { Light: "color/neutral/400", Dark: "color/neutral/400" },
-        "color/border/neutral/light": { Light: "color/neutral/alpha/black/a24", Dark: "color/neutral/alpha/white/a16" },
-        "color/border/selected": { Light: "color/brand/400", Dark: "color/brand/400" },
-        "color/border/success": { Light: "color/success/300", Dark: "color/success/500" },
-        "color/border/warning": { Light: "color/warning/300", Dark: "color/warning/500" },
-        "color/elevation/shadow/card": { Light: "color/neutral/alpha/black/a12", Dark: "color/neutral/alpha/white/a00" },
-        "color/elevation/shadow/convex/top": { Light: "color/neutral/alpha/white/a12", Dark: "color/neutral/alpha/white/a06" },
-        "color/elevation/shadow/convex/bottom": { Light: "color/neutral/alpha/black/a04", Dark: "color/neutral/alpha/black/a20" },
-        "color/elevation/shadow/concave/top": { Light: "color/neutral/alpha/black/a04", Dark: "color/neutral/alpha/black/a12" },
-        "color/elevation/shadow/concave/bottom": { Light: "color/neutral/alpha/white/a48", Dark: "color/neutral/alpha/white/a04" },
-        "color/elevation/surface/canvas": { Light: "color/neutral/white", Dark: "color/neutral/950" },
-        "color/elevation/surface/canvas/deep": { Light: "color/neutral/50", Dark: "color/neutral/black" },
-        "color/elevation/surface/canvas/deeper": { Light: "color/neutral/100", Dark: "color/neutral/black" },
-        "color/elevation/surface/menu": { Light: "color/neutral/50", Dark: "color/neutral/850" },
-        "color/elevation/surface/overlay": { Light: "color/neutral/white", Dark: "color/neutral/900" },
-        "color/elevation/surface/overlay/deep": { Light: "color/neutral/50", Dark: "color/neutral/950" },
-        "color/elevation/surface/overlay/deeper": { Light: "color/neutral/100", Dark: "color/neutral/black" },
-        "color/elevation/surface/raised": { Light: "color/neutral/50", Dark: "color/neutral/850" },
-        "color/elevation/surface/scrim": { Light: "color/neutral/alpha/black/a48", Dark: "color/neutral/alpha/black/a80" },
-        "color/icon/brand/accent": { Light: "color/brand/400", Dark: "color/brand/400" },
-        "color/icon/brand/bold": { Light: "color/brand/500", Dark: "color/brand/300" },
-        "color/icon/brand/bolder": { Light: "color/brand/900", Dark: "color/brand/50" },
-        "color/icon/danger": { Light: "color/danger/500", Dark: "color/danger/300" },
-        "color/icon/disabled": { Light: "color/neutral/alpha/black/a24", Dark: "color/neutral/alpha/white/a16" },
-        "color/icon/info": { Light: "color/info/500", Dark: "color/info/300" },
-        "color/icon/inverse": { Light: "color/neutral/white", Dark: "color/neutral/950" },
-        "color/icon/neutral/bold": { Light: "color/neutral/500", Dark: "color/neutral/300" },
-        "color/icon/neutral/bolder": { Light: "color/neutral/900", Dark: "color/neutral/white" },
-        "color/icon/success": { Light: "color/success/500", Dark: "color/success/300" },
-        "color/icon/warning": { Light: "color/warning/500", Dark: "color/warning/300" },
-        "color/text/brand/bold": { Light: "color/brand/500", Dark: "color/brand/300" },
-        "color/text/brand/bolder": { Light: "color/brand/900", Dark: "color/brand/50" },
-        "color/text/danger/bold": { Light: "color/danger/500", Dark: "color/danger/300" },
-        "color/text/danger/bolder": { Light: "color/danger/900", Dark: "color/danger/50" },
+        "color/bg/info/bold": { Light: "color/info/500", Dark: "color/info/300" },
+        "color/bg/info/soft": { Light: "color/info/150", Dark: "color/info/800" },
+        "color/bg/info/softer": { Light: "color/info/100", Dark: "color/info/850" },
+        "color/bg/info/softest": { Light: "color/info/50", Dark: "color/info/900" },
+        "color/text/default": { Light: "color/neutral/900", Dark: "color/neutral/white" },
+        "color/text/subtle": { Light: "color/neutral/500", Dark: "color/neutral/300" },
         "color/text/disabled": { Light: "color/neutral/alpha/black/a24", Dark: "color/neutral/alpha/white/a16" },
-        "color/text/fixed/dark": { Light: "color/neutral/700", Dark: "color/neutral/700" },
-        "color/text/fixed/light": { Light: "color/neutral/white", Dark: "color/neutral/50" },
-        "color/text/info/bold": { Light: "color/info/500", Dark: "color/info/300" },
-        "color/text/info/bolder": { Light: "color/info/900", Dark: "color/info/50" },
         "color/text/inverse": { Light: "color/neutral/white", Dark: "color/neutral/900" },
         "color/text/link": { Light: "color/brand/500", Dark: "color/brand/300" },
-        "color/text/neutral/bold": { Light: "color/neutral/500", Dark: "color/neutral/300" },
-        "color/text/neutral/bolder": { Light: "color/neutral/900", Dark: "color/neutral/white" },
-        "color/text/selected/bold": { Light: "color/brand/500", Dark: "color/brand/300" },
-        "color/text/selected/bolder": { Light: "color/brand/900", Dark: "color/brand/50" },
-        "color/text/success/bold": { Light: "color/success/500", Dark: "color/success/300" },
-        "color/text/success/bolder": { Light: "color/success/900", Dark: "color/success/50" },
-        "color/text/warning/bold": { Light: "color/warning/500", Dark: "color/warning/300" },
-        "color/text/warning/bolder": { Light: "color/warning/900", Dark: "color/warning/50" }
+        "color/text/fixed/dark": { Light: "color/neutral/900", Dark: "color/neutral/900" },
+        "color/text/fixed/light": { Light: "color/neutral/white", Dark: "color/neutral/white" },
+        "color/text/brand/default": { Light: "color/brand/500", Dark: "color/brand/300" },
+        "color/text/brand/strong": { Light: "color/brand/900", Dark: "color/brand/50" },
+        "color/text/selected/default": { Light: "color/brand/500", Dark: "color/brand/300" },
+        "color/text/selected/strong": { Light: "color/brand/900", Dark: "color/brand/50" },
+        "color/text/success/default": { Light: "color/success/500", Dark: "color/success/300" },
+        "color/text/success/strong": { Light: "color/success/900", Dark: "color/success/50" },
+        "color/text/danger/default": { Light: "color/danger/500", Dark: "color/danger/300" },
+        "color/text/danger/strong": { Light: "color/danger/900", Dark: "color/danger/50" },
+        "color/text/warning/default": { Light: "color/warning/500", Dark: "color/warning/300" },
+        "color/text/warning/strong": { Light: "color/warning/900", Dark: "color/warning/50" },
+        "color/text/info/default": { Light: "color/info/500", Dark: "color/info/300" },
+        "color/text/info/strong": { Light: "color/info/900", Dark: "color/info/50" },
+        "color/border/default": { Light: "color/neutral/alpha/black/a24", Dark: "color/neutral/alpha/white/a16" },
+        "color/border/strong": { Light: "color/neutral/400", Dark: "color/neutral/400" },
+        "color/border/disabled": { Light: "color/neutral/alpha/black/a12", Dark: "color/neutral/alpha/white/a08" },
+        "color/border/focus": { Light: "color/brand/500", Dark: "color/brand/400" },
+        "color/border/inverse": { Light: "color/neutral/white", Dark: "color/neutral/950" },
+        "color/border/brand/default": { Light: "color/brand/alpha/a36", Dark: "color/brand/alpha/a36" },
+        "color/border/brand/strong": { Light: "color/brand/400", Dark: "color/brand/400" },
+        "color/border/selected": { Light: "color/brand/400", Dark: "color/brand/400" },
+        "color/border/success": { Light: "color/success/300", Dark: "color/success/500" },
+        "color/border/danger": { Light: "color/danger/300", Dark: "color/danger/500" },
+        "color/border/warning": { Light: "color/warning/300", Dark: "color/warning/500" },
+        "color/border/info": { Light: "color/info/300", Dark: "color/info/500" },
+        "color/icon/default": { Light: "color/neutral/900", Dark: "color/neutral/white" },
+        "color/icon/subtle": { Light: "color/neutral/500", Dark: "color/neutral/300" },
+        "color/icon/disabled": { Light: "color/neutral/alpha/black/a24", Dark: "color/neutral/alpha/white/a16" },
+        "color/icon/inverse": { Light: "color/neutral/white", Dark: "color/neutral/950" },
+        "color/icon/brand/default": { Light: "color/brand/500", Dark: "color/brand/300" },
+        "color/icon/brand/strong": { Light: "color/brand/900", Dark: "color/brand/50" },
+        "color/icon/brand/accent": { Light: "color/brand/400", Dark: "color/brand/400" },
+        "color/icon/success": { Light: "color/success/500", Dark: "color/success/300" },
+        "color/icon/danger": { Light: "color/danger/500", Dark: "color/danger/300" },
+        "color/icon/warning": { Light: "color/warning/500", Dark: "color/warning/300" },
+        "color/icon/info": { Light: "color/info/500", Dark: "color/info/300" }
       },
       contrastRequired: [
-        { text: "color/text/neutral/bold", background: "color/elevation/surface/canvas", minimum: 4.5 },
-        { text: "color/text/neutral/bolder", background: "color/elevation/surface/canvas", minimum: 7 },
-        { text: "color/text/brand/bold", background: "color/elevation/surface/canvas", minimum: 4.5 },
-        { text: "color/text/brand/bolder", background: "color/elevation/surface/canvas", minimum: 7 },
-        { text: "color/text/danger/bold", background: "color/elevation/surface/canvas", minimum: 4.5 },
-        { text: "color/text/danger/bolder", background: "color/elevation/surface/canvas", minimum: 7 },
-        { text: "color/text/info/bold", background: "color/elevation/surface/canvas", minimum: 4.5 },
-        { text: "color/text/info/bolder", background: "color/elevation/surface/canvas", minimum: 7 },
-        { text: "color/text/success/bold", background: "color/elevation/surface/canvas", minimum: 4.5 },
-        { text: "color/text/success/bolder", background: "color/elevation/surface/canvas", minimum: 7 },
-        { text: "color/text/warning/bold", background: "color/elevation/surface/canvas", minimum: 4.5 },
-        { text: "color/text/warning/bolder", background: "color/elevation/surface/canvas", minimum: 7 },
-        { text: "color/text/link", background: "color/elevation/surface/canvas", minimum: 4.5 },
-        { text: "color/icon/neutral/bold", background: "color/elevation/surface/canvas", minimum: 3 },
-        { text: "color/icon/neutral/bolder", background: "color/elevation/surface/canvas", minimum: 4.5 },
-        { text: "color/icon/brand/bold", background: "color/elevation/surface/canvas", minimum: 3 },
-        { text: "color/icon/danger", background: "color/elevation/surface/canvas", minimum: 3 },
-        { text: "color/icon/info", background: "color/elevation/surface/canvas", minimum: 3 },
-        { text: "color/icon/success", background: "color/elevation/surface/canvas", minimum: 3 },
-        { text: "color/icon/warning", background: "color/elevation/surface/canvas", minimum: 3 },
-        { text: "color/border/focus", background: "color/elevation/surface/canvas", minimum: 3 }
+        { text: "color/text/subtle", background: "color/elevation/surface/canvas/default", minimum: 4.5 },
+        { text: "color/text/default", background: "color/elevation/surface/canvas/default", minimum: 7 },
+        { text: "color/text/brand/default", background: "color/elevation/surface/canvas/default", minimum: 4.5 },
+        { text: "color/text/brand/strong", background: "color/elevation/surface/canvas/default", minimum: 7 },
+        { text: "color/text/danger/default", background: "color/elevation/surface/canvas/default", minimum: 4.5 },
+        { text: "color/text/danger/strong", background: "color/elevation/surface/canvas/default", minimum: 7 },
+        { text: "color/text/info/default", background: "color/elevation/surface/canvas/default", minimum: 4.5 },
+        { text: "color/text/info/strong", background: "color/elevation/surface/canvas/default", minimum: 7 },
+        { text: "color/text/success/default", background: "color/elevation/surface/canvas/default", minimum: 4.5 },
+        { text: "color/text/success/strong", background: "color/elevation/surface/canvas/default", minimum: 7 },
+        { text: "color/text/warning/default", background: "color/elevation/surface/canvas/default", minimum: 4.5 },
+        { text: "color/text/warning/strong", background: "color/elevation/surface/canvas/default", minimum: 7 },
+        { text: "color/text/link", background: "color/elevation/surface/canvas/default", minimum: 4.5 },
+        { text: "color/icon/subtle", background: "color/elevation/surface/canvas/default", minimum: 3 },
+        { text: "color/icon/default", background: "color/elevation/surface/canvas/default", minimum: 4.5 },
+        { text: "color/icon/brand/default", background: "color/elevation/surface/canvas/default", minimum: 3 },
+        { text: "color/icon/danger", background: "color/elevation/surface/canvas/default", minimum: 3 },
+        { text: "color/icon/info", background: "color/elevation/surface/canvas/default", minimum: 3 },
+        { text: "color/icon/success", background: "color/elevation/surface/canvas/default", minimum: 3 },
+        { text: "color/icon/warning", background: "color/elevation/surface/canvas/default", minimum: 3 },
+        { text: "color/border/focus", background: "color/elevation/surface/canvas/default", minimum: 3 }
       ],
       statusPairings: {
         roles: ["danger", "success", "warning", "info"],
         backgrounds: ["softer"],
-        "text/bold": 4.5,
-        "text/bolder": 7,
+        text: 4.5,
+        "text/strong": 7,
         icon: 3
       }
     },
@@ -931,20 +980,20 @@
         { name: "primary", group: "primary", kind: "bg", role: "brand", sameAs: "color/bg/brand/bold", description: "Main accent: the color seen most often across screens and components." },
         { name: "onPrimary", group: "primary", kind: "content", role: "brand", sameAs: "color/text/inverse", description: "Text and icons on primary." },
         { name: "primaryContainer", group: "primary", kind: "bg", role: "brand", sameAs: "color/bg/brand/soft", description: "Softer primary fill for containers." },
-        { name: "onPrimaryContainer", group: "primary", kind: "content", role: "brand", sameAs: "color/text/brand/bolder", description: "Text and icons on primaryContainer." },
+        { name: "onPrimaryContainer", group: "primary", kind: "content", role: "brand", sameAs: "color/text/brand/strong", description: "Text and icons on primaryContainer." },
         { name: "inversePrimary", group: "primary", kind: "bg", role: "brand", Light: "color/brand/300", Dark: "color/brand/500", description: "Primary color for places using inverse colors, like a snackbar button." },
         { name: "secondary", group: "secondary", kind: "bg", role: "{secondary}", sameAs: "color/bg/{secondary}/bold", description: "Second accent, to add variety and tell parts of the product apart." },
         { name: "onSecondary", group: "secondary", kind: "content", role: "{secondary}", sameAs: "color/text/inverse", description: "Text and icons on secondary." },
         { name: "secondaryContainer", group: "secondary", kind: "bg", role: "{secondary}", sameAs: "color/bg/{secondary}/soft", description: "Softer secondary fill for containers." },
-        { name: "onSecondaryContainer", group: "secondary", kind: "content", role: "{secondary}", sameAs: "color/text/{secondary}/bolder", description: "Text and icons on secondaryContainer." },
+        { name: "onSecondaryContainer", group: "secondary", kind: "content", role: "{secondary}", sameAs: "color/text/{secondary}/strong", description: "Text and icons on secondaryContainer." },
         { name: "tertiary", group: "tertiary", kind: "bg", role: "{tertiary}", sameAs: "color/bg/{tertiary}/bold", description: "Third accent, to balance the others or draw attention to an element." },
         { name: "onTertiary", group: "tertiary", kind: "content", role: "{tertiary}", sameAs: "color/text/inverse", description: "Text and icons on tertiary." },
         { name: "tertiaryContainer", group: "tertiary", kind: "bg", role: "{tertiary}", sameAs: "color/bg/{tertiary}/soft", description: "Softer tertiary fill for containers." },
-        { name: "onTertiaryContainer", group: "tertiary", kind: "content", role: "{tertiary}", sameAs: "color/text/{tertiary}/bolder", description: "Text and icons on tertiaryContainer." },
+        { name: "onTertiaryContainer", group: "tertiary", kind: "content", role: "{tertiary}", sameAs: "color/text/{tertiary}/strong", description: "Text and icons on tertiaryContainer." },
         { name: "background", group: "surface", kind: "bg", sameAs: "color/bg/base", description: "Color behind scrollable content." },
-        { name: "onBackground", group: "surface", kind: "content", sameAs: "color/text/neutral/bolder", description: "Text and icons on background." },
-        { name: "surface", group: "surface", kind: "bg", sameAs: "color/elevation/surface/canvas", description: "Color of component surfaces, such as cards, sheets and menus." },
-        { name: "onSurface", group: "surface", kind: "content", sameAs: "color/text/neutral/bolder", description: "Text and icons on surface." },
+        { name: "onBackground", group: "surface", kind: "content", sameAs: "color/text/default", description: "Text and icons on background." },
+        { name: "surface", group: "surface", kind: "bg", sameAs: "color/elevation/surface/canvas/default", description: "Color of component surfaces, such as cards, sheets and menus." },
+        { name: "onSurface", group: "surface", kind: "content", sameAs: "color/text/default", description: "Text and icons on surface." },
         { name: "surfaceVariant", group: "surface", kind: "bg", sameAs: "color/bg/neutral/soft", description: "Alternative to surface, for similar uses." },
         { name: "onSurfaceVariant", group: "surface", kind: "content", Light: "color/neutral/600", Dark: "color/neutral/200", description: "Secondary text and icons on surface." },
         { name: "surfaceTint", group: "surface", kind: "bg", role: "brand", sameAs: "color/bg/brand/bold", description: "Tint laid over surface by components with tonal elevation." },
@@ -953,16 +1002,16 @@
         { name: "error", group: "error", kind: "bg", role: "danger", sameAs: "color/bg/danger/bold", description: "Signals errors in components, such as invalid text in a field." },
         { name: "onError", group: "error", kind: "content", role: "danger", sameAs: "color/text/inverse", description: "Text and icons on error." },
         { name: "errorContainer", group: "error", kind: "bg", role: "danger", sameAs: "color/bg/danger/soft", description: "Softer error fill for containers." },
-        { name: "onErrorContainer", group: "error", kind: "content", role: "danger", sameAs: "color/text/danger/bolder", description: "Text and icons on errorContainer." },
-        { name: "outline", group: "outline", kind: "line", sameAs: "color/border/neutral/heavy", description: "Subtle boundary color that adds contrast for accessibility." },
-        { name: "outlineVariant", group: "outline", kind: "line", sameAs: "color/border/neutral/light", description: "Decorative boundary color, where strong contrast is not needed." },
+        { name: "onErrorContainer", group: "error", kind: "content", role: "danger", sameAs: "color/text/danger/strong", description: "Text and icons on errorContainer." },
+        { name: "outline", group: "outline", kind: "line", sameAs: "color/border/strong", description: "Subtle boundary color that adds contrast for accessibility." },
+        { name: "outlineVariant", group: "outline", kind: "line", sameAs: "color/border/default", description: "Decorative boundary color, where strong contrast is not needed." },
         { name: "scrim", group: "outline", kind: "bg", sameAs: "color/elevation/surface/scrim", description: "Color of a scrim that covers content behind a layer." },
         { name: "surfaceBright", group: "surface container", kind: "bg", Light: "color/neutral/white", Dark: "color/neutral/700", followsDarkCanvas: true, description: "Surface variant that is always brighter than surface." },
         { name: "surfaceContainer", group: "surface container", kind: "bg", Light: "color/neutral/100", Dark: "color/neutral/850", followsDarkCanvas: true, description: "Surface variant for component containers, such as cards and menus." },
         { name: "surfaceContainerHigh", group: "surface container", kind: "bg", Light: "color/neutral/150", Dark: "color/neutral/800", followsDarkCanvas: true, description: "Surface container with more emphasis than surfaceContainer." },
         { name: "surfaceContainerHighest", group: "surface container", kind: "bg", Light: "color/neutral/200", Dark: "color/neutral/700", followsDarkCanvas: true, description: "Surface container with more emphasis than surfaceContainerHigh." },
         { name: "surfaceContainerLow", group: "surface container", kind: "bg", Light: "color/neutral/50", Dark: "color/neutral/900", followsDarkCanvas: true, description: "Surface container with less emphasis than surfaceContainer." },
-        { name: "surfaceContainerLowest", group: "surface container", kind: "bg", sameAs: "color/elevation/surface/canvas", description: "Surface container with less emphasis than surfaceContainerLow." },
+        { name: "surfaceContainerLowest", group: "surface container", kind: "bg", sameAs: "color/elevation/surface/canvas/default", description: "Surface container with less emphasis than surfaceContainerLow." },
         { name: "surfaceDim", group: "surface container", kind: "bg", Light: "color/neutral/200", Dark: "color/neutral/950", followsDarkCanvas: true, description: "Surface variant that is always dimmer than surface." },
         { name: "primaryFixed", group: "fixed", kind: "bg", role: "brand", Light: "color/brand/100", Dark: "color/brand/100", description: "Primary fill that keeps the same color in light and dark." },
         { name: "primaryFixedDim", group: "fixed", kind: "bg", role: "brand", Light: "color/brand/200", Dark: "color/brand/200", description: "Stronger version of primaryFixed, the same in light and dark." },
@@ -1576,6 +1625,34 @@
     return renames;
   }
 
+  // src/selection.ts
+  var choosable = (spec) => spec.inputs.collections.allowed;
+  function skippedCollections(spec, inputs) {
+    var _a;
+    const chosen = (_a = inputs == null ? void 0 : inputs.collections) != null ? _a : spec.inputs.collections.default;
+    return choosable(spec).filter((c) => !chosen.includes(c));
+  }
+  function chosenPlatforms(spec, inputs) {
+    var _a;
+    const chosen = (_a = inputs == null ? void 0 : inputs.textStylePlatforms) != null ? _a : spec.inputs.textStylePlatforms.default;
+    return spec.inputs.textStylePlatforms.allowed.filter((p) => chosen.includes(p));
+  }
+  function unknownChoices(spec, inputs) {
+    var _a, _b;
+    const allowedCollections = choosable(spec);
+    const allowedPlatforms = spec.inputs.textStylePlatforms.allowed;
+    return {
+      collections: ((_a = inputs == null ? void 0 : inputs.collections) != null ? _a : []).filter((c) => !allowedCollections.includes(c)),
+      platforms: ((_b = inputs == null ? void 0 : inputs.textStylePlatforms) != null ? _b : []).filter((p) => !allowedPlatforms.includes(p))
+    };
+  }
+  function tableSourceAfterWrite(plan, fromFile, skipped) {
+    return {
+      collections: [...plan.collections, ...fromFile.collections.filter((c) => skipped.includes(c.name))],
+      variables: [...plan.variables, ...fromFile.variables.filter((v) => skipped.includes(v.collection))]
+    };
+  }
+
   // src/foundations.ts
   var ROLE_INPUTS = ["brand", "success", "danger", "warning", "info"];
   function canvasStepOf(v) {
@@ -1606,14 +1683,16 @@
     return textFillValueFor(spec, name, canvased, mode.textFillStep, customRoles);
   }
   function textFillValueFor(spec, name, value, step, customRoles) {
-    var _a;
     const rule = spec.appearance.textFill;
     const listed = rule.tokens.includes(name) || customRoles.some((r) => rule.customRoleTokens.some((t) => t.replace("{role}", r) === name));
-    if (!listed) return value;
+    return listed ? withTextFillStep(spec, value, step) : value;
+  }
+  function withTextFillStep(spec, value, step) {
+    var _a;
     const family = (_a = value.match(/^color\/([^/]+)\/(\d+|white|black)$/)) == null ? void 0 : _a[1];
     if (!family) return value;
     if (typeof step === "number") return `color/${family}/${step}`;
-    return family === "neutral" ? `color/neutral/${step}` : `color/${family}/${rule.stepsWithoutColor[step]}`;
+    return family === "neutral" ? `color/neutral/${step}` : `color/${family}/${spec.appearance.textFill.stepsWithoutColor[step]}`;
   }
   function canvasValueFor(spec, name, value, base, step, customRoles) {
     var _a, _b, _c, _d;
@@ -1778,9 +1857,11 @@
     return out;
   }
   function buildPlan(spec, inputs) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const report = [];
+    const skipped = skippedCollections(spec, inputs);
     const add = (check, collection, token, mode, expected, actual, message) => {
+      if (skipped.includes(collection) && check !== "missing_input") return;
       report.push({ check, severity: severityOf(spec, check), collection, token, mode, expected, actual, message });
     };
     const hasErrors = () => report.some((r) => r.severity === "error");
@@ -1993,6 +2074,13 @@
       }
       extraNames.push(name);
     });
+    const unknown = unknownChoices(spec, inputs);
+    for (const c of unknown.collections) {
+      add("missing_input", "Collections", "collections", "Global", spec.inputs.collections.allowed.join(", "), c, `"${c}" is not a collection that can be chosen.`);
+    }
+    for (const p of unknown.platforms) {
+      add("missing_input", "Text styles", "textStylePlatforms", "Global", spec.inputs.textStylePlatforms.allowed.join(", "), p, `"${p}" is not a text style platform.`);
+    }
     if (hasErrors()) return stop();
     const naming = namePalettes(spec, inputs);
     for (const p of [...naming.problems, ...naming.neutralNaming.problems]) {
@@ -2069,17 +2157,15 @@
       vars.push(__spreadValues({ collection: "Theme", name, type, scopes, values }, alpha ? { alpha } : {}));
     };
     const exp = spec.theme.colorExpansion;
+    const neutralExtra = (name) => theme(name, "COLOR", everyTheme({ alias: exp.neutralExtras[name] }));
     for (const role of [...Object.keys(spec.theme.colorRoles), ...customRoles]) {
       if (inactiveRoles.includes(role)) continue;
+      if (role === "neutral") neutralExtra("color/neutral/black");
       for (const step of exp.steps) {
         const name = exp.pattern.replace("{role}", role).replace("{step}", String(step));
         theme(name, "COLOR", Object.fromEntries(themeModes.map((m, i) => [m, { alias: `Color/${paletteFor(role, i)}/${step}` }])));
       }
-      if (role === "neutral") {
-        for (const [name, target] of Object.entries(exp.neutralExtras)) {
-          theme(name, "COLOR", everyTheme({ alias: target }));
-        }
-      }
+      if (role === "neutral") neutralExtra("color/neutral/white");
     }
     const al = spec.theme.alpha;
     const customAlpha = customRoles.flatMap((role) => al.opacities.map((o) => ({
@@ -2136,11 +2222,19 @@
     }
     const appNames = [...appMaps.keys()];
     const modeBases = appearanceModes(spec, inputs);
+    const fixedText = spec.appearance.textFill.fixedTokens;
+    const baseTextFill = {
+      Light: canvasStepOf((_l = inputs.lightTextFillStep) != null ? _l : spec.inputs.lightTextFillStep.default),
+      Dark: canvasStepOf((_m = inputs.darkTextFillStep) != null ? _m : spec.inputs.darkTextFillStep.default)
+    };
     for (const name of appearanceOrder(spec, appNames)) {
       const map = appMaps.get(name);
       const values = {};
+      const fixedBase = fixedText[name];
       for (const m of modeBases) {
-        values[m.name] = { alias: appearanceValueFor(spec, name, map[m.base], m, customRoles) };
+        values[m.name] = {
+          alias: fixedBase ? withTextFillStep(spec, map[fixedBase], baseTextFill[fixedBase]) : appearanceValueFor(spec, name, map[m.base], m, customRoles)
+        };
       }
       vars.push({ collection: "Appearance", name, type: "COLOR", scopes: scopesFor(name), values });
     }
@@ -2284,8 +2378,8 @@
         for (const role of [...sp.roles.filter((r) => !inactiveRoles.includes(r)), ...customRoles]) {
           for (const bgName of sp.backgrounds) {
             const bg = `color/bg/${role}/${bgName}`;
-            checkPair(`color/text/${role}/bold`, bg, sp["text/bold"], "status_pairing", i, m);
-            checkPair(`color/text/${role}/bolder`, bg, sp["text/bolder"], "status_pairing", i, m);
+            checkPair(`color/text/${role}/default`, bg, sp["text"], "status_pairing", i, m);
+            checkPair(`color/text/${role}/strong`, bg, sp["text/strong"], "status_pairing", i, m);
             checkPair(`color/icon/${role}`, bg, sp["icon"], "status_pairing", i, m);
           }
         }
@@ -2339,7 +2433,15 @@
         manifest.push(entry);
       }
     }
-    return { ok: true, collections, variables: vars, report, manifest, palettes: [...naming.neutralNaming.palettes, ...naming.palettes] };
+    const written = (collection) => !skipped.includes(collection);
+    return {
+      ok: true,
+      collections: collections.filter((c) => written(c.name)),
+      variables: vars.filter((v) => written(v.collection)),
+      report,
+      manifest: manifest.filter((e) => written(e.collection)),
+      palettes: [...naming.neutralNaming.palettes, ...naming.palettes]
+    };
   }
   function appearanceOrder(spec, names) {
     const { categories, emphasis } = spec.appearance.order;
@@ -2347,13 +2449,17 @@
     const reference = [...specNames, ...names.filter((n) => !specNames.includes(n))];
     const pos = new Map(reference.map((n, i) => [n, i]));
     const up = (n) => n.split("/").slice(0, -1).join("/");
-    const parentOf = (n) => pos.has(up(n)) ? up(up(n)) : up(n);
-    const firstOfParent = /* @__PURE__ */ new Map();
-    for (const n of reference) if (!firstOfParent.has(parentOf(n))) firstOfParent.set(parentOf(n), pos.get(n));
+    const subGroupOf = (n) => {
+      if (n.split("/").length <= 3) return n;
+      return pos.has(up(n)) ? subGroupOf(up(n)) : up(n);
+    };
+    const firstOfSubGroup = /* @__PURE__ */ new Map();
+    for (const n of reference) if (!firstOfSubGroup.has(subGroupOf(n))) firstOfSubGroup.set(subGroupOf(n), pos.get(n));
     const rank = (list, x) => list.includes(x) ? list.indexOf(x) : list.length;
     const key = (n) => {
       const parts = n.split("/");
-      return [rank(categories, parts[1]), firstOfParent.get(parentOf(n)), rank(emphasis, parts[parts.length - 1]), pos.get(n)];
+      const own = subGroupOf(n) === n ? -1 : rank(emphasis, parts[parts.length - 1]);
+      return [rank(categories, parts[1]), firstOfSubGroup.get(subGroupOf(n)), own, pos.get(n)];
     };
     const keys = new Map(names.map((n) => [n, key(n)]));
     return [...names].sort((a, b) => {
@@ -2361,6 +2467,15 @@
       for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
       return 0;
     });
+  }
+  function appearanceRenames(spec, customRoles, namesInFile) {
+    const rule = spec.appearance.renamedTokens;
+    const all = __spreadValues({}, rule.tokens);
+    for (const role of customRoles) {
+      for (const [from, to] of Object.entries(rule.customRoleTokens)) all[from.replace("{role}", role)] = to.replace("{role}", role);
+    }
+    const inFile = new Set(namesInFile);
+    return Object.fromEntries(Object.entries(all).filter(([from, to]) => inFile.has(from) && !inFile.has(to)));
   }
   function themeModeNames(spec, n, names = []) {
     const t = spec.collections.Theme;
@@ -2410,12 +2525,12 @@
       return {
         canvas: color("color/bg/base"),
         input: color("color/bg/input"),
-        border: color("color/border/neutral/light"),
-        icon: color("color/icon/neutral/bolder"),
-        text: color("color/text/neutral/bolder"),
-        textBold: color("color/text/neutral/bold"),
-        brandBolder: color("color/text/brand/bolder"),
-        brandBold: color("color/text/brand/bold"),
+        border: color("color/border/default"),
+        icon: color("color/icon/default"),
+        text: color("color/text/default"),
+        textBold: color("color/text/subtle"),
+        brandBolder: color("color/text/brand/strong"),
+        brandBold: color("color/text/brand/default"),
         softNeutral: color("color/bg/neutral/softest"),
         softBrand: color("color/bg/brand/softest")
       };
@@ -3316,9 +3431,10 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
 
   // src/text-styles.ts
   var warning = (check, token, expected, actual, message) => ({ check, severity: "warning", collection: "Text styles", token, mode: "", expected, actual, message });
-  function buildTextStyles(spec, plan) {
+  function buildTextStyles(spec, plan, platforms = Object.keys(spec.textStyles.groups)) {
     var _a, _b;
     const ts = spec.textStyles;
+    if (platforms.length === 0) return { styles: [], report: [] };
     const inCollection = (collection) => new Map(plan.variables.filter((v) => v.collection === collection).map((v) => [v.name, v]));
     const themeVariables = inCollection("Theme");
     const primitives = inCollection("Primitives");
@@ -3345,6 +3461,7 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
     const styles = [];
     const report = [];
     for (const [group, rows] of Object.entries(ts.groups)) {
+      if (!platforms.includes(group)) continue;
       let sameAsNormal = 0;
       for (const row2 of rows) {
         const define = (name, letterSpacing, asked) => {
@@ -3862,7 +3979,7 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
     figma.closePlugin(`Tokenseed could not read this file: ${e instanceof Error ? e.message : String(e)}`);
   });
   figma.ui.onmessage = async (msg) => {
-    var _a;
+    var _a, _b;
     if (msg.type === "resize" || msg.type === "resize-end") {
       const { width, height } = clampWindowSize(msg.width, msg.height);
       figma.ui.resize(width, height);
@@ -3888,14 +4005,20 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
       const report = [...plan.report];
       let modes = [];
       let renames = {};
-      const textStyles = plan.ok ? buildTextStyles(tokens_default, plan) : { styles: [], report: [] };
+      let tokenRenames = {};
+      const skipped = skippedCollections(tokens_default, inputs);
+      const inChosenCollection = (r) => !skipped.includes(r.collection);
+      const textStyles = plan.ok ? buildTextStyles(tokens_default, plan, chosenPlatforms(tokens_default, inputs)) : { styles: [], report: [] };
       if (plan.ok) {
         modes = matchModes(plan, inputs, collections);
         renames = plannedPaletteRenames(plan, existing, collections);
+        if (!skipped.includes("Appearance")) {
+          tokenRenames = appearanceRenames(tokens_default, (_b = inputs.customRoles) != null ? _b : [], appearanceVariables(existing, collections).map((v) => v.name));
+        }
         const renamed = (name) => Object.keys(renames).some((old) => name.startsWith(`Color/${old}/`));
         report.push(
-          ...findOrphans(plan, existing, collections).filter((r) => !(r.collection === "Primitives" && renamed(r.token))),
-          ...findOrphanModes(modes, collections),
+          ...findOrphans(plan, existing, collections).filter((r) => inChosenCollection(r) && !(r.collection === "Primitives" && renamed(r.token)) && !(r.collection === "Appearance" && r.token in tokenRenames)),
+          ...findOrphanModes(modes, collections).filter(inChosenCollection),
           ...textStyles.report,
           ...findOrphanTextStyles(tokens_default, (await figma.getLocalTextStylesAsync()).map((s) => s.name))
         );
@@ -3904,8 +4027,9 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
       if (plan.ok && msg.write) {
         checkRenames(modes, collections);
         const renamedPalettes = renamePalettes(renames, existing, collections);
+        const renamedTokens = renameAppearanceTokens(tokenRenames, existing, collections);
         summary = writePlan(plan, existing, collections, modes);
-        summary.renamed = renamedPalettes;
+        summary.renamed = [...renamedPalettes, ...renamedTokens];
         await storePaletteSources(plan);
         try {
           summary.textStyles = await writeTextStyles(textStyles.styles);
@@ -3914,7 +4038,8 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
           summary.problems.push(`Text styles were not written: ${e instanceof Error ? e.message : String(e)}`);
         }
         try {
-          summary.tablesPage = (await drawColorTables(buildTables(tokens_default, plan), buildColorMaps(plan))).page;
+          const source = skipped.length ? tableSourceAfterWrite(plan, await readLiveVariables(), skipped) : plan;
+          summary.tablesPage = (await drawColorTables(buildTables(tokens_default, source), buildColorMaps(source))).page;
         } catch (e) {
           summary.problems.push(`Color tables were not drawn: ${e instanceof Error ? e.message : String(e)}`);
         }
@@ -4059,6 +4184,21 @@ Fixed Dim`, x: x + 196, y: 508, w: 196, h: 112 },
   function rgbaToHex(c, keepAlpha = false) {
     const channels = keepAlpha && c.a !== void 0 && c.a < 1 ? [c.r, c.g, c.b, c.a] : [c.r, c.g, c.b];
     return "#" + channels.map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("").toUpperCase();
+  }
+  function appearanceVariables(existing, collections) {
+    var _a;
+    const id = (_a = collections.find((c) => c.name === "Appearance")) == null ? void 0 : _a.id;
+    return existing.filter((v) => v.variableCollectionId === id);
+  }
+  function renameAppearanceTokens(renames, existing, collections) {
+    const done = [];
+    for (const v of appearanceVariables(existing, collections)) {
+      const to = renames[v.name];
+      if (!to) continue;
+      done.push(`Appearance token ${v.name} was renamed to ${to}.`);
+      v.name = to;
+    }
+    return done;
   }
   function findOrphans(plan, existing, collections) {
     const planned = new Set(plan.variables.map((v) => `${v.collection}|${v.name}`));

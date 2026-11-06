@@ -21,8 +21,10 @@ const warning = (check: string, token: string, expected: string, actual: string 
 );
 
 // The text styles to write for this plan, and the warnings about them. Nothing is written here.
-export function buildTextStyles(spec: Spec, plan: Plan): { styles: TextStyleDef[]; report: ReportEntry[] } {
+// platforms: the groups to make (android, ios, web), all of them when omitted. The others get no style and no warning.
+export function buildTextStyles(spec: Spec, plan: Plan, platforms: string[] = Object.keys(spec.textStyles.groups)): { styles: TextStyleDef[]; report: ReportEntry[] } {
   const ts = spec.textStyles;
+  if (platforms.length === 0) return { styles: [], report: [] };
   const inCollection = (collection: string) => new Map(plan.variables.filter((v) => v.collection === collection).map((v) => [v.name, v]));
   const themeVariables = inCollection("Theme");
   const primitives = inCollection("Primitives");
@@ -49,6 +51,7 @@ export function buildTextStyles(spec: Spec, plan: Plan): { styles: TextStyleDef[
   const styles: TextStyleDef[] = [];
   const report: ReportEntry[] = [];
   for (const [group, rows] of Object.entries(ts.groups) as [string, any[]][]) {
+    if (!platforms.includes(group)) continue;
     let sameAsNormal = 0;
     for (const row of rows) {
       // The weight a style really uses: the one it asks for, or the first of its fallbacks that exists.

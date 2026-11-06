@@ -7,6 +7,7 @@ import type { Neutral, Palette } from "./palette.ts";
 import { validateHex } from "./validate.ts";
 import { assignPaletteNames, hslHue, hueDistance, similarPalettes } from "./naming.ts";
 import type { NamedColorInput, NamedPalette, SimilarNotice } from "./naming.ts";
+import { skippedCollections, unknownChoices } from "./selection.ts";
 
 // The parsed contents of spec/tokens.json. Kept loose on purpose: the file is the source of truth.
 export type Spec = any;
@@ -58,6 +59,8 @@ export type Inputs = {
   customRoles?: string[]; // optional; extra color roles such as "promo", treated like status roles
   extraAppearances?: AppearanceInput[]; // optional; besides Light and Dark
   statusRoles?: string[]; // optional; which of success, danger, warning, info exist (all four when omitted)
+  collections?: string[]; // optional; which of Appearance and ColorScheme are written (both when omitted)
+  textStylePlatforms?: string[]; // optional; which of android, ios, web get text styles (all three when omitted)
 };
 
 // ---------- Output shapes (section 6.1) ----------
@@ -156,11 +159,16 @@ export function appearanceValueFor(spec: Spec, name: string, value: string, mode
 function textFillValueFor(spec: Spec, name: string, value: string, step: number | string, customRoles: string[]): string {
   const rule = spec.appearance.textFill;
   const listed = rule.tokens.includes(name) || customRoles.some((r) => rule.customRoleTokens.some((t: string) => t.replace("{role}", r) === name));
-  if (!listed) return value;
+  return listed ? withTextFillStep(spec, value, step) : value;
+}
+
+// A value moved to a text fill step, in its own color family. Black and white exist only in neutral;
+// other families use the step in appearance.textFill.stepsWithoutColor instead.
+function withTextFillStep(spec: Spec, value: string, step: number | string): string {
   const family = value.match(/^color\/([^/]+)\/(\d+|white|black)$/)?.[1];
   if (!family) return value;
   if (typeof step === "number") return `color/${family}/${step}`;
-  return family === "neutral" ? `color/neutral/${step}` : `color/${family}/${rule.stepsWithoutColor[step]}`;
+  return family === "neutral" ? `color/neutral/${step}` : `color/${family}/${spec.appearance.textFill.stepsWithoutColor[step]}`;
 }
 
 // Section 5.1, appearance.lightCanvas and appearance.darkCanvas in tokens.json: the value of an
@@ -356,10 +364,14 @@ export function hueOnlyShifts(naming: ReturnType<typeof namePalettes>, built: Pa
 
 export function buildPlan(spec: Spec, inputs: Inputs): Plan {
   const report: ReportEntry[] = [];
+  // Collections the user did not choose: their checks are skipped, so they cannot stop generation.
+  // Input checks still count, because the inputs shape the collections that are written too.
+  const skipped: string[] = skippedCollections(spec, inputs);
   const add = (
     check: string, collection: string, token: string, mode: string,
     expected: string, actual: string | number, message: string,
   ): void => {
+    if (skipped.includes(collection) && check !== "missing_input") return;
     report.push({ check, severity: severityOf(spec, check), collection, token, mode, expected, actual, message });
   };
   const hasErrors = (): boolean => report.some((r) => r.severity === "error");
@@ -541,6 +553,15 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
     extraNames.push(name);
   });
 
+  // Which collections and text style platforms to write: only the names in tokens.json.
+  const unknown = unknownChoices(spec, inputs);
+  for (const c of unknown.collections) {
+    add("missing_input", "Collections", "collections", "Global", spec.inputs.collections.allowed.join(", "), c, `"${c}" is not a collection that can be chosen.`);
+  }
+  for (const p of unknown.platforms) {
+    add("missing_input", "Text styles", "textStylePlatforms", "Global", spec.inputs.textStylePlatforms.allowed.join(", "), p, `"${p}" is not a text style platform.`);
+  }
+
   if (hasErrors()) return stop();
 
   // ----- 2. Name and generate palettes (sections 1.1.8 and 5.2 to 5.5) -----
@@ -619,18 +640,16 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
   };
 
   const exp = spec.theme.colorExpansion;
+  const neutralExtra = (name: string): void => theme(name, "COLOR", everyTheme({ alias: exp.neutralExtras[name] }));
   // Built-in roles, then custom roles (theme.customRoles): the same 13-step expansion.
   for (const role of [...Object.keys(spec.theme.colorRoles), ...customRoles]) {
     if (inactiveRoles.includes(role)) continue; // a status role the user turned off
+    if (role === "neutral") neutralExtra("color/neutral/black"); // the darkest neutral comes first
     for (const step of exp.steps) {
       const name = exp.pattern.replace("{role}", role).replace("{step}", String(step));
       theme(name, "COLOR", Object.fromEntries(themeModes.map((m, i) => [m, { alias: `Color/${paletteFor(role, i)}/${step}` }])));
     }
-    if (role === "neutral") {
-      for (const [name, target] of Object.entries(exp.neutralExtras) as [string, string][]) {
-        theme(name, "COLOR", everyTheme({ alias: target }));
-      }
-    }
+    if (role === "neutral") neutralExtra("color/neutral/white"); // and the lightest comes last
   }
 
   // Alpha tokens: a composed color with two links, the color source and the Opacity Primitive.
@@ -699,12 +718,23 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
 
   // Every mode copies its base (Light or Dark) and applies its own canvas and text fill steps (section 5.1).
   const modeBases = appearanceModes(spec, inputs);
+  // Fixed text tokens keep one value in every mode: the bolder text of one base, at that base's text fill step.
+  const fixedText: Record<string, string> = spec.appearance.textFill.fixedTokens;
+  const baseTextFill: Record<string, number | string> = {
+    Light: canvasStepOf(inputs.lightTextFillStep ?? spec.inputs.lightTextFillStep.default),
+    Dark: canvasStepOf(inputs.darkTextFillStep ?? spec.inputs.darkTextFillStep.default),
+  };
   // Created in appearance.order, so a new collection lists them in that order in Figma.
   for (const name of appearanceOrder(spec, appNames)) {
     const map = appMaps.get(name)!;
     const values: Record<string, Value> = {};
+    const fixedBase = fixedText[name];
     for (const m of modeBases) {
-      values[m.name] = { alias: appearanceValueFor(spec, name, map[m.base], m, customRoles) };
+      values[m.name] = {
+        alias: fixedBase
+          ? withTextFillStep(spec, map[fixedBase], baseTextFill[fixedBase])
+          : appearanceValueFor(spec, name, map[m.base], m, customRoles),
+      };
     }
     vars.push({ collection: "Appearance", name, type: "COLOR", scopes: scopesFor(name), values });
   }
@@ -848,8 +878,8 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
       for (const role of [...sp.roles.filter((r: string) => !inactiveRoles.includes(r)), ...customRoles]) {
         for (const bgName of sp.backgrounds) {
           const bg = `color/bg/${role}/${bgName}`;
-          checkPair(`color/text/${role}/bold`, bg, sp["text/bold"], "status_pairing", i, m);
-          checkPair(`color/text/${role}/bolder`, bg, sp["text/bolder"], "status_pairing", i, m);
+          checkPair(`color/text/${role}/default`, bg, sp["text"], "status_pairing", i, m);
+          checkPair(`color/text/${role}/strong`, bg, sp["text/strong"], "status_pairing", i, m);
           checkPair(`color/icon/${role}`, bg, sp["icon"], "status_pairing", i, m);
         }
       }
@@ -902,13 +932,23 @@ export function buildPlan(spec: Spec, inputs: Inputs): Plan {
     }
   }
 
-  return { ok: true, collections, variables: vars, report, manifest, palettes: [...naming.neutralNaming.palettes, ...naming.palettes] };
+  // Collections that were not chosen are built (ColorScheme copies some Appearance values) but not written.
+  const written = (collection: string): boolean => !skipped.includes(collection);
+  return {
+    ok: true,
+    collections: collections.filter((c) => written(c.name)),
+    variables: vars.filter((v) => written(v.collection)),
+    report,
+    manifest: manifest.filter((e) => written(e.collection)),
+    palettes: [...naming.neutralNaming.palettes, ...naming.palettes],
+  };
 }
 
 // Appearance token names in the order of appearance.order (section 3.3): group (elevation, bg, text,
 // border, icon), then sub-group in order of first appearance in appearance.tokens, then emphasis
-// (bolder ... softest), then tokens without an emphasis in appearance.tokens order. A token nested under
-// another token (canvas/deep under canvas) stays in that token's sub-group, so they are listed together.
+// (bolder ... softest), then tokens without an emphasis in appearance.tokens order. A token directly under
+// its group (color/border/danger) is a sub-group of its own, so the list alone sets its place. A token nested
+// under another token (canvas/deep under canvas) stays in that token's sub-group, so they are listed together.
 // Names that the spec does not know (added by hand in Figma) keep their relative order after the known
 // ones of their sub-group.
 export function appearanceOrder(spec: Spec, names: string[]): string[] {
@@ -917,13 +957,20 @@ export function appearanceOrder(spec: Spec, names: string[]): string[] {
   const reference = [...specNames, ...names.filter((n) => !specNames.includes(n))];
   const pos = new Map(reference.map((n, i) => [n, i]));
   const up = (n: string): string => n.split("/").slice(0, -1).join("/");
-  const parentOf = (n: string): string => (pos.has(up(n)) ? up(up(n)) : up(n));
-  const firstOfParent = new Map<string, number>();
-  for (const n of reference) if (!firstOfParent.has(parentOf(n))) firstOfParent.set(parentOf(n), pos.get(n)!);
+  // A token directly under its group (color/border/danger) is a sub-group of its own. Every other token belongs to
+  // its Figma group (color/text/default with color/text/subtle), or to the token it is nested under.
+  const subGroupOf = (n: string): string => {
+    if (n.split("/").length <= 3) return n;
+    return pos.has(up(n)) ? subGroupOf(up(n)) : up(n);
+  };
+  const firstOfSubGroup = new Map<string, number>();
+  for (const n of reference) if (!firstOfSubGroup.has(subGroupOf(n))) firstOfSubGroup.set(subGroupOf(n), pos.get(n)!);
   const rank = (list: string[], x: string): number => (list.includes(x) ? list.indexOf(x) : list.length);
   const key = (n: string): number[] => {
     const parts = n.split("/");
-    return [rank(categories, parts[1]), firstOfParent.get(parentOf(n))!, rank(emphasis, parts[parts.length - 1]), pos.get(n)!];
+    // A sub-group's own token comes before the tokens nested under it.
+    const own = subGroupOf(n) === n ? -1 : rank(emphasis, parts[parts.length - 1]);
+    return [rank(categories, parts[1]), firstOfSubGroup.get(subGroupOf(n))!, own, pos.get(n)!];
   };
   const keys = new Map(names.map((n) => [n, key(n)]));
   return [...names].sort((a, b) => {
@@ -931,6 +978,18 @@ export function appearanceOrder(spec: Spec, names: string[]): string[] {
     for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
     return 0;
   });
+}
+
+// Section 3.2, appearance.renamedTokens: old name -> new name for the Appearance tokens that were renamed,
+// limited to the old names that are in the file and whose new name is not. Changes nothing.
+export function appearanceRenames(spec: Spec, customRoles: string[], namesInFile: string[]): Record<string, string> {
+  const rule = spec.appearance.renamedTokens;
+  const all: Record<string, string> = { ...rule.tokens };
+  for (const role of customRoles) {
+    for (const [from, to] of Object.entries(rule.customRoleTokens) as [string, string][]) all[from.replace("{role}", role)] = to.replace("{role}", role);
+  }
+  const inFile = new Set(namesInFile);
+  return Object.fromEntries(Object.entries(all).filter(([from, to]) => inFile.has(from) && !inFile.has(to)));
 }
 
 // Theme mode names: the user's name for each theme, or the default names in tokens.json

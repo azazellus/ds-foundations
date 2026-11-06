@@ -12,13 +12,13 @@
      A line, inside or outside as in the design, is a shadow, so it never changes a size. */
   :root, .panel.light {
     color-scheme: light;
-    --text: #141319;      /* color/text/neutral/bolder */
-    --muted: #696871;     /* color/text/neutral/bold */
+    --text: #141319;      /* color/text/default */
+    --muted: #696871;     /* color/text/subtle */
     --step-label: #696871;
     --placeholder: #696871;
-    --window: #ffffff;    /* color/elevation/surface/canvas */
+    --window: #ffffff;    /* color/elevation/surface/canvas/default */
     --panel: #ffffff;     /* color/bg/container: theme, color mode, export and report panels */
-    --overlay: #ffffff;   /* color/elevation/surface/overlay: the top bar */
+    --overlay: #ffffff;   /* color/elevation/surface/overlay/default: the top bar */
     --icon-inverse: #ffffff; /* icons on the main button and in ticked checkboxes */
     --add-bg: #eff1ff;    /* color/bg/brand/softest: the "Add …" placeholder sections */
     --field: #ffffff;     /* color/bg/input */
@@ -27,8 +27,8 @@
     --track: #dbdae4;     /* color/bg/neutral/soft: the slider's line */
     --tab-track: #f4f3f9; /* color/elevation/surface/overlay/deep: behind the three tabs */
     --glow: #e2e5ff;      /* the center of the soft light behind the logo on the landing page */
-    --border: rgba(0, 0, 0, 0.24);         /* color/border/neutral/light */
-    --brand-line: rgba(85, 58, 223, 0.36); /* color/border/brand/light: "Add …" sections */
+    --border: rgba(0, 0, 0, 0.24);         /* color/border/default */
+    --brand-line: rgba(85, 58, 223, 0.36); /* color/border/brand/default: "Add …" sections */
     --accent: #553adf;    /* brand text and icons, selected weight chips */
     --action: #553adf;    /* main button, ticked checkboxes, slider thumb */
     --accent-soft: #eff1ff;
@@ -221,6 +221,8 @@
   input.cb:checked { background: var(--action) var(--check-icon) center / 16px 16px no-repeat; box-shadow: var(--convex); }
   input.cb:focus-visible { outline: 2px solid var(--action); outline-offset: 1px; }
   .check-row { display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: 24px; }
+  /* A checkbox with a label (the CheckboxLabel component): the label is Regular, and SemiBold when ticked. */
+  .check-row:has(input:checked), .choice:has(input:checked) { font-weight: 600; }
 
   /* Dropdowns: a styled box with a transparent native <select> on top, so it stays accessible. */
   .picker { position: relative; display: flex; align-items: center; gap: 8px; height: 24px; padding: 2px 4px 2px 12px; border-radius: 8px; background: var(--field); box-shadow: var(--line), var(--convex); font: 14px/20px var(--mono); }
@@ -305,6 +307,16 @@
   .landing-start { height: 40px; padding: 0 20px !important; font-size: 16px; }
   .landing-text p { margin: 0; width: 416px; max-width: 100%; font-size: 16px; line-height: 24px; text-align: center; }
 
+  /* Generate tab, top: the title, then what to write, in columns of checkboxes. */
+  .generate-head { display: flex; flex-direction: column; gap: 24px; padding: 12px 24px; margin-bottom: 24px; }
+  .generate-head .section-title { padding: 0; }
+  .choices { display: flex; flex-wrap: wrap; gap: 24px 32px; }
+  .choice-col { width: 200px; display: flex; flex-direction: column; gap: 16px; }
+  .choice-col h2 { margin: 0; font-size: 16px; line-height: 20px; font-weight: 700; }
+  .choice-list { display: flex; flex-direction: column; gap: 8px; }
+  .choice { display: flex; align-items: center; gap: 8px; cursor: pointer; align-self: flex-start; }
+  .choice:has(input:disabled) { cursor: default; }
+
   /* Generate tab: the result of the check on the left, the buttons on the right. */
   .action-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; min-height: 40px; padding: 0 24px; margin-bottom: 24px; }
   .action-row .group { display: flex; gap: 8px; margin-left: auto; }
@@ -321,8 +333,9 @@
   .report-title { display: flex; align-items: center; gap: 8px; font-size: 20px; line-height: 32px; font-weight: 700; }
   .report-count { font-size: 14px; line-height: 20px; font-weight: 400; color: var(--muted); }
   .report-warning { display: none; }
-  .report-card.error { min-height: calc(100vh - 136px); }
-  .action-row:not(.hidden) + .report-card.error { min-height: calc(100vh - 200px); } /* 64px less: Update tables stays above it */
+  /* The Generate tab fills the window (its 112px top and 24px bottom padding aside), so a red report takes the space left. */
+  #tabGenerate { display: flex; flex-direction: column; min-height: calc(100vh - 136px); }
+  .report-card.error { flex: 1; }
   .report-card.error .report-title { color: var(--error); }
   .report-card.error .report-warning { display: block; background: var(--error); }
   .report-head .when-open { display: none; }
@@ -400,6 +413,31 @@
 
 <!-- Generate tab: the check runs when the tab opens, and writes nothing. With errors, Generate is hidden. Update tables stays: it reads the file, not the form. -->
 <div id="tabGenerate" class="hidden">
+  <!-- What Generate tokens writes (spec section 5.1). The values are the names in tokens.json, under
+       inputs.collections and inputs.textStylePlatforms. Primitives and Theme are always written. -->
+  <section class="generate-head" aria-labelledby="generateTitle">
+    <div class="section-title">
+      <h1 id="generateTitle">Generate</h1>
+      <p>Choose what to write into this Figma file. Primitives and Theme are always included, because every other token links to them.</p>
+    </div>
+    <div class="choices">
+      <div class="choice-col" role="group" aria-labelledby="collectionsTitle">
+        <h2 id="collectionsTitle">Collections</h2>
+        <div class="choice-list">
+          <label class="choice"><input type="checkbox" class="cb choose-collection" value="Appearance" checked> Appearance</label>
+          <label class="choice"><input type="checkbox" class="cb choose-collection" value="ColorScheme" checked> ColorScheme</label>
+        </div>
+      </div>
+      <div class="choice-col" role="group" aria-labelledby="platformsTitle">
+        <h2 id="platformsTitle">Text styles</h2>
+        <div class="choice-list">
+          <label class="choice"><input type="checkbox" class="cb choose-platform" value="android" checked> Android</label>
+          <label class="choice"><input type="checkbox" class="cb choose-platform" value="ios" checked> iOS</label>
+          <label class="choice"><input type="checkbox" class="cb choose-platform" value="web" checked> Web</label>
+        </div>
+      </div>
+    </div>
+  </section>
   <div class="action-row" id="actionRow">
     <div class="status-line" id="statusLine" role="status"><span id="statusIcon"></span><span id="statusText"></span></div>
     <div class="group">
@@ -1294,8 +1332,13 @@
       lightTextFillStep: lightPanel.textFill.get().step,
       ...(dark ? { darkCanvasStep: dark.canvas.get().step, darkTextFillStep: dark.textFill.get().step } : {}),
       extraAppearances,
+      collections: tickedValues(".choose-collection"),
+      textStylePlatforms: tickedValues(".choose-platform"),
     };
   }
+
+  // The values of the ticked boxes among these (the Generate tab's collections or text style platforms).
+  const tickedValues = (selector) => [...document.querySelectorAll(selector)].filter((cb) => cb.checked).map((cb) => cb.value);
 
   // Put saved inputs back (or start a fresh form when there are none).
   function fillInputs(inputs) {
@@ -1329,6 +1372,9 @@
       addAppearance("extra", { ...a, canvasStep: a.canvasStep ?? (a.base === "Light" ? LIGHT_STEPS[0] : DARK_DEFAULT) });
     }
     refreshAddDark();
+    // What to generate: everything, unless this file saved other choices.
+    for (const cb of document.querySelectorAll(".choose-collection")) cb.checked = !inputs.collections || inputs.collections.includes(cb.value);
+    for (const cb of document.querySelectorAll(".choose-platform")) cb.checked = !inputs.textStylePlatforms || inputs.textStylePlatforms.includes(cb.value);
   }
 
   // ---------- Keyboard ----------
@@ -1380,6 +1426,8 @@
     busy = value;
     document.getElementById("create").disabled = value;
     document.getElementById("tables").disabled = value;
+    // The choices are locked while something runs, so the result always matches what is ticked.
+    for (const cb of document.querySelectorAll(".choose-collection, .choose-platform")) cb.disabled = value;
   }
   // A file with tokens is updated, and can redraw its tables. A file with none has nothing to redraw from.
   function showTokenButtons() {
@@ -1402,6 +1450,8 @@
     parent.postMessage({ pluginMessage: { type: "run", inputs: readInputs(), write } }, "*");
   }
   document.getElementById("create").onclick = () => run(true);
+  // A new choice changes what is checked, so the check runs again. It writes nothing.
+  for (const cb of document.querySelectorAll(".choose-collection, .choose-platform")) cb.onchange = () => run(false);
 
   // Redraw the tables from the file's current variables. The form inputs are not used.
   document.getElementById("tables").onclick = () => {

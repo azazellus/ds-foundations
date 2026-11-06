@@ -33,8 +33,8 @@ Sections 1 to 3 describe what the collections contain. Section 5 describes how t
 | Role | The meaning of a color: neutral, brand, a status role (success, danger, warning, info), or a custom role added by the user. |
 | Step | A shade of a palette, from 950 (darkest) to 50 (lightest). |
 | Anchor | The step of the brand palette that keeps the brand color's exact HEX (section 5.2). |
-| Canvas | The base surface of an appearance: color/elevation/surface/canvas and color/bg/base. |
-| Text fill | The step of the bolder text and icons of an appearance (section 5.1). |
+| Canvas | The base surface of an appearance: color/elevation/surface/canvas/default and color/bg/base. |
+| Text fill | The step of the strongest text and icons of an appearance (section 5.1). |
 | Alpha token | A Theme color token made of a color link and an opacity link (section 2.1). Never contrast-checked. |
 | Alias | A variable value that links to another variable instead of storing a raw value. |
 
@@ -141,7 +141,7 @@ Each row pairs a text step of the palette under validation with a background ste
 | 150 | 700 | Theme neutral | 7:1 | 9.5:1 |
 | 500 | 100 | Same palette (self) | 4.5:1 | 4.5:1 |
 
-> Note: The same-palette pairing protects `color/text/{role}/bold` on `color/bg/{role}/softer` in Light (section 3.4). Step 100 of a palette is usually a little darker than neutral step 100, because its target L is lower. It is much darker when the supplied color is very light and becomes the anchor at step 100.
+> Note: The same-palette pairing protects `color/text/{role}/default` on `color/bg/{role}/softer` in Light (section 3.4). Step 100 of a palette is usually a little darker than neutral step 100, because its target L is lower. It is much darker when the supplied color is very light and becomes the anchor at step 100.
 
 Minimum ratios are hard requirements. Target ratios are optimization goals. The method for calculating contrast is defined in section 5.7.
 
@@ -369,6 +369,7 @@ Naming: `color/{role}/{step}`, in lowercase, where `{role}` has no slash. Exampl
 - Values reference Primitives only. Raw HEX values are never stored in this collection.
 - All Theme color tokens have all variable scopes disabled.
 - Figma type: COLOR.
+- Order in Figma: neutral, brand, success, danger, warning, info, then custom roles. Neutral starts with black, then 950 down to 50, and ends with white. Alpha tokens follow, each color from `a96` down to `a00`.
 
 #### Roles and palette mapping
 
@@ -400,7 +401,7 @@ Alpha tokens provide semi-transparent colors. Each alpha token is a color variab
 
 Alpha tokens are not contrast-calibrated. They define a base color with transparency, not an accessible foreground/background pairing. Contrast checks never apply to alpha tokens, or to Appearance tokens that reference them (section 3.4).
 
-**Colored alpha:** for each role in brand, danger, success, warning, info, and every custom role, one token is generated for each Opacity Primitive in section 1.4, in each theme.
+**Colored alpha:** for each role in brand, success, danger, warning, info, and every custom role, one token is generated for each Opacity Primitive in section 1.4, in each theme.
 
 - Naming: `color/{role}/alpha/a{NN}`, where `{NN}` is the percentage, zero-padded to two digits (`a00`, `a04`, `a06`, `a08`, `a12`, and so on).
 - Color source: the role's 500 step in the same theme.
@@ -532,7 +533,7 @@ Main pattern: `color/{category}/{role}/{emphasis}`
 
 - Category: `elevation`, `bg`, `text`, `border`, or `icon`.
 - Role: `neutral`, `brand`, `selected` (brand colors for selected states), `success`, `danger`, `warning`, `info`, or a custom role (section 5.1).
-- Emphasis: the strength of the color, from the scale below.
+- Emphasis: the strength of the color. `bg` uses the scale below. `text`, `icon`, and `border` use their own words, described after it.
 
 | Emphasis | Use |
 |---|---|
@@ -540,10 +541,18 @@ Main pattern: `color/{category}/{role}/{emphasis}`
 | softer | Low emphasis; secondary fills |
 | soft | Moderate emphasis; secondary surfaces |
 | accent | Medium emphasis; graphic elements and selected graphic emphasis |
-| bold | High emphasis; primary text and strong fills |
-| bolder | Highest emphasis; emphasized text and icons |
+| bold | High emphasis; strong fills |
+| bolder | Highest emphasis; the strongest fills |
 
-Examples: `color/bg/neutral/soft`, `color/text/neutral/bolder`, `color/border/danger`.
+**Text, icons, and borders.** These follow Atlassian's naming. Neutral is the default color, so its name has no role: `color/text/default`, `color/icon/default`, and `color/border/default`.
+
+- `default` names the main token of a set. It is a name of its own, so the token sits in the same Figma group as its variants: `color/text/default` next to `color/text/subtle`, and `color/text/brand/default` next to `color/text/brand/strong`. A token without variants, such as `color/border/danger`, has no `default`.
+- `color/text/default` and `color/icon/default` are the main neutral text and icons. `color/text/subtle` and `color/icon/subtle` are the softer ones.
+- For a color role, `default` is the role's color: `color/text/brand/default`, `color/icon/brand/default`, and `color/border/brand/default`. `strong` is its higher-contrast variant, such as `color/text/brand/strong`.
+- `color/border/default` is the light neutral border, and `color/border/strong` the strong one.
+- `subtle` and `strong` describe contrast, not lightness. In Dark, a `strong` token is lighter than its `default`.
+
+Examples: `color/bg/neutral/soft`, `color/text/default`, `color/text/subtle`, `color/text/brand/strong`, `color/border/danger`.
 
 Some tokens have no emphasis suffix. These are the only permitted exceptions:
 
@@ -551,12 +560,14 @@ Some tokens have no emphasis suffix. These are the only permitted exceptions:
 |---|---|
 | bg | base, container, input, action, disabled |
 | text | disabled, inverse, link, fixed/dark, fixed/light |
-| border | brand/heavy, brand/light, neutral/heavy, neutral/light, danger, disabled, focus, info, inverse, selected, success, warning |
+| border | danger, disabled, focus, info, inverse, selected, success, warning |
 | icon | danger, disabled, inverse, info, success, warning |
-| elevation/surface | canvas, canvas/deep, canvas/deeper, menu, overlay, overlay/deep, overlay/deeper, raised, scrim |
+| elevation/surface | canvas/default, canvas/deep, canvas/deeper, menu, overlay/default, overlay/deep, overlay/deeper, raised, scrim |
 | elevation/shadow | card, convex/top, convex/bottom, concave/top, concave/bottom |
 
-Do not create additional no-emphasis variants. Do not mix emphasis systems within a category. `bg`, `text`, and `icon` use `softest` through `bolder`. `border` uses `light` and `heavy` where a strength distinction is needed. `accent` is reserved for selected graphic emphasis and for the brand accent tokens.
+Do not create additional no-emphasis variants. Do not mix emphasis systems within a category. `bg` uses `softest` through `bolder`. `text` and `icon` use `default`, `subtle`, and `strong`, and `border` uses `default` and `strong`. `accent` is reserved for selected graphic emphasis and for the brand accent tokens.
+
+**Renamed tokens.** Earlier versions named the text, icon, border, canvas, and overlay tokens differently, such as `color/text/neutral/bolder` for `color/text/default`, `color/border/neutral/light` for `color/border/default`, and `color/elevation/surface/canvas` for `color/elevation/surface/canvas/default`. In a file that has an old name and not the new one, the plugin renames the variable in place, so layers that use it keep working. The full list is in `tokens.json`, under `appearance.renamedTokens`.
 
 ### 3.3 Appearance tokens
 
@@ -565,8 +576,10 @@ Each row references one Theme token per appearance. Alpha tokens are referenced 
 The table is sorted alphabetically for reading. In Figma, and in the color tables, Appearance tokens follow this order (`appearance.order` in `tokens.json`):
 
 - Groups, from top to bottom: elevation, bg, text, border, icon.
-- Inside a group, sub-groups (such as brand, danger, or neutral) keep the order in which they first appear in this table.
-- Inside a sub-group, tokens follow the emphasis hierarchy, from top to bottom: bolder, bold, accent, soft, softer, softest. A token nested under another token, such as `canvas/deep`, belongs to that token's sub-group. Tokens without an emphasis (such as base, disabled, heavy, or light) come after them, in table order.
+- Inside a group, the default comes first: `color/text/default`, `color/icon/default`, or `color/border/default`, followed by its `subtle` or `strong` variant.
+- Then come the tokens that name no role (such as base, disabled, inverse, link, or focus).
+- Then the roles, in this order: neutral, brand, selected, success, danger, warning, info. This covers both sub-groups, such as `color/bg/brand`, and single tokens, such as `color/border/danger`.
+- Inside a sub-group, tokens follow the emphasis hierarchy, from top to bottom: default, strong, subtle, bolder, bold, accent, soft, softer, softest. Tokens in the same Figma group stay together, such as `canvas/default`, `canvas/deep`, and `canvas/deeper`. Tokens without an emphasis (such as base, disabled, deep, or deeper) come after them, in table order.
 
 > Note: Figma lists variables in the order they were created, and plugins cannot reorder existing variables. The order applies when the plugin creates the variables.
 
@@ -578,10 +591,10 @@ The table is sorted alphabetically for reading. In Figma, and in the color table
 | color/bg/{role}/soft | color/{role}/150 | color/{role}/800 |
 | color/bg/{role}/softer | color/{role}/100 | color/{role}/850 |
 | color/bg/{role}/softest | color/{role}/50 | color/{role}/900 |
-| color/text/{role}/bolder | color/{role}/900 | color/{role}/50 |
-| color/text/{role}/bold | color/{role}/500 | color/{role}/300 |
 | color/border/{role} | color/{role}/300 | color/{role}/500 |
 | color/icon/{role} | color/{role}/500 | color/{role}/300 |
+| color/text/{role}/default | color/{role}/500 | color/{role}/300 |
+| color/text/{role}/strong | color/{role}/900 | color/{role}/50 |
 
 Their `softest`, `softer`, and `soft` backgrounds follow the dark canvas like the other backgrounds (section 5.1).
 
@@ -594,11 +607,11 @@ Their `softest`, `softer`, and `soft` backgrounds follow the dark canvas like th
 | color/bg/brand/soft | color/brand/150 | color/brand/800 |
 | color/bg/brand/softer | color/brand/100 | color/brand/850 |
 | color/bg/brand/softest | color/brand/50 | color/brand/900 |
+| color/bg/container | color/neutral/white | color/neutral/900 |
 | color/bg/danger/bold | color/danger/500 | color/danger/300 |
 | color/bg/danger/soft | color/danger/150 | color/danger/800 |
 | color/bg/danger/softer | color/danger/100 | color/danger/850 |
 | color/bg/danger/softest | color/danger/50 | color/danger/900 |
-| color/bg/container | color/neutral/white | color/neutral/900 |
 | color/bg/disabled | color/neutral/alpha/black/a12 | color/neutral/alpha/white/a16 |
 | color/bg/info/bold | color/info/500 | color/info/300 |
 | color/bg/info/soft | color/info/150 | color/info/800 |
@@ -622,16 +635,16 @@ Their `softest`, `softer`, and `soft` backgrounds follow the dark canvas like th
 | color/bg/warning/soft | color/warning/150 | color/warning/800 |
 | color/bg/warning/softer | color/warning/100 | color/warning/850 |
 | color/bg/warning/softest | color/warning/50 | color/warning/900 |
-| color/border/brand/heavy | color/brand/400 | color/brand/400 |
-| color/border/brand/light | color/brand/alpha/a36 | color/brand/alpha/a36 |
+| color/border/brand/default | color/brand/alpha/a36 | color/brand/alpha/a36 |
+| color/border/brand/strong | color/brand/400 | color/brand/400 |
 | color/border/danger | color/danger/300 | color/danger/500 |
+| color/border/default | color/neutral/alpha/black/a24 | color/neutral/alpha/white/a16 |
 | color/border/disabled | color/neutral/alpha/black/a12 | color/neutral/alpha/white/a08 |
 | color/border/focus | color/brand/500 | color/brand/400 |
 | color/border/info | color/info/300 | color/info/500 |
 | color/border/inverse | color/neutral/white | color/neutral/950 |
-| color/border/neutral/heavy | color/neutral/400 | color/neutral/400 |
-| color/border/neutral/light | color/neutral/alpha/black/a24 | color/neutral/alpha/white/a16 |
 | color/border/selected | color/brand/400 | color/brand/400 |
+| color/border/strong | color/neutral/400 | color/neutral/400 |
 | color/border/success | color/success/300 | color/success/500 |
 | color/border/warning | color/warning/300 | color/warning/500 |
 | color/elevation/shadow/card | color/neutral/alpha/black/a12 | color/neutral/alpha/white/a00 |
@@ -639,45 +652,45 @@ Their `softest`, `softer`, and `soft` backgrounds follow the dark canvas like th
 | color/elevation/shadow/concave/top | color/neutral/alpha/black/a04 | color/neutral/alpha/black/a12 |
 | color/elevation/shadow/convex/bottom | color/neutral/alpha/black/a04 | color/neutral/alpha/black/a20 |
 | color/elevation/shadow/convex/top | color/neutral/alpha/white/a12 | color/neutral/alpha/white/a06 |
-| color/elevation/surface/canvas | color/neutral/white | color/neutral/950 |
 | color/elevation/surface/canvas/deep | color/neutral/50 | color/neutral/black |
 | color/elevation/surface/canvas/deeper | color/neutral/100 | color/neutral/black |
+| color/elevation/surface/canvas/default | color/neutral/white | color/neutral/950 |
 | color/elevation/surface/menu | color/neutral/50 | color/neutral/850 |
-| color/elevation/surface/overlay | color/neutral/white | color/neutral/900 |
 | color/elevation/surface/overlay/deep | color/neutral/50 | color/neutral/950 |
 | color/elevation/surface/overlay/deeper | color/neutral/100 | color/neutral/black |
+| color/elevation/surface/overlay/default | color/neutral/white | color/neutral/900 |
 | color/elevation/surface/raised | color/neutral/50 | color/neutral/850 |
 | color/elevation/surface/scrim | color/neutral/alpha/black/a48 | color/neutral/alpha/black/a80 |
 | color/icon/brand/accent | color/brand/400 | color/brand/400 |
-| color/icon/brand/bold | color/brand/500 | color/brand/300 |
-| color/icon/brand/bolder | color/brand/900 | color/brand/50 |
+| color/icon/brand/default | color/brand/500 | color/brand/300 |
+| color/icon/brand/strong | color/brand/900 | color/brand/50 |
 | color/icon/danger | color/danger/500 | color/danger/300 |
+| color/icon/default | color/neutral/900 | color/neutral/white |
 | color/icon/disabled | color/neutral/alpha/black/a24 | color/neutral/alpha/white/a16 |
 | color/icon/info | color/info/500 | color/info/300 |
 | color/icon/inverse | color/neutral/white | color/neutral/950 |
-| color/icon/neutral/bold | color/neutral/500 | color/neutral/300 |
-| color/icon/neutral/bolder | color/neutral/900 | color/neutral/white |
+| color/icon/subtle | color/neutral/500 | color/neutral/300 |
 | color/icon/success | color/success/500 | color/success/300 |
 | color/icon/warning | color/warning/500 | color/warning/300 |
-| color/text/brand/bold | color/brand/500 | color/brand/300 |
-| color/text/brand/bolder | color/brand/900 | color/brand/50 |
-| color/text/danger/bold | color/danger/500 | color/danger/300 |
-| color/text/danger/bolder | color/danger/900 | color/danger/50 |
+| color/text/brand/default | color/brand/500 | color/brand/300 |
+| color/text/brand/strong | color/brand/900 | color/brand/50 |
+| color/text/danger/default | color/danger/500 | color/danger/300 |
+| color/text/danger/strong | color/danger/900 | color/danger/50 |
+| color/text/default | color/neutral/900 | color/neutral/white |
 | color/text/disabled | color/neutral/alpha/black/a24 | color/neutral/alpha/white/a16 |
-| color/text/fixed/dark | color/neutral/700 | color/neutral/700 |
-| color/text/fixed/light | color/neutral/white | color/neutral/50 |
-| color/text/info/bold | color/info/500 | color/info/300 |
-| color/text/info/bolder | color/info/900 | color/info/50 |
+| color/text/fixed/dark | color/neutral/900 | color/neutral/900 |
+| color/text/fixed/light | color/neutral/white | color/neutral/white |
+| color/text/info/default | color/info/500 | color/info/300 |
+| color/text/info/strong | color/info/900 | color/info/50 |
 | color/text/inverse | color/neutral/white | color/neutral/900 |
 | color/text/link | color/brand/500 | color/brand/300 |
-| color/text/neutral/bold | color/neutral/500 | color/neutral/300 |
-| color/text/neutral/bolder | color/neutral/900 | color/neutral/white |
-| color/text/selected/bold | color/brand/500 | color/brand/300 |
-| color/text/selected/bolder | color/brand/900 | color/brand/50 |
-| color/text/success/bold | color/success/500 | color/success/300 |
-| color/text/success/bolder | color/success/900 | color/success/50 |
-| color/text/warning/bold | color/warning/500 | color/warning/300 |
-| color/text/warning/bolder | color/warning/900 | color/warning/50 |
+| color/text/selected/default | color/brand/500 | color/brand/300 |
+| color/text/selected/strong | color/brand/900 | color/brand/50 |
+| color/text/subtle | color/neutral/500 | color/neutral/300 |
+| color/text/success/default | color/success/500 | color/success/300 |
+| color/text/success/strong | color/success/900 | color/success/50 |
+| color/text/warning/default | color/warning/500 | color/warning/300 |
+| color/text/warning/strong | color/warning/900 | color/warning/50 |
 
 > Note: `color/elevation/shadow/card` is fully transparent in Dark (`a00`) on purpose.
 
@@ -685,42 +698,42 @@ Their `softest`, `softer`, and `soft` backgrounds follow the dark canvas like th
 
 Validate the following pairings in every theme and every appearance (Light, Dark, and each extra appearance). Contrast is calculated on the fully resolved, opaque HEX values (section 5.7).
 
-Alpha-based tokens are excluded. Any Appearance token that references an alpha Theme token is excluded, and it is not resolved, composited, or reported. This includes `color/bg/disabled`, `color/border/brand/light`, `color/border/disabled`, `color/border/neutral/light`, `color/elevation/shadow/card`, `color/elevation/shadow/concave/bottom`, `color/elevation/shadow/concave/top`, `color/elevation/shadow/convex/bottom`, `color/elevation/shadow/convex/top`, `color/elevation/surface/scrim`, `color/icon/disabled`, and `color/text/disabled`.
+Alpha-based tokens are excluded. Any Appearance token that references an alpha Theme token is excluded, and it is not resolved, composited, or reported. This includes `color/bg/disabled`, `color/border/brand/default`, `color/border/disabled`, `color/border/default`, `color/elevation/shadow/card`, `color/elevation/shadow/concave/bottom`, `color/elevation/shadow/concave/top`, `color/elevation/shadow/convex/bottom`, `color/elevation/shadow/convex/top`, `color/elevation/surface/scrim`, `color/icon/disabled`, and `color/text/disabled`.
 
 | Foreground token | Background token | Minimum contrast |
 |---|---|---|
-| color/text/neutral/bold | color/elevation/surface/canvas | 4.5:1 |
-| color/text/neutral/bolder | color/elevation/surface/canvas | 7:1 |
-| color/text/brand/bold | color/elevation/surface/canvas | 4.5:1 |
-| color/text/brand/bolder | color/elevation/surface/canvas | 7:1 |
-| color/text/danger/bold | color/elevation/surface/canvas | 4.5:1 |
-| color/text/danger/bolder | color/elevation/surface/canvas | 7:1 |
-| color/text/info/bold | color/elevation/surface/canvas | 4.5:1 |
-| color/text/info/bolder | color/elevation/surface/canvas | 7:1 |
-| color/text/success/bold | color/elevation/surface/canvas | 4.5:1 |
-| color/text/success/bolder | color/elevation/surface/canvas | 7:1 |
-| color/text/warning/bold | color/elevation/surface/canvas | 4.5:1 |
-| color/text/warning/bolder | color/elevation/surface/canvas | 7:1 |
-| color/text/link | color/elevation/surface/canvas | 4.5:1 |
-| color/icon/neutral/bold | color/elevation/surface/canvas | 3:1 |
-| color/icon/neutral/bolder | color/elevation/surface/canvas | 4.5:1 |
-| color/icon/brand/bold | color/elevation/surface/canvas | 3:1 |
-| color/icon/danger | color/elevation/surface/canvas | 3:1 |
-| color/icon/info | color/elevation/surface/canvas | 3:1 |
-| color/icon/success | color/elevation/surface/canvas | 3:1 |
-| color/icon/warning | color/elevation/surface/canvas | 3:1 |
-| color/border/focus | color/elevation/surface/canvas | 3:1 |
+| color/text/subtle | color/elevation/surface/canvas/default | 4.5:1 |
+| color/text/default | color/elevation/surface/canvas/default | 7:1 |
+| color/text/brand/default | color/elevation/surface/canvas/default | 4.5:1 |
+| color/text/brand/strong | color/elevation/surface/canvas/default | 7:1 |
+| color/text/danger/default | color/elevation/surface/canvas/default | 4.5:1 |
+| color/text/danger/strong | color/elevation/surface/canvas/default | 7:1 |
+| color/text/info/default | color/elevation/surface/canvas/default | 4.5:1 |
+| color/text/info/strong | color/elevation/surface/canvas/default | 7:1 |
+| color/text/success/default | color/elevation/surface/canvas/default | 4.5:1 |
+| color/text/success/strong | color/elevation/surface/canvas/default | 7:1 |
+| color/text/warning/default | color/elevation/surface/canvas/default | 4.5:1 |
+| color/text/warning/strong | color/elevation/surface/canvas/default | 7:1 |
+| color/text/link | color/elevation/surface/canvas/default | 4.5:1 |
+| color/icon/subtle | color/elevation/surface/canvas/default | 3:1 |
+| color/icon/default | color/elevation/surface/canvas/default | 4.5:1 |
+| color/icon/brand/default | color/elevation/surface/canvas/default | 3:1 |
+| color/icon/danger | color/elevation/surface/canvas/default | 3:1 |
+| color/icon/info | color/elevation/surface/canvas/default | 3:1 |
+| color/icon/success | color/elevation/surface/canvas/default | 3:1 |
+| color/icon/warning | color/elevation/surface/canvas/default | 3:1 |
+| color/border/focus | color/elevation/surface/canvas/default | 3:1 |
 
 Pairings that use a status role that is not in use (section 5.1) are skipped.
 
-For each custom role, also validate `color/text/{role}/bold` (4.5:1), `color/text/{role}/bolder` (7:1), and `color/icon/{role}` (3:1) against `color/elevation/surface/canvas`.
+For each custom role, also validate `color/text/{role}/default` (4.5:1), `color/text/{role}/strong` (7:1), and `color/icon/{role}` (3:1) against `color/elevation/surface/canvas/default`.
 
 #### Status pairings
 
 For each status role (danger, success, warning, info) and each custom role, validate against `color/bg/{role}/softer` only:
 
-- `color/text/{role}/bold`: at least 4.5:1.
-- `color/text/{role}/bolder`: at least 7:1.
+- `color/text/{role}/default`: at least 4.5:1.
+- `color/text/{role}/strong`: at least 7:1.
 - `color/icon/{role}`: at least 3:1.
 
 Status pairings are validated after generation. A failure stops generation and is reported. The plugin does not remap tokens to fix it, because remapping can silently change the design.
@@ -752,20 +765,20 @@ In the table, a token either names the Appearance token it copies (its Light and
 | primary | brand | color/bg/brand/bold | — | — | Main accent: the color seen most often across screens and components. |
 | onPrimary | brand | color/text/inverse | — | — | Text and icons on primary. |
 | primaryContainer | brand | color/bg/brand/soft | — | — | Softer primary fill for containers. |
-| onPrimaryContainer | brand | color/text/brand/bolder | — | — | Text and icons on primaryContainer. |
+| onPrimaryContainer | brand | color/text/brand/strong | — | — | Text and icons on primaryContainer. |
 | inversePrimary | brand | — | color/brand/300 | color/brand/500 | Primary color for places using inverse colors, like a snackbar button. |
 | secondary | {secondary} | color/bg/{secondary}/bold | — | — | Second accent, to add variety and tell parts of the product apart. |
 | onSecondary | {secondary} | color/text/inverse | — | — | Text and icons on secondary. |
 | secondaryContainer | {secondary} | color/bg/{secondary}/soft | — | — | Softer secondary fill for containers. |
-| onSecondaryContainer | {secondary} | color/text/{secondary}/bolder | — | — | Text and icons on secondaryContainer. |
+| onSecondaryContainer | {secondary} | color/text/{secondary}/strong | — | — | Text and icons on secondaryContainer. |
 | tertiary | {tertiary} | color/bg/{tertiary}/bold | — | — | Third accent, to balance the others or draw attention to an element. |
 | onTertiary | {tertiary} | color/text/inverse | — | — | Text and icons on tertiary. |
 | tertiaryContainer | {tertiary} | color/bg/{tertiary}/soft | — | — | Softer tertiary fill for containers. |
-| onTertiaryContainer | {tertiary} | color/text/{tertiary}/bolder | — | — | Text and icons on tertiaryContainer. |
+| onTertiaryContainer | {tertiary} | color/text/{tertiary}/strong | — | — | Text and icons on tertiaryContainer. |
 | background | — | color/bg/base | — | — | Color behind scrollable content. |
-| onBackground | — | color/text/neutral/bolder | — | — | Text and icons on background. |
-| surface | — | color/elevation/surface/canvas | — | — | Color of component surfaces, such as cards, sheets and menus. |
-| onSurface | — | color/text/neutral/bolder | — | — | Text and icons on surface. |
+| onBackground | — | color/text/default | — | — | Text and icons on background. |
+| surface | — | color/elevation/surface/canvas/default | — | — | Color of component surfaces, such as cards, sheets and menus. |
+| onSurface | — | color/text/default | — | — | Text and icons on surface. |
 | surfaceVariant | — | color/bg/neutral/soft | — | — | Alternative to surface, for similar uses. |
 | onSurfaceVariant | — | — | color/neutral/600 | color/neutral/200 | Secondary text and icons on surface. |
 | surfaceTint | brand | color/bg/brand/bold | — | — | Tint laid over surface by components with tonal elevation. |
@@ -774,16 +787,16 @@ In the table, a token either names the Appearance token it copies (its Light and
 | error | danger | color/bg/danger/bold | — | — | Signals errors in components, such as invalid text in a field. |
 | onError | danger | color/text/inverse | — | — | Text and icons on error. |
 | errorContainer | danger | color/bg/danger/soft | — | — | Softer error fill for containers. |
-| onErrorContainer | danger | color/text/danger/bolder | — | — | Text and icons on errorContainer. |
-| outline | — | color/border/neutral/heavy | — | — | Subtle boundary color that adds contrast for accessibility. |
-| outlineVariant | — | color/border/neutral/light | — | — | Decorative boundary color, where strong contrast is not needed. |
+| onErrorContainer | danger | color/text/danger/strong | — | — | Text and icons on errorContainer. |
+| outline | — | color/border/strong | — | — | Subtle boundary color that adds contrast for accessibility. |
+| outlineVariant | — | color/border/default | — | — | Decorative boundary color, where strong contrast is not needed. |
 | scrim | — | color/elevation/surface/scrim | — | — | Color of a scrim that covers content behind a layer. |
 | surfaceBright | — | — | color/neutral/white | color/neutral/700 (follows the dark canvas) | Surface variant that is always brighter than surface. |
 | surfaceContainer | — | — | color/neutral/100 | color/neutral/850 (follows the dark canvas) | Surface variant for component containers, such as cards and menus. |
 | surfaceContainerHigh | — | — | color/neutral/150 | color/neutral/800 (follows the dark canvas) | Surface container with more emphasis than surfaceContainer. |
 | surfaceContainerHighest | — | — | color/neutral/200 | color/neutral/700 (follows the dark canvas) | Surface container with more emphasis than surfaceContainerHigh. |
 | surfaceContainerLow | — | — | color/neutral/50 | color/neutral/900 (follows the dark canvas) | Surface container with less emphasis than surfaceContainer. |
-| surfaceContainerLowest | — | color/elevation/surface/canvas | — | — | Surface container with less emphasis than surfaceContainerLow. |
+| surfaceContainerLowest | — | color/elevation/surface/canvas/default | — | — | Surface container with less emphasis than surfaceContainerLow. |
 | surfaceDim | — | — | color/neutral/200 | color/neutral/950 (follows the dark canvas) | Surface variant that is always dimmer than surface. |
 | primaryFixed | brand | — | color/brand/100 | color/brand/100 | Primary fill that keeps the same color in light and dark. |
 | primaryFixedDim | brand | — | color/brand/200 | color/brand/200 | Stronger version of primaryFixed, the same in light and dark. |
@@ -852,7 +865,7 @@ Validate the following pairings in every theme and every mode (Light, Dark, and 
 ## 4. Accessibility reference
 
 - WCAG 2.2 AA: body text at least 4.5:1. Large text and UI components at least 3:1.
-- WCAG 2.2 AAA: body text at least 7:1. The `bolder` text tokens must meet it (section 3.4). For other text tokens it is optional.
+- WCAG 2.2 AAA: body text at least 7:1. `color/text/default` and the `strong` text tokens must meet it (section 3.4). For other text tokens it is optional.
 - Non-color cues: do not rely on color alone to convey state (danger, success). Pair color with an icon or text.
 - Text tokens must document their intended `bg` pairings and be verified in every appearance.
 
@@ -885,22 +898,26 @@ The plugin asks for each input below. Every palette input is a HEX value. The pl
 | Light text fill step | Global | Optional | 700, 800, 850, 900, 950, or black | 900 |
 | Dark text fill step | Global | Optional | 150, 100, 50, or white | white |
 | Extra appearances | Global | Optional | Zero or more: name, base (Light or Dark), a canvas step (white or 50 for a Light base; 950, 900, 850, or black for a Dark base), and a text fill step (the Light or Dark list above, by base) | None added |
+| Collections | Global | Optional | Any of: Appearance, ColorScheme. Primitives and Theme are always written | Both |
+| Text style platforms | Global | Optional | Any of: Android, iOS, web | All three |
 
 Rules for inputs:
 
 - The neutral color is optional, one per theme. Only its hue is used. A plain gray (R, G, and B equal), the default, gives the fixed Color/Gray palette. Any other color gives a tinted neutral (section 1.1.9). An invalid HEX stops generation as `invalid_hex`.
-- Status roles choose which of success, danger, warning, and info exist, for all themes at once. Brand and neutral always exist. For a status role that is not in use, no status color is asked for and nothing is generated for it: no Primitive palette, no Theme `color/{role}/...` tokens or alpha tokens, and no Appearance tokens whose name contains the role (such as `color/bg/warning/soft`, `color/text/warning/bold`, `color/border/warning`, and `color/icon/warning`) or whose value points to it. The contrast and status pairings in section 3.4 that use those tokens are skipped. Variables already in the file from an earlier run are not deleted; they are reported as `orphan_variable`.
+- Status roles choose which of success, danger, warning, and info exist, for all themes at once. Brand and neutral always exist. For a status role that is not in use, no status color is asked for and nothing is generated for it: no Primitive palette, no Theme `color/{role}/...` tokens or alpha tokens, and no Appearance tokens whose name contains the role (such as `color/bg/warning/soft`, `color/text/warning/default`, `color/border/warning`, and `color/icon/warning`) or whose value points to it. The contrast and status pairings in section 3.4 that use those tokens are skipped. Variables already in the file from an earlier run are not deleted; they are reported as `orphan_variable`.
 - Palette names are not inputs. The plugin chooses them from the list in section 1.1.8. A missing or invalid HEX stops generation as `missing_input` or `invalid_hex`.
 - Defaults apply only to optional inputs. A missing mandatory input stops generation (section 6.2).
 - Per-theme inputs must be supplied for every theme. Each theme needs a brand color, a color for each status role in use, a color for each custom role, and a font family.
 - The first theme is named Main theme unless the user names it. Every other theme the user does not name is named Custom theme, then Custom theme 2, Custom theme 3, and so on, with the lowest number that is free. A theme name uses letters, numbers, and single spaces and is unique. An invalid or duplicated name stops generation as `missing_input`. Only the themes requested exist.
 - Dark is optional. Without it, the Appearance collection has no Dark mode, no Dark value is written, every check in Dark is skipped, and the dark canvas and text fill steps are ignored. Dark-based extra appearances are still allowed: they copy the Dark values of section 3.3.
 - Custom roles add colors beyond brand and the status roles, such as `promo`. A role name uses lowercase letters and numbers, with single hyphens between them, such as `7` or `brand-2`. It is unique and not one of: neutral, brand, success, danger, warning, info, base, disabled, input, selected, focus, inverse, shadow, surface, fixed, link. Each theme supplies its own HEX for every custom role. A custom role generates the same tokens and checks as a status role: a Primitive palette per hue (section 5.3), the Theme tokens `color/{role}/{step}` and `color/{role}/alpha/a{NN}` (section 2.1), the Appearance tokens in section 3.3, and the checks in section 3.4.
+- Collections choose what Generate tokens writes besides Primitives and Theme, which are always written because every other collection links to them. A collection that is not chosen is not written, and its checks are skipped, so they cannot stop generation. Its variables and modes already in the file are left as they are and are not reported as `orphan_variable` or `orphan_mode`. ColorScheme does not need Appearance, because it links to Theme.
+- Text style platforms choose which groups of text styles are written (section 6.1.3). A group that is not chosen is not written, and its warnings are skipped. Its text styles already in the file are left as they are. With no platform chosen, no text style is written.
 - Font weights are chosen from the styles that the theme's font family has in Figma. Italic styles are not offered. Every selected style becomes a Primitive `Typography/Font-weight/{Style}`. Each weight slot in section 2.2 uses the selected style whose name matches the slot when spaces and letter case are ignored. A slot that matches in no theme is not created. A slot that matches in some themes but not in others stops generation as `missing_input`; the report names the slot and the font families without a match. A selected style that the family does not have also stops generation as `missing_input`.
 - Extra appearances are named by the user. One the user does not name is named Custom appearance, then Custom appearance 2, Custom appearance 3, and so on, with the lowest number that is free. A name uses letters, numbers, and single spaces, is unique, and is not Light or Dark. An invalid or duplicated name stops generation as `missing_input`.
 - An extra appearance copies the value of every Appearance token from its base. It also has its own canvas step: white or 50 for a Light base (default white), and 950, 900, 850, or black for a Dark base (default 900). The light or dark canvas rule below applies to it with that step. The light and dark canvas step inputs apply to Light and Dark themselves. It has its own text fill step too (default 700 for a Light base and 150 for a Dark base), and the text fill rules below apply to it with that step.
-- The dark canvas step changes `color/bg/base` (Dark) and `color/elevation/surface/canvas` (Dark). Both use the chosen step. With black, both use `color/neutral/black`.
-- The Dark backgrounds and surfaces above the canvas follow it, so they always stay lighter than the canvas. The Dark values in section 3.3 are for step 950. With another step, each following token moves its Dark step lighter by the same number of steps along the shade scale (section 1.1.3) as the canvas moved from 950. With black, which is not on the shade scale, they keep the values they have at 950. The following tokens are `color/bg/{role}/softest`, `color/bg/{role}/softer`, and `color/bg/{role}/soft` for brand, danger, info, neutral, selected, success, warning, and every custom role, plus `color/elevation/surface/overlay`, `color/elevation/surface/menu`, and `color/elevation/surface/raised`. The full list is in `tokens.json`, under `appearance.darkCanvas`.
+- The dark canvas step changes `color/bg/base` (Dark) and `color/elevation/surface/canvas/default` (Dark). Both use the chosen step. With black, both use `color/neutral/black`.
+- The Dark backgrounds and surfaces above the canvas follow it, so they always stay lighter than the canvas. The Dark values in section 3.3 are for step 950. With another step, each following token moves its Dark step lighter by the same number of steps along the shade scale (section 1.1.3) as the canvas moved from 950. With black, which is not on the shade scale, they keep the values they have at 950. The following tokens are `color/bg/{role}/softest`, `color/bg/{role}/softer`, and `color/bg/{role}/soft` for brand, danger, info, neutral, selected, success, warning, and every custom role, plus `color/elevation/surface/overlay/default`, `color/elevation/surface/menu`, and `color/elevation/surface/raised`. The full list is in `tokens.json`, under `appearance.darkCanvas`.
 
 Dark values of the following tokens for each dark canvas step:
 
@@ -922,7 +939,7 @@ The surfaces below the canvas are set from the canvas itself: `color/elevation/s
 
 Light canvas rules:
 
-- The light canvas step changes `color/bg/base` (Light) and `color/elevation/surface/canvas` (Light). With 50, both use `color/neutral/50` instead of `color/neutral/white`.
+- The light canvas step changes `color/bg/base` (Light) and `color/elevation/surface/canvas/default` (Light). With 50, both use `color/neutral/50` instead of `color/neutral/white`.
 - With 50, the elevated surfaces change too, so they stand out from the canvas: `color/elevation/surface/menu` uses `color/neutral/white` and `color/elevation/surface/raised` uses `color/neutral/100` (Light). The surfaces below the canvas also move, so they stay darker than it: `color/elevation/surface/canvas/deep` uses `color/neutral/100` and `color/elevation/surface/canvas/deeper` uses `color/neutral/150`. The list is in `tokens.json`, under `appearance.lightCanvas.valuesByStep`.
 - No other token follows the light canvas. All other Light values stay as in section 3.3, and the contrast checks in section 3.4 are unchanged.
 
@@ -935,14 +952,15 @@ Light values for each light canvas step:
 
 Text fill rules:
 
-- The text fill step sets how strong the bolder text and icons are in an appearance. Each appearance has its own step. The values in section 3.3 are for the default steps, 900 in Light and white in Dark.
-- With another step, these tokens use it in that mode, in their own color family: `color/text/{role}/bolder` for brand, danger, info, neutral, selected, success, warning, and every custom role, plus `color/icon/neutral/bolder` and `color/icon/brand/bolder`. The list is in `tokens.json`, under `appearance.textFill`.
+- The text fill step sets how strong the strongest text and icons are in an appearance. Each appearance has its own step. The values in section 3.3 are for the default steps, 900 in Light and white in Dark.
+- With another step, these tokens use it in that mode, in their own color family: `color/text/default` and `color/icon/default` (neutral), `color/text/{role}/strong` for brand, danger, info, selected, success, warning, and every custom role, and `color/icon/brand/strong`. The list is in `tokens.json`, under `appearance.textFill`.
 - Only neutral has black and white. Where neutral uses black, the other families use step 950. Where neutral uses white, they use step 50.
+- The fixed text tokens keep one value in every mode. `color/text/fixed/dark` is the same Theme token as `color/text/default` in Light, so it uses the Light text fill step. `color/text/fixed/light` is the same as `color/text/default` in Dark, so it uses the Dark text fill step. Both lists are in `tokens.json`, under `appearance.textFill.fixedTokens`.
 - Bold tokens and `color/bg/neutral/bolder` do not change. ColorScheme tokens that are the same as a bolder token follow it (section 3.5). The contrast checks in section 3.4 run on the chosen values.
 
 Values for each text fill step:
 
-| Text fill step | color/text/neutral/bolder | Other families |
+| Text fill step | color/text/default | Other families |
 |---|---|---|
 | 900 (Light default) | color/neutral/900 | color/{role}/900 |
 | 700, 800, 850, or 950 | color/neutral/{step} | color/{role}/{step} |
@@ -1140,11 +1158,11 @@ The plugin produces six outputs. The first three come from the check that runs w
   "check": "contrast_minimum",
   "severity": "error",
   "collection": "Appearance",
-  "token": "color/text/brand/bold",
+  "token": "color/text/brand/default",
   "mode": "Light",
   "expected": ">= 4.5",
   "actual": 4.31,
-  "message": "Minimum contrast not met against color/elevation/surface/canvas."
+  "message": "Minimum contrast not met against color/elevation/surface/canvas/default."
 }
 ```
 
@@ -1389,14 +1407,14 @@ Steps are sequential.
 5. Create or update Primitives, since they have no references.
 6. Create or update Theme tokens, with `VARIABLE_ALIAS` values pointing to Primitive IDs.
 7. Create or update alpha tokens (section 2.1).
-8. Create or update Appearance tokens, with aliases pointing to Theme IDs.
-9. Create or update ColorScheme tokens, with aliases pointing to Theme IDs.
-10. Create or update the text styles (section 6.1.3).
-11. Redraw the color tables and the ColorScheme color maps (section 6.1.1), and the text style tables (section 6.1.3).
+8. Create or update Appearance tokens, with aliases pointing to Theme IDs, if Appearance is chosen (section 5.1).
+9. Create or update ColorScheme tokens, with aliases pointing to Theme IDs, if ColorScheme is chosen.
+10. Create or update the text styles of the chosen platforms (section 6.1.3).
+11. Redraw the color tables and the ColorScheme color maps (section 6.1.1), and the text style tables (section 6.1.3). A collection that was not chosen is drawn from the file, as the file holds it. The text style tables always show the text styles in the file, so they include platforms that were not chosen.
 12. Save the form's settings in the file (see "Saved settings" below).
 13. Show the manifest, the report, and a summary of what was created, updated, unchanged, and renamed.
 
-Variables in the file that are not in the manifest are reported as `orphan_variable`. Modes that the inputs do not list are reported as `orphan_mode`. The plugin never deletes either.
+Variables in the file that are not in the manifest are reported as `orphan_variable`. Modes that the inputs do not list are reported as `orphan_mode`. Neither is reported in a collection that was not chosen (section 5.1). The plugin never deletes either.
 
 #### Saved settings
 
